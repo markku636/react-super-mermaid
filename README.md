@@ -29,6 +29,136 @@ Plus mermaid's native `default` / `dark` / `neutral` / `forest` and `auto`.
 
 > The previews above are styled with the package's real palettes. Run the demo to see live, interactive output (see [Demo](#demo)).
 
+## Diagram types
+
+Anything mermaid can draw, `<MermaidViewer>` renders — with pan/zoom, search and export on top. The `colorful` theme adds palette + shadows to flowchart / sequence / class / state / ER; the rest render in mermaid's native look. The blocks below render live on GitHub.
+
+### Flowchart
+
+```mermaid
+flowchart LR
+  U[User] --> B{Logged in?}
+  B -- yes --> C[Lobby]
+  B -- no --> D[Login]
+  C --> E[(DB)]
+  D --> E
+```
+
+### Sequence
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant API
+  participant DB
+  U->>API: request
+  API->>DB: query
+  DB-->>API: rows
+  API-->>U: response
+```
+
+### Class
+
+```mermaid
+classDiagram
+  class Animal {
+    +String name
+    +move()
+  }
+  class Dog {
+    +bark()
+  }
+  Animal <|-- Dog
+```
+
+### State
+
+```mermaid
+stateDiagram-v2
+  [*] --> Idle
+  Idle --> Running : start
+  Running --> Idle : stop
+  Running --> [*]
+```
+
+### Entity Relationship
+
+```mermaid
+erDiagram
+  CUSTOMER ||--o{ ORDER : places
+  ORDER ||--|{ LINE_ITEM : contains
+  PRODUCT ||--o{ LINE_ITEM : "ordered in"
+```
+
+### Gantt
+
+```mermaid
+gantt
+  title Sprint
+  dateFormat YYYY-MM-DD
+  section Dev
+  Design  :a1, 2026-01-01, 3d
+  Build   :after a1, 5d
+  section QA
+  Test    :2026-01-09, 3d
+```
+
+### Pie
+
+```mermaid
+pie title Traffic
+  "Direct" : 45
+  "Search" : 30
+  "Social" : 25
+```
+
+### Mindmap
+
+```mermaid
+mindmap
+  root((mermaid))
+    Diagrams
+      Flowchart
+      Sequence
+    Themes
+      Colorful
+      Sketch
+```
+
+### Timeline
+
+```mermaid
+timeline
+  title Releases
+  2024 : v1
+  2025 : v2 : v2.1
+  2026 : v3
+```
+
+### User journey
+
+```mermaid
+journey
+  title My day
+  section Morning
+    Wake: 3: Me
+    Commute: 2: Me
+  section Work
+    Code: 5: Me
+```
+
+### Git graph
+
+```mermaid
+gitGraph
+  commit
+  branch dev
+  commit
+  checkout main
+  merge dev
+  commit
+```
+
 ## Features
 
 - 🎨 **Beautified themes** — `colorful` (palette + shadows) and `sketch` (Excalidraw hand-drawn), plus native themes and `auto`.
