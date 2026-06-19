@@ -216,4 +216,23 @@ export const RSM_CSS = `
   .rsm-zoom > button { padding: 4px 8px; font-size: 12px; }
   .rsm-input { flex-basis: 150px; }
 }
+
+/* ── 標籤字重(量測階段就生效)──
+ * boostLegibility 在「渲染後」才把標籤字重加到 600/700,但 mermaid 是在「渲染中」
+ * 量測文字寬度來決定 foreignObject / 節點外框的大小。若只在事後加粗,粗體字會比已量好的
+ * 框更寬 → foreignObject 把尾字裁掉(心智圖節點「react-super-mermaid」尾巴的 d 不見就是這個)。
+ * 解法:把同樣的字重用 CSS 提前宣告,且「不」scope 在 .rsm-root 之下,而是 scope 在 mermaid
+ * 的渲染 id(svg[id^="rsm-"])——因為量測時那顆暫時的 svg 還在 <body> 下、尚未掛進 .rsm-root。
+ * 這樣 mermaid 量到的就是粗體寬度,框會剛好容納,事後 boostLegibility 設同值不再撐破。
+ * 只 scope 我們自己渲染出的 svg,故不會污染 host 頁面其它 mermaid。 */
+svg[id^="rsm-"] g.node text,
+svg[id^="rsm-"] g.node tspan,
+svg[id^="rsm-"] g.node .nodeLabel,
+svg[id^="rsm-"] g.mindmap-node text,
+svg[id^="rsm-"] g.mindmap-node .nodeLabel,
+svg[id^="rsm-"] g[class*="timeline-node"] text,
+svg[id^="rsm-"] text.actor { font-weight: 600 !important; }
+svg[id^="rsm-"] .cluster-label text,
+svg[id^="rsm-"] .cluster-label .nodeLabel,
+svg[id^="rsm-"] text.pieTitleText { font-weight: 700 !important; }
 `;
