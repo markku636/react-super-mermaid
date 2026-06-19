@@ -1,0 +1,32 @@
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { defineConfig } from 'tsup';
+
+const USE_CLIENT = "'use client';\n";
+
+export default defineConfig({
+  entry: { index: 'src/index.ts' },
+  format: ['esm', 'cjs'],
+  target: 'es2020',
+  dts: true,
+  sourcemap: true,
+  clean: true,
+  treeshake: true,
+  splitting: false,
+  minify: false,
+  // Never bundle the peers — the host provides them (or we load mermaid at runtime).
+  external: ['react', 'react-dom', 'react/jsx-runtime', 'mermaid', 'svg-pan-zoom'],
+  onSuccess: async () => {
+    // Ship the sketch-theme handwriting font alongside the JS so the default
+    // jsDelivr URL (`/npm/react-super-mermaid/dist/Virgil.woff2`) resolves post-publish.
+    mkdirSync('dist', { recursive: true });
+    copyFileSync('assets/Virgil.woff2', 'dist/Virgil.woff2');
+    // esbuild strips a `banner` "use client" directive when bundling, so prepend it
+    // here to preserve the React Server Components client boundary for Next.js consumers.
+    for (const file of ['dist/index.js', 'dist/index.cjs']) {
+      const code = readFileSync(file, 'utf8');
+      if (!code.startsWith("'use client'")) {
+        writeFileSync(file, USE_CLIENT + code);
+      }
+    }
+  },
+});

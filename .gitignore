@@ -1,0 +1,6 @@
+node_modules
+dist
+*.tgz
+.DS_Store
+example/node_modules
+example/dist

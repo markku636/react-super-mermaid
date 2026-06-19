@@ -1,0 +1,83 @@
+{
+  "name": "react-super-mermaid",
+  "version": "0.1.0",
+  "description": "Drop-in React Mermaid viewer: beautified colorful + Excalidraw sketch themes, pan/zoom, in-diagram search, and SVG/PNG export. Loads mermaid externally (injected, peer, or CDN). Zero-config styling, TypeScript.",
+  "type": "module",
+  "license": "MIT",
+  "author": "mark-ku",
+  "homepage": "https://github.com/mark-ku/react-super-mermaid#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mark-ku/react-super-mermaid.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mark-ku/react-super-mermaid/issues"
+  },
+  "keywords": [
+    "react",
+    "mermaid",
+    "diagram",
+    "flowchart",
+    "sequence-diagram",
+    "svg",
+    "pan-zoom",
+    "excalidraw",
+    "sketch",
+    "png-export",
+    "typescript"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
+  "peerDependencies": {
+    "mermaid": ">=10 <12",
+    "react": ">=17",
+    "react-dom": ">=17",
+    "svg-pan-zoom": "^3.6.0"
+  },
+  "peerDependenciesMeta": {
+    "mermaid": {
+      "optional": true
+    },
+    "svg-pan-zoom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/svg-pan-zoom": "^3.3.4",
+    "mermaid": "^11.15.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "svg-pan-zoom": "^3.6.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
