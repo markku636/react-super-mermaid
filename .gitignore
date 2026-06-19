@@ -4,3 +4,6 @@ dist
 .DS_Store
 example/node_modules
 example/dist
+
+# 含 npm token,絕對不可進版控
+.npmrc

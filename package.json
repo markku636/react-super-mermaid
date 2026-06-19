@@ -4,14 +4,14 @@
   "description": "Drop-in React Mermaid viewer: beautified colorful + Excalidraw sketch themes, pan/zoom, in-diagram search, and SVG/PNG export. Loads mermaid externally (injected, peer, or CDN). Zero-config styling, TypeScript.",
   "type": "module",
   "license": "MIT",
-  "author": "mark-ku",
-  "homepage": "https://github.com/mark-ku/react-super-mermaid#readme",
+  "author": "markku636",
+  "homepage": "https://github.com/markku636/react-super-mermaid#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mark-ku/react-super-mermaid.git"
+    "url": "git+https://github.com/markku636/react-super-mermaid.git"
   },
   "bugs": {
-    "url": "https://github.com/mark-ku/react-super-mermaid/issues"
+    "url": "https://github.com/markku636/react-super-mermaid/issues"
   },
   "keywords": [
     "react",
