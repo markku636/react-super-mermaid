@@ -3,11 +3,15 @@ import type {
   ExportRasterOptions,
   MermaidSource,
   MermaidTheme,
+  RsmBackground,
   SearchState,
   SvgPanZoomSource,
 } from '../types';
 import { useMermaidViewer } from './useMermaidViewer';
 import { DEFAULT_THEME_OPTIONS, Toolbar, type ThemeOption } from './Toolbar';
+
+/** 背景循環順序:透明 → 純色 → 格線 → 透明。 */
+const BACKGROUND_CYCLE: RsmBackground[] = ['transparent', 'solid', 'grid'];
 
 export interface MermaidViewerProps {
   /** mermaid 原始碼字串(必填)。 */
@@ -26,7 +30,15 @@ export interface MermaidViewerProps {
   search?: boolean;
   /** 是否啟用匯出 SVG/PNG(toolbar 內)。預設 true。 */
   exportable?: boolean;
-  /** 是否綁定鍵盤快捷鍵(/ Ctrl+F 搜尋、+ - 0 1 縮放)。預設 true。 */
+  /** 是否顯示背景切換鈕(透明 / 純色 / 格線)。預設 true。 */
+  background?: boolean;
+  /** 背景模式初始 / 受控值,預設 'transparent';toolbar 變更存內部 state。 */
+  backgroundMode?: RsmBackground;
+  /** 是否顯示全螢幕鈕(以跳窗形式覆蓋整個視窗,支援 RWD)。預設 true。 */
+  fullscreen?: boolean;
+  /** 進 / 出全螢幕時的回呼。 */
+  onFullscreenChange?: (fullscreen: boolean) => void;
+  /** 是否綁定鍵盤快捷鍵(/ Ctrl+F 搜尋、+ - 0 1 縮放、F 全螢幕、B 背景)。預設 true。 */
   keyboard?: boolean;
   /** sketch 抖動種子,預設 42。 */
   seed?: number;
@@ -63,6 +75,13 @@ export interface MermaidViewerHandle {
   downloadSvg: (filename?: string) => void;
   downloadPng: (filename?: string, opts?: ExportRasterOptions) => Promise<void>;
   getSvg: () => SVGSVGElement | null;
+  enterFullscreen: () => void;
+  exitFullscreen: () => void;
+  toggleFullscreen: () => void;
+  isFullscreen: () => boolean;
+  setBackground: (mode: RsmBackground) => void;
+  cycleBackground: () => void;
+  getBackground: () => RsmBackground;
 }
 
 function usePrefersDark(explicit?: boolean): boolean {
@@ -89,6 +108,9 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       panZoom = true,
       search: searchEnabled = true,
       exportable = true,
+      background: backgroundEnabled = true,
+      fullscreen: fullscreenEnabled = true,
+      onFullscreenChange,
       keyboard = true,
       seed = 42,
       fontUrl,
@@ -116,6 +138,18 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
     const [query, setQuery] = useState('');
     const [matchInfo, setMatchInfo] = useState<SearchState>({ current: 0, total: 0 });
     const [exporting, setExporting] = useState(false);
+
+    // 背景模式:以 prop 為初始 / 受控值,toolbar 變更存內部 state;prop 改變時同步。
+    const [background, setBackgroundState] = useState<RsmBackground>(
+      props.backgroundMode ?? 'transparent',
+    );
+    useEffect(() => {
+      if (props.backgroundMode) {
+        setBackgroundState(props.backgroundMode);
+      }
+    }, [props.backgroundMode]);
+
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     const rootRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -187,6 +221,101 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       }
     }, [vm, onError]);
 
+    const cycleBackground = useCallback((): void => {
+      setBackgroundState((prev) => {
+        const i = BACKGROUND_CYCLE.indexOf(prev);
+        return BACKGROUND_CYCLE[(i + 1) % BACKGROUND_CYCLE.length];
+      });
+    }, []);
+
+    const setBackground = useCallback((mode: RsmBackground): void => {
+      setBackgroundState(mode);
+    }, []);
+
+    // 全螢幕用「跳窗」實作(position:fixed 覆蓋整個視窗),而非原生 Fullscreen API:
+    // 可靠、可跨 iframe、天然支援 RWD,且 Esc / 按鈕皆能關閉。
+    const enterFullscreen = useCallback((): void => {
+      setIsFullscreen((prev) => {
+        if (!prev) {
+          onFullscreenChange?.(true);
+        }
+        return true;
+      });
+    }, [onFullscreenChange]);
+
+    const exitFullscreen = useCallback((): void => {
+      setIsFullscreen((prev) => {
+        if (prev) {
+          onFullscreenChange?.(false);
+        }
+        return false;
+      });
+    }, [onFullscreenChange]);
+
+    const toggleFullscreen = useCallback((): void => {
+      setIsFullscreen((prev) => {
+        onFullscreenChange?.(!prev);
+        return !prev;
+      });
+    }, [onFullscreenChange]);
+
+    // 進 / 出全螢幕:鎖住背景捲動、綁 window 級 Esc 關閉,並在版面尺寸改變後重新 fit。
+    useEffect(() => {
+      if (!isFullscreen) {
+        return undefined;
+      }
+      const body = typeof document !== 'undefined' ? document.body : null;
+      const prevOverflow = body?.style.overflow ?? '';
+      if (body) {
+        body.style.overflow = 'hidden';
+      }
+      const onWinKey = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          exitFullscreen();
+        }
+      };
+      window.addEventListener('keydown', onWinKey);
+      // 等版面套用全螢幕尺寸後再 resize + fit + center。
+      const fitId = window.setTimeout(() => vm.reset(), 60);
+      // RWD:旋轉螢幕 / 視窗尺寸變動時重新貼合。
+      let resizeId = 0;
+      const onResize = (): void => {
+        window.clearTimeout(resizeId);
+        resizeId = window.setTimeout(() => vm.reset(), 150);
+      };
+      window.addEventListener('resize', onResize);
+      window.addEventListener('orientationchange', onResize);
+      // 把焦點移到 root,讓內部鍵盤快捷鍵(縮放 / 搜尋)在跳窗內可用。
+      rootRef.current?.focus();
+      return () => {
+        window.removeEventListener('keydown', onWinKey);
+        window.removeEventListener('resize', onResize);
+        window.removeEventListener('orientationchange', onResize);
+        window.clearTimeout(fitId);
+        window.clearTimeout(resizeId);
+        if (body) {
+          body.style.overflow = prevOverflow;
+        }
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isFullscreen, exitFullscreen]);
+
+    // 離開全螢幕後也重新 fit(版面從跳窗縮回行內尺寸);跳過首次掛載。
+    const fsMountedRef = useRef(false);
+    useEffect(() => {
+      if (!fsMountedRef.current) {
+        fsMountedRef.current = true;
+        return undefined;
+      }
+      if (isFullscreen) {
+        return undefined;
+      }
+      const id = window.setTimeout(() => vm.reset(), 60);
+      return () => window.clearTimeout(id);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isFullscreen]);
+
     // 鍵盤快捷鍵:綁在 root(需 focus),避免像 window 那樣劫持 host 全域按鍵。
     useEffect(() => {
       if (!keyboard) {
@@ -213,6 +342,11 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           closeSearch();
           return;
         }
+        if (e.key === 'Escape' && isFullscreen) {
+          e.preventDefault();
+          exitFullscreen();
+          return;
+        }
         if (typing) {
           return;
         }
@@ -226,11 +360,29 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           vm.actualSize();
         } else if (e.key === 'w' || e.key === 'W') {
           vm.fit();
+        } else if (fullscreenEnabled && (e.key === 'f' || e.key === 'F')) {
+          e.preventDefault();
+          toggleFullscreen();
+        } else if (backgroundEnabled && (e.key === 'b' || e.key === 'B')) {
+          e.preventDefault();
+          cycleBackground();
         }
       };
       root.addEventListener('keydown', onKey);
       return () => root.removeEventListener('keydown', onKey);
-    }, [keyboard, searchOpen, openSearch, closeSearch, vm]);
+    }, [
+      keyboard,
+      searchOpen,
+      openSearch,
+      closeSearch,
+      vm,
+      isFullscreen,
+      exitFullscreen,
+      toggleFullscreen,
+      cycleBackground,
+      fullscreenEnabled,
+      backgroundEnabled,
+    ]);
 
     useImperativeHandle(
       ref,
@@ -250,8 +402,24 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         downloadSvg: vm.downloadSvg,
         downloadPng: vm.downloadPng,
         getSvg: vm.getSvg,
+        enterFullscreen,
+        exitFullscreen,
+        toggleFullscreen,
+        isFullscreen: () => isFullscreen,
+        setBackground,
+        cycleBackground,
+        getBackground: () => background,
       }),
-      [vm],
+      [
+        vm,
+        enterFullscreen,
+        exitFullscreen,
+        toggleFullscreen,
+        isFullscreen,
+        setBackground,
+        cycleBackground,
+        background,
+      ],
     );
 
     let countText = '';
@@ -261,7 +429,13 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       countText = '0';
     }
 
-    const rootClassName = ['rsm-root', dark ? 'rsm-dark' : '', className ?? '']
+    const rootClassName = [
+      'rsm-root',
+      dark ? 'rsm-dark' : '',
+      `rsm-bg-${background}`,
+      isFullscreen ? 'rsm-fullscreen' : '',
+      className ?? '',
+    ]
       .filter(Boolean)
       .join(' ');
 
@@ -289,6 +463,12 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
             exporting={exporting}
             onExportSvg={exportSvg}
             onExportPng={exportPng}
+            backgroundEnabled={backgroundEnabled}
+            background={background}
+            onCycleBackground={cycleBackground}
+            fullscreenEnabled={fullscreenEnabled}
+            fullscreen={isFullscreen}
+            onToggleFullscreen={toggleFullscreen}
           />
         ) : null}
 
@@ -333,6 +513,17 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           {vm.status === 'loading' ? <div className="rsm-overlay">圖表渲染中…</div> : null}
           {vm.status === 'error' ? (
             <div className="rsm-overlay rsm-error">圖表載入失敗：{vm.error}</div>
+          ) : null}
+          {isFullscreen ? (
+            <button
+              type="button"
+              className="rsm-fs-close"
+              onClick={exitFullscreen}
+              title="離開全螢幕（Esc）"
+              aria-label="離開全螢幕"
+            >
+              ✕
+            </button>
           ) : null}
           <div ref={vm.stageRef} className="rsm-stage" />
         </div>

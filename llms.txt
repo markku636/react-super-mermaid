@@ -1,0 +1,41 @@
+# react-super-mermaid
+
+> Drop-in React Mermaid viewer. Renders any Mermaid diagram, then re-styles it after render with two signature themes — `colorful` (modern palette, soft shadows, slate edges, vibrant per-type colouring) and `sketch` (Excalidraw hand-drawn) — and layers on pan/zoom, in-diagram search, fullscreen, background toggle, and SVG/PNG/JPEG/WebP export. Mermaid, svg-pan-zoom and React are optional peer dependencies that are never bundled (inject an instance, dynamic-import the peer, or load from a CDN). TypeScript, SSR-safe, zero-config styling, ships a `'use client'` boundary for Next.js.
+
+Key facts:
+- Package: `react-super-mermaid` on npm. License MIT. Author markku636.
+- Install: `npm i react-super-mermaid` then optionally `npm i mermaid svg-pan-zoom` (peers). For no-build pages, load mermaid from a CDN and install nothing.
+- Entry component: `<MermaidViewer code={...} />`. Give it a sized parent — it fills `height: 100%`.
+- Themes: `colorful` (default), `sketch`, `auto`, and Mermaid's native `default` / `dark` / `neutral` / `forest`.
+- Post-render styling is pure DOM manipulation in the browser; each pass early-outs on zero matches, so a Mermaid DOM change can never break rendering.
+
+## Components and hooks
+
+- `MermaidViewer` — full viewer with toolbar (theme picker, search, zoom, export, fullscreen, background). Props: `code` (required string), `theme`, `dark`, `toolbar`, `panZoom`, `search`, `exportable`, `background`, `backgroundMode` (`transparent|solid|grid`), `fullscreen`, `onFullscreenChange`, `keyboard`, `seed`, `fontUrl`, `mermaid` (`{instance?,cdnUrl?}`), `svgPanZoom`, `mermaidConfig`, `injectStyles`, `className`, `style`, `onRender`, `onError`.
+- `MermaidDiagram` — diagram only (equivalent to `<MermaidViewer toolbar={false} />`).
+- `useMermaidViewer` — hook backing the components for custom UIs.
+- Imperative ref handle (`MermaidViewerHandle`): `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setBackground / cycleBackground / getBackground`.
+
+## Framework-agnostic core API
+
+- `renderDiagram({ code, container, theme, dark, seed, fontUrl, mermaidConfig, mermaid, injectStyles })` — one-shot render + post-process into a container, returns `{ svg, svgString, id }`.
+- `loadMermaid({ source })` — resolve external mermaid: injected instance → peer `import('mermaid')` → CDN; memoized.
+- `colorizeDiagram(svgOrRoot, { dark })` — apply the `colorful` post-process (palette + shadows + per-type colouring for flowchart / sequence / class / state / ER / pie / gantt / mindmap / timeline / journey).
+- `boostLegibility(svgOrRoot)` — bump label font-weight for crisp text in every theme (weight-only, never changes colours). Applied automatically by the viewer.
+- `sketchifyDiagram(svgOrRoot, { dark, seed })` — apply the Excalidraw hand-drawn post-process (sequence diagrams especially).
+- `resolveTheme(theme, dark)`, `ensureStyles()`, `loadSvgPanZoom()`, and export helpers (`serializeLiveSvg`, `prepareSvgString`, `prepareSvgElement`, `rasterizeToBlob`, `svgBlob`, `downloadBlob`).
+
+## Styling
+
+- Styles auto-inject once (`injectStyles` default true) — no CSS import. Override via CSS variables on `.rsm-root`, e.g. `--rsm-accent`, `--rsm-border`, `--rsm-radius`, `--rsm-surface`.
+- `sketch` uses Excalidraw's Virgil font fetched at runtime from the package's jsDelivr asset; falls back to `KaiTi / Comic Sans MS / cursive` if it can't load. `colorful` needs no font.
+
+## Keyboard shortcuts
+
+Focus the viewer: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` fullscreen · `b` cycle background · `Esc` close search / exit fullscreen.
+
+## Links
+
+- Source and full docs: https://github.com/markku636/react-super-mermaid
+- npm: https://www.npmjs.com/package/react-super-mermaid
+- Runnable demo: the `example/` directory (Vite + React).

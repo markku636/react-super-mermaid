@@ -12,6 +12,7 @@ export const RSM_CSS = `
   --rsm-hover: #f3f4f6;
   --rsm-surface: #ffffff;
   --rsm-canvas-bg: transparent;
+  --rsm-grid-dot: rgba(0, 0, 0, 0.08);
   --rsm-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -149,5 +150,70 @@ export const RSM_CSS = `
   --rsm-accent: #60a5fa;
   --rsm-hover: #1f2937;
   --rsm-surface: #111827;
+  --rsm-grid-dot: rgba(255, 255, 255, 0.10);
+}
+
+/* ── 背景模式 ── 透明(預設,跟隨頁面) / 純色(surface) / 點陣格線。 */
+.rsm-root.rsm-bg-solid .rsm-canvas { background: var(--rsm-surface); }
+.rsm-root.rsm-bg-grid .rsm-canvas {
+  background-color: var(--rsm-surface);
+  background-image: radial-gradient(var(--rsm-grid-dot) 1px, transparent 1px);
+  background-size: 18px 18px;
+  background-position: -9px -9px;
+}
+
+/* ── 全螢幕跳窗 ── position:fixed 覆蓋整個視窗,RWD 友善。 */
+.rsm-root.rsm-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: 0;
+  z-index: 2147483000;
+  border: 0;
+  border-radius: 0;
+  animation: rsm-fs-in 0.16s ease-out;
+}
+@keyframes rsm-fs-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 全螢幕右上角的離開鈕(toolbar 隱藏時也能關閉)。 */
+.rsm-fs-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  border: 1px solid var(--rsm-border);
+  border-radius: 8px;
+  background: var(--rsm-surface);
+  color: var(--rsm-fg);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.rsm-fs-close:hover { background: var(--rsm-hover); }
+
+/* ── RWD ── 小螢幕收緊 toolbar、縮短搜尋框,避免換行擠壓畫布。 */
+@media (max-width: 640px) {
+  .rsm-toolbar { gap: 6px; padding: 6px 8px; }
+  .rsm-btn { padding: 4px 8px; font-size: 12px; }
+  .rsm-label { font-size: 11px; }
+  .rsm-select { padding: 3px 6px; font-size: 12px; }
+  .rsm-zoom > button { padding: 4px 8px; font-size: 12px; }
+  .rsm-input { flex-basis: 150px; }
 }
 `;

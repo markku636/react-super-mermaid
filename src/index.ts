@@ -20,7 +20,7 @@ export { loadMermaid } from './core/load-mermaid';
 export { loadSvgPanZoom } from './core/load-svg-pan-zoom';
 export { ensureStyles } from './core/ensure-styles';
 export { resolveTheme } from './core/resolve-theme';
-export { colorizeDiagram, type ColorizeOptions } from './core/themes/colorize';
+export { colorizeDiagram, boostLegibility, type ColorizeOptions } from './core/themes/colorize';
 export {
   sketchifyDiagram,
   ensureSketchFont,

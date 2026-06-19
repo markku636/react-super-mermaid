@@ -7,3 +7,6 @@ example/dist
 
 # 含 npm token,絕對不可進版控
 .npmrc
+
+# verification/test artifacts (local only)
+outputs/

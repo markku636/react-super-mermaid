@@ -1,9 +1,16 @@
-import type { MermaidTheme } from '../types';
+import type { MermaidTheme, RsmBackground } from '../types';
 
 export interface ThemeOption {
   value: MermaidTheme;
   label: string;
 }
+
+/** 背景模式 → 按鈕上顯示的圖示與文字。 */
+export const BACKGROUND_LABELS: Record<RsmBackground, { icon: string; label: string }> = {
+  transparent: { icon: '▦', label: '透明' },
+  solid: { icon: '◻', label: '純色' },
+  grid: { icon: '⊞', label: '格線' },
+};
 
 export const DEFAULT_THEME_OPTIONS: ThemeOption[] = [
   { value: 'colorful', label: 'Colorful' },
@@ -31,6 +38,12 @@ export interface ToolbarProps {
   exporting: boolean;
   onExportSvg: () => void;
   onExportPng: () => void;
+  backgroundEnabled: boolean;
+  background: RsmBackground;
+  onCycleBackground: () => void;
+  fullscreenEnabled: boolean;
+  fullscreen: boolean;
+  onToggleFullscreen: () => void;
 }
 
 export function Toolbar(props: ToolbarProps): React.JSX.Element {
@@ -50,6 +63,17 @@ export function Toolbar(props: ToolbarProps): React.JSX.Element {
           ))}
         </select>
       </label>
+
+      {props.backgroundEnabled ? (
+        <button
+          type="button"
+          className="rsm-btn"
+          onClick={props.onCycleBackground}
+          title="切換畫布背景（透明 / 純色 / 格線，B）"
+        >
+          {BACKGROUND_LABELS[props.background].icon} 背景：{BACKGROUND_LABELS[props.background].label}
+        </button>
+      ) : null}
 
       <div className="rsm-toolbar-spacer" />
 
@@ -107,6 +131,18 @@ export function Toolbar(props: ToolbarProps): React.JSX.Element {
           ⤢
         </button>
       </div>
+
+      {props.fullscreenEnabled ? (
+        <button
+          type="button"
+          className="rsm-btn rsm-btn-fullscreen"
+          aria-pressed={props.fullscreen ? 'true' : 'false'}
+          onClick={props.onToggleFullscreen}
+          title={props.fullscreen ? '離開全螢幕（Esc）' : '全螢幕檢視（F）'}
+        >
+          {props.fullscreen ? '✕ 離開全螢幕' : '⛶ 全螢幕'}
+        </button>
+      ) : null}
     </div>
   );
 }

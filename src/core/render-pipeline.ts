@@ -3,7 +3,7 @@
 
 import { assertBrowser } from '../env';
 import type { MermaidLike, MermaidTheme, RenderDiagramOptions, RenderResult } from '../types';
-import { colorizeDiagram } from './themes/colorize';
+import { boostLegibility, colorizeDiagram } from './themes/colorize';
 import { ensureSketchFont, SKETCH_FONT, sketchifyDiagram } from './themes/sketch';
 import { ensureStyles } from './ensure-styles';
 import { loadMermaid } from './load-mermaid';
@@ -101,6 +101,8 @@ export function applyPostProcess(
     // 原生 handDrawn 不作用於 sequenceDiagram,這裡補手繪後處理;非序列圖會自動略過。
     sketchifyDiagram(svg, { dark: opts.dark, seed: opts.seed });
   }
+  // 字體清晰度:所有主題(含原生 neutral/forest/dark)都套用,只加粗不改色,安全。
+  boostLegibility(svg);
 }
 
 /**

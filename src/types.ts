@@ -64,6 +64,9 @@ export type MermaidTheme =
 
 export type MermaidBaseTheme = 'default' | 'dark' | 'neutral' | 'forest';
 
+/** 畫布背景模式:透明(跟隨頁面) / 純色(surface) / 點陣格線。 */
+export type RsmBackground = 'transparent' | 'solid' | 'grid';
+
 export interface RenderDiagramOptions {
   /** mermaid 原始碼字串。 */
   code: string;

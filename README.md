@@ -31,7 +31,7 @@ Plus mermaid's native `default` / `dark` / `neutral` / `forest` and `auto`.
 
 ## Diagram types
 
-Anything mermaid can draw, `<MermaidViewer>` renders — with pan/zoom, search and export on top. The `colorful` theme adds palette + shadows to flowchart / sequence / class / state / ER; the rest render in mermaid's native look. The blocks below render live on GitHub.
+Anything mermaid can draw, `<MermaidViewer>` renders — with pan/zoom, search and export on top. The `colorful` theme adds a modern palette, soft shadows and slate edges to flowchart / sequence / class / state / ER, plus vibrant per-type colouring for pie / gantt / mindmap / timeline / journey; `sketch` brings the Excalidraw hand-drawn look. Every theme (including mermaid's native ones) gets a font-weight legibility boost so labels stay crisp. The blocks below render live on GitHub.
 
 ### Flowchart
 
@@ -165,6 +165,8 @@ gitGraph
 - 🧰 **Toolbox or diagram-only** — show the built-in toolbar, or just the chart with `toolbar={false}`.
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).
 - 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w` (via `svg-pan-zoom`).
+- ⛶ **Fullscreen modal** — open the diagram in a viewport-filling, RWD-friendly popup (`f` / `Esc`); body scroll locked, auto re-fit.
+- ▦ **Background toggle** — cycle the canvas between transparent / solid / dot-grid (`b`), handy for reading and exports.
 - 📤 **Export** — SVG and high-res PNG/JPEG/WebP (1×/2×/4×, optional transparent background).
 - 🪶 **Lightweight & decoupled** — `mermaid`, `svg-pan-zoom`, `react` are **optional peer deps**, never bundled. No Tailwind, no app coupling.
 - 🌐 **Load external mermaid** — inject an instance, dynamic-import the peer, or pull from a CDN. Your bundle doesn't carry mermaid.
@@ -246,6 +248,10 @@ Resolution order is **injected → peer import → CDN**, memoized so mermaid lo
 | `panZoom` | `boolean` | `true` | |
 | `search` | `boolean` | `true` | toolbar search |
 | `exportable` | `boolean` | `true` | toolbar SVG/PNG export |
+| `background` | `boolean` | `true` | toolbar background toggle (transparent / solid / grid) |
+| `backgroundMode` | `'transparent' \| 'solid' \| 'grid'` | `'transparent'` | initial / controlled canvas background |
+| `fullscreen` | `boolean` | `true` | toolbar fullscreen button — opens a viewport-filling modal (RWD) |
+| `onFullscreenChange` | `(fullscreen: boolean) => void` | — | fired on enter / exit fullscreen |
 | `keyboard` | `boolean` | `true` | shortcuts when the viewer is focused |
 | `seed` | `number` | `42` | sketch wobble seed |
 | `fontUrl` | `string` | jsDelivr Virgil | sketch handwriting font |
@@ -275,7 +281,7 @@ await ref.current?.downloadPng('diagram.png', { scale: 4 });
 const svgString = ref.current?.exportSvg();
 ```
 
-Handle: `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg`.
+Handle: `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setBackground / cycleBackground / getBackground`.
 
 ## Themes & the sketch font
 
@@ -301,7 +307,7 @@ Styles are injected automatically (`injectStyles` default `true`) — no CSS imp
 
 ## Keyboard shortcuts
 
-Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `Esc` close search.
+Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` toggle fullscreen · `b` cycle background · `Esc` close search / exit fullscreen.
 
 ## Next.js / SSR
 
