@@ -1,33 +1,33 @@
 <#
 .SYNOPSIS
-  Build 並發佈 react-super-mermaid 到 npm。
+  Build and publish react-super-mermaid to npm.
 
 .DESCRIPTION
-  在套件資料夾執行:檢查登入 → (可選)bump 版本 → npm publish。
-  npm publish 會自動觸發 prepublishOnly(typecheck + tsup build),所以這裡不重複 build。
+  Runs in the package folder: check auth -> (optional) bump version -> npm publish.
+  npm publish triggers prepublishOnly (typecheck + tsup build), so no extra build here.
 
-  認證(擇一,token 一律不寫進本檔):
-    - 環境變數 NPM_TOKEN:有設就自動帶入(最推薦,不留痕跡)。
-        單次:  $env:NPM_TOKEN = 'npm_xxx'; ./publish.ps1
-        永久:  setx NPM_TOKEN "npm_xxx"   (重開終端機生效;存使用者環境,不進 repo)
-    - 或事先 `npm login` / `npm config set //registry.npmjs.org/:_authToken=...`,本腳本會沿用。
+  Auth (pick one; the token is NEVER written into this file):
+    - Env var NPM_TOKEN (recommended, leaves no trace):
+        one-off:    $env:NPM_TOKEN = 'npm_xxx'; ./publish.ps1
+        persistent: setx NPM_TOKEN "npm_xxx"   (reopen terminal; stored in user env, not in repo)
+    - Or run `npm login` / `npm config set //registry.npmjs.org/:_authToken=...` beforehand.
 
-  2FA 說明:
-    - 用「Automation」classic token(繞過 2FA)→ 全自動跑完,不跳任何提示。
-    - 用一般 / security key 2FA → npm 會開瀏覽器要你用 security key 驗證,
-      請在「互動式」PowerShell 視窗執行(不要在背景跑),驗證完就會繼續。
+  2FA note:
+    - An "Automation" classic token bypasses 2FA -> runs fully unattended, no prompt.
+    - A normal / security-key 2FA token will make npm open a browser to confirm with your
+      security key. Run this in an INTERACTIVE PowerShell window (not in the background).
 
 .PARAMETER Bump
-  發佈前要不要 bump 版本:none(預設)/ patch / minor / major。
-  republish 同一版本會被 npm 拒絕,改版時用這個。
+  Bump the version before publishing: none (default) / patch / minor / major.
+  Republishing the same version is rejected by npm; use this for new releases.
 
 .PARAMETER DryRun
-  只做 npm publish --dry-run,不真的上傳(會跑 build、列出 tarball 內容)。
+  npm publish --dry-run only (packs and lists tarball, does not upload).
 
 .EXAMPLE
-  ./publish.ps1                 # 發佈目前版本
-  ./publish.ps1 -Bump patch     # 0.1.0 -> 0.1.1 後發佈
-  ./publish.ps1 -DryRun         # 試跑,不上傳
+  ./publish.ps1
+  ./publish.ps1 -Bump patch
+  ./publish.ps1 -DryRun
 #>
 param(
   [ValidateSet('none', 'patch', 'minor', 'major')]
@@ -36,61 +36,60 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-# 不論從哪裡呼叫,都切到腳本所在(= 套件根)資料夾。
+# Always run from the script's own folder (= package root), wherever it's invoked from.
 Set-Location -Path $PSScriptRoot
 
 function Write-Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
 
-Write-Step 'react-super-mermaid 發佈流程'
+Write-Step 'react-super-mermaid publish'
 
-# 認證:優先用環境變數 NPM_TOKEN(不寫進檔案);否則沿用既有 npm login / 設定。
+# Auth: prefer env var NPM_TOKEN (not stored in this file); else fall back to npm login/config.
 $authArgs = @()
 if (-not [string]::IsNullOrWhiteSpace($env:NPM_TOKEN)) {
   $authArgs = @("--//registry.npmjs.org/:_authToken=$($env:NPM_TOKEN)")
-  Write-Host '認證來源: 環境變數 NPM_TOKEN'
+  Write-Host 'auth source: env NPM_TOKEN'
 }
 
-# 1. 確認 npm 登入 / token 有效
+# 1. Verify login / token.
 $who = npm whoami @authArgs
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($who)) {
-  Write-Host '未登入 npm。請設定環境變數 NPM_TOKEN,或先 `npm login`:' -ForegroundColor Red
-  Write-Host '  $env:NPM_TOKEN = ''npm_xxx''   # 單次' -ForegroundColor Yellow
-  Write-Host '  setx NPM_TOKEN "npm_xxx"       # 永久(重開終端機)' -ForegroundColor Yellow
+  Write-Host 'Not logged in to npm. Set NPM_TOKEN or run `npm login`:' -ForegroundColor Red
+  Write-Host "  `$env:NPM_TOKEN = 'npm_xxx'   # one-off" -ForegroundColor Yellow
+  Write-Host '  setx NPM_TOKEN "npm_xxx"      # persistent (reopen terminal)' -ForegroundColor Yellow
   exit 1
 }
-Write-Host "登入身分: $who"
+Write-Host "logged in as: $who"
 
-# 2. (可選)bump 版本
+# 2. Optional version bump.
 if ($Bump -ne 'none') {
-  Write-Step "bump 版本 ($Bump)"
+  Write-Step "bump version ($Bump)"
   npm version $Bump --no-git-tag-version
-  if ($LASTEXITCODE -ne 0) { Write-Host 'npm version 失敗。' -ForegroundColor Red; exit 1 }
+  if ($LASTEXITCODE -ne 0) { Write-Host 'npm version failed.' -ForegroundColor Red; exit 1 }
 }
 
 $pkg = Get-Content package.json -Raw | ConvertFrom-Json
-Write-Host "套件: $($pkg.name)@$($pkg.version)"
+Write-Host "package: $($pkg.name)@$($pkg.version)"
 
-# 3. 發佈(prepublishOnly 會自動先 typecheck + build)
+# 3. Publish (prepublishOnly auto-runs typecheck + build).
 $publishArgs = @('publish', '--access', 'public') + $authArgs
 if ($DryRun) { $publishArgs += '--dry-run' }
 
-Write-Step "npm $($publishArgs -join ' ')"
+Write-Step "npm $(@('publish','--access','public') -join ' ')$(if ($DryRun) { ' --dry-run' })"
 npm @publishArgs
 if ($LASTEXITCODE -ne 0) {
   Write-Host ''
-  Write-Host '發佈失敗。' -ForegroundColor Red
-  Write-Host '若錯誤是 EOTP / 需要 2FA:' -ForegroundColor Yellow
-  Write-Host '  (a) 在互動式 PowerShell 直接跑這個腳本,npm 會開瀏覽器讓你用 security key 驗證;或' -ForegroundColor Yellow
-  Write-Host '  (b) 改用「Automation」classic token(繞過 2FA),設定後即可全自動發佈:' -ForegroundColor Yellow
-  Write-Host '      npm config set //registry.npmjs.org/:_authToken=<automation token>' -ForegroundColor Yellow
+  Write-Host 'Publish failed.' -ForegroundColor Red
+  Write-Host 'If the error is EOTP / 2FA required:' -ForegroundColor Yellow
+  Write-Host '  (a) run this in an interactive PowerShell; npm opens a browser to confirm with your security key, or' -ForegroundColor Yellow
+  Write-Host '  (b) use an "Automation" classic token (bypasses 2FA) as NPM_TOKEN.' -ForegroundColor Yellow
   exit 1
 }
 
 if ($DryRun) {
-  Write-Host '✅ Dry-run 完成(未上傳)。' -ForegroundColor Green
+  Write-Host 'OK: dry-run complete (nothing uploaded).' -ForegroundColor Green
 }
 else {
-  Write-Host "✅ 發佈成功: $($pkg.name)@$($pkg.version)" -ForegroundColor Green
-  Write-Step '線上版本確認'
+  Write-Host "OK: published $($pkg.name)@$($pkg.version)" -ForegroundColor Green
+  Write-Step 'live version'
   npm view $pkg.name version
 }

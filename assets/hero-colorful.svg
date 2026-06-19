@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 260" font-family="ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <filter id="sh" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#0F172A" flood-opacity="0.22"/>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#64748B"/>
+    </marker>
+  </defs>
+
+  <rect width="720" height="260" fill="#ffffff"/>
+
+  <!-- edges (slate, rounded) -->
+  <g stroke="#64748B" stroke-width="1.8" fill="none" stroke-linecap="round" marker-end="url(#arr)">
+    <path d="M168 130 L240 130"/>
+    <path d="M338 104 C420 80, 450 70, 506 70"/>
+    <path d="M338 156 C420 180, 450 190, 506 190"/>
+  </g>
+  <text x="430" y="62" fill="#475569" font-size="13">yes</text>
+  <text x="430" y="208" fill="#475569" font-size="13">no</text>
+
+  <!-- node: User (blue) -->
+  <g filter="url(#sh)">
+    <rect x="40" y="104" width="128" height="52" rx="10" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.6"/>
+  </g>
+  <text x="104" y="135" fill="#1F2937" font-size="15" text-anchor="middle">User</text>
+
+  <!-- decision: Auth? (orange diamond) -->
+  <g filter="url(#sh)">
+    <polygon points="300,86 356,130 300,174 244,130" fill="#FFEDD5" stroke="#F97316" stroke-width="1.6"/>
+  </g>
+  <text x="300" y="135" fill="#1F2937" font-size="14" text-anchor="middle">Auth?</text>
+
+  <!-- node: Lobby (green) -->
+  <g filter="url(#sh)">
+    <rect x="506" y="44" width="160" height="52" rx="10" fill="#DCFCE7" stroke="#22C55E" stroke-width="1.6"/>
+  </g>
+  <text x="586" y="75" fill="#1F2937" font-size="15" text-anchor="middle">Lobby</text>
+
+  <!-- node: Login (red) -->
+  <g filter="url(#sh)">
+    <rect x="506" y="164" width="160" height="52" rx="10" fill="#FEE2E2" stroke="#EF4444" stroke-width="1.6"/>
+  </g>
+  <text x="586" y="195" fill="#1F2937" font-size="15" text-anchor="middle">Login</text>
+</svg>

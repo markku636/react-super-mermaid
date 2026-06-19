@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 260" font-family="'Comic Sans MS', 'Segoe Print', cursive">
+  <defs>
+    <filter id="wobble" x="-3%" y="-3%" width="106%" height="106%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="2" seed="42" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#1e1e1e"/>
+    </marker>
+  </defs>
+
+  <rect width="720" height="260" fill="#ffffff"/>
+
+  <g filter="url(#wobble)">
+    <!-- edges (excalidraw ink) -->
+    <g stroke="#1e1e1e" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arr2)">
+      <path d="M168 130 L240 130"/>
+      <path d="M338 104 C420 80, 450 70, 506 70"/>
+      <path d="M338 156 C420 180, 450 190, 506 190"/>
+    </g>
+    <text x="430" y="62" fill="#1e1e1e" font-size="13">yes</text>
+    <text x="430" y="208" fill="#1e1e1e" font-size="13">no</text>
+
+    <rect x="40" y="104" width="128" height="52" rx="10" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+    <text x="104" y="135" fill="#1e1e1e" font-size="15" text-anchor="middle">User</text>
+
+    <polygon points="300,86 356,130 300,174 244,130" fill="#ffd8a8" stroke="#e8590c" stroke-width="2"/>
+    <text x="300" y="135" fill="#1e1e1e" font-size="14" text-anchor="middle">Auth?</text>
+
+    <rect x="506" y="44" width="160" height="52" rx="10" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+    <text x="586" y="75" fill="#1e1e1e" font-size="15" text-anchor="middle">Lobby</text>
+
+    <rect x="506" y="164" width="160" height="52" rx="10" fill="#ffc9c9" stroke="#e03131" stroke-width="2"/>
+    <text x="586" y="195" fill="#1e1e1e" font-size="15" text-anchor="middle">Login</text>
+  </g>
+</svg>

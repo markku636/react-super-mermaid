@@ -1,6 +1,14 @@
 # react-super-mermaid
 
+[![npm version](https://img.shields.io/npm/v/react-super-mermaid.svg)](https://www.npmjs.com/package/react-super-mermaid)
+[![license](https://img.shields.io/npm/l/react-super-mermaid.svg)](./LICENSE)
+[![types](https://img.shields.io/npm/types/react-super-mermaid.svg)](#)
+
 > Drop-in React **Mermaid** viewer — beautified themes (Colorful + Excalidraw **sketch**), pan/zoom, in-diagram search, and SVG/PNG export. Loads mermaid **externally** (injected, peer, or CDN) so your app stays light. TypeScript, zero-config styling.
+
+<p align="center">
+  <img src="assets/hero-colorful.svg" alt="colorful theme preview" width="92%" />
+</p>
 
 ```tsx
 import { MermaidViewer } from 'react-super-mermaid';
@@ -8,30 +16,52 @@ import { MermaidViewer } from 'react-super-mermaid';
 <MermaidViewer code={`flowchart LR\n  A[Start] --> B{OK?} --> C[Done]`} toolbar />;
 ```
 
+## Two signature themes
+
+The same diagram, re-styled after mermaid renders — no config:
+
+| `theme="colorful"` | `theme="sketch"` |
+| :---: | :---: |
+| <img src="assets/hero-colorful.svg" alt="colorful" width="100%" /> | <img src="assets/hero-sketch.svg" alt="sketch" width="100%" /> |
+| modern palette · soft shadows · slate edges | Excalidraw hand-drawn · wobble · handwriting font |
+
+Plus mermaid's native `default` / `dark` / `neutral` / `forest` and `auto`.
+
+> The previews above are styled with the package's real palettes. Run the demo to see live, interactive output (see [Demo](#demo)).
+
 ## Features
 
-- 🎨 **Beautified themes** — `colorful` (modern palette + soft shadows) and `sketch` (Excalidraw hand-drawn), plus mermaid's native `default / dark / neutral / forest` and `auto`.
-- 🧰 **Toolbox or diagram-only** — show a built-in toolbar (theme / zoom / search / export), or just the chart with `toolbar={false}`.
+- 🎨 **Beautified themes** — `colorful` (palette + shadows) and `sketch` (Excalidraw hand-drawn), plus native themes and `auto`.
+- 🧰 **Toolbox or diagram-only** — show the built-in toolbar, or just the chart with `toolbar={false}`.
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).
 - 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w` (via `svg-pan-zoom`).
 - 📤 **Export** — SVG and high-res PNG/JPEG/WebP (1×/2×/4×, optional transparent background).
 - 🪶 **Lightweight & decoupled** — `mermaid`, `svg-pan-zoom`, `react` are **optional peer deps**, never bundled. No Tailwind, no app coupling.
-- 🌐 **Load external mermaid** — inject an instance, dynamic-import the peer, or pull from a CDN. Your bundle doesn't have to carry mermaid.
-- 🧩 **TypeScript** — full `.d.ts`. **SSR-safe** import (no top-level DOM access).
+- 🌐 **Load external mermaid** — inject an instance, dynamic-import the peer, or pull from a CDN. Your bundle doesn't carry mermaid.
+- 🧩 **TypeScript** — full `.d.ts`. **SSR-safe** import (no top-level DOM access), ships a `'use client'` boundary for Next.js.
 
 ## Install
 
 ```bash
 npm i react-super-mermaid
-# mermaid is an OPTIONAL peer — install it if you want it bundled/imported locally:
+# mermaid + svg-pan-zoom are OPTIONAL peers — install them to bundle/import locally:
 npm i mermaid svg-pan-zoom
 ```
 
-`mermaid` and `svg-pan-zoom` are optional peers. For **no-build / `<script type="module">`** pages you can load mermaid entirely from a CDN (see below) and install nothing. In a **bundler** (Vite / webpack / Next.js), install `mermaid` as a peer **or** inject an instance.
+For **no-build / `<script type="module">`** pages you can load mermaid entirely from a CDN (see below) and install nothing. In a **bundler** (Vite / webpack / Next.js), install `mermaid` as a peer **or** inject an instance.
 
 ## Quick start
 
 ### With toolbox
+
+This input:
+
+```mermaid
+flowchart LR
+  U[User] --> B{Logged in?}
+  B -- yes --> C[Lobby]
+  B -- no --> D[Login]
+```
 
 ```tsx
 import { MermaidViewer } from 'react-super-mermaid';
@@ -39,7 +69,7 @@ import { MermaidViewer } from 'react-super-mermaid';
 export default function App() {
   return (
     <div style={{ height: 480 }}>
-      <MermaidViewer code={`sequenceDiagram\n  Alice->>Bob: Hi\n  Bob-->>Alice: Hello`} toolbar theme="colorful" />
+      <MermaidViewer code={flow} toolbar theme="colorful" />
     </div>
   );
 }
@@ -58,8 +88,6 @@ import { MermaidDiagram } from 'react-super-mermaid';
 
 ## Load external mermaid
 
-The package never hard-codes a mermaid import you can't control. Pick whichever fits:
-
 ```tsx
 // (a) inject an instance you already imported
 import mermaid from 'mermaid';
@@ -68,7 +96,7 @@ import mermaid from 'mermaid';
 // (b) default: dynamic import('mermaid') from your installed peer
 <MermaidViewer code={code} />;
 
-// (c) CDN — install nothing
+// (c) CDN — install nothing (best for no-build pages)
 <MermaidViewer
   code={code}
   mermaid={{ cdnUrl: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs' }}
@@ -90,8 +118,8 @@ Resolution order is **injected → peer import → CDN**, memoized so mermaid lo
 | `exportable` | `boolean` | `true` | toolbar SVG/PNG export |
 | `keyboard` | `boolean` | `true` | shortcuts when the viewer is focused |
 | `seed` | `number` | `42` | sketch wobble seed |
-| `fontUrl` | `string` | jsDelivr Virgil | sketch handwriting font (see below) |
-| `mermaid` | `{ instance? , cdnUrl? }` | — | how to obtain mermaid |
+| `fontUrl` | `string` | jsDelivr Virgil | sketch handwriting font |
+| `mermaid` | `{ instance?, cdnUrl? }` | — | how to obtain mermaid |
 | `svgPanZoom` | `{ instance?, cdnUrl? }` | — | how to obtain svg-pan-zoom |
 | `mermaidConfig` | `object` | — | passthrough to `mermaid.initialize` |
 | `injectStyles` | `boolean` | `true` | inject the package's CSS once |
@@ -121,10 +149,9 @@ Handle: `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search /
 
 ## Themes & the sketch font
 
-The `sketch` theme uses Excalidraw's **Virgil** handwriting font. By default it is fetched at runtime from this package's own jsDelivr asset, so it isn't bundled into your JS (the `colorful` default needs no font at all). Override it:
+The `sketch` theme uses Excalidraw's **Virgil** handwriting font, fetched at runtime from this package's jsDelivr asset (so it isn't bundled into your JS; the `colorful` default needs no font at all). Override it:
 
 ```tsx
-// host your own copy
 <MermaidViewer code={code} theme="sketch" fontUrl="/fonts/Virgil.woff2" />
 ```
 
@@ -132,7 +159,7 @@ If the font can't load, sketch falls back to `KaiTi / Comic Sans MS / cursive` �
 
 ## Styling
 
-Styles are injected automatically (`injectStyles` default `true`) — no CSS import needed. Override the look via CSS variables on `.rsm-root`:
+Styles are injected automatically (`injectStyles` default `true`) — no CSS import needed. Override via CSS variables on `.rsm-root`:
 
 ```css
 .rsm-root {
@@ -152,14 +179,24 @@ The package imports cleanly on the server (no top-level DOM access) and ships a 
 
 ## Low-level (framework-agnostic) API
 
-For non-React or advanced use, the core functions are exported too:
-
 ```ts
 import { renderDiagram, loadMermaid, colorizeDiagram, sketchifyDiagram } from 'react-super-mermaid';
 
 await renderDiagram({ code, container: '#out', theme: 'colorful' });
 ```
 
+## Demo
+
+A runnable demo (Vite + React, installs the package from npm) lives in [`example/`](./example):
+
+```bash
+cd example
+npm install
+npm run dev
+```
+
+It showcases the toolbox, diagram-only mode with custom ref-driven buttons, every theme, and multiple diagram types.
+
 ## License
 
-MIT
+MIT © [markku636](https://github.com/markku636)
