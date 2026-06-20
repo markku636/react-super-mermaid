@@ -166,7 +166,7 @@ gitGraph
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).
 - 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w` (via `svg-pan-zoom`).
 - ⛶ **Fullscreen modal** — open the diagram in a viewport-filling, RWD-friendly popup (`f` / `Esc`); body scroll locked, auto re-fit.
-- ▦ **Background toggle** — cycle the canvas between transparent / solid / dot-grid (`b`), handy for reading and exports.
+- ▦ **Background picker** — a swatch popover to set the canvas **surface** (preset colors + a custom color well) and an independent **pattern** (none / dots / grid lines, cycle with `b`). Surface + pattern combine freely and carry through to exports.
 - 📤 **Export** — SVG and high-res PNG/JPEG/WebP (1×/2×/4×, optional transparent background).
 - 🪶 **Lightweight & decoupled** — `mermaid`, `svg-pan-zoom`, `react` are **optional peer deps**, never bundled. No Tailwind, no app coupling.
 - 🌐 **Load external mermaid** — inject an instance, dynamic-import the peer, or pull from a CDN. Your bundle doesn't carry mermaid.
@@ -248,8 +248,9 @@ Resolution order is **injected → peer import → CDN**, memoized so mermaid lo
 | `panZoom` | `boolean` | `true` | |
 | `search` | `boolean` | `true` | toolbar search |
 | `exportable` | `boolean` | `true` | toolbar SVG/PNG export |
-| `background` | `boolean` | `true` | toolbar background toggle (transparent / solid / grid) |
-| `backgroundMode` | `'transparent' \| 'solid' \| 'grid'` | `'transparent'` | initial / controlled canvas background |
+| `background` | `boolean` | `true` | show the background picker (surface swatches + custom color + pattern toggle) |
+| `pattern` | `'none' \| 'dots' \| 'grid'` | `'dots'` | initial / controlled overlay pattern |
+| `solidColor` | `string \| null` | `null` (transparent) | initial / controlled canvas surface color (hex); `null` follows the page |
 | `fullscreen` | `boolean` | `true` | toolbar fullscreen button — opens a viewport-filling modal (RWD) |
 | `onFullscreenChange` | `(fullscreen: boolean) => void` | — | fired on enter / exit fullscreen |
 | `keyboard` | `boolean` | `true` | shortcuts when the viewer is focused |
@@ -281,7 +282,7 @@ await ref.current?.downloadPng('diagram.png', { scale: 4 });
 const svgString = ref.current?.exportSvg();
 ```
 
-Handle: `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setBackground / cycleBackground / getBackground`.
+Handle: `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setPattern / cyclePattern / getPattern / setSolidColor / getSolidColor`.
 
 ## Themes & the sketch font
 
@@ -307,7 +308,7 @@ Styles are injected automatically (`injectStyles` default `true`) — no CSS imp
 
 ## Keyboard shortcuts
 
-Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` toggle fullscreen · `b` cycle background · `Esc` close search / exit fullscreen.
+Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` toggle fullscreen · `b` cycle background pattern (none / dots / grid) · `Esc` close search / exit fullscreen.
 
 ## Next.js / SSR
 

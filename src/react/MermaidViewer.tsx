@@ -3,15 +3,15 @@ import type {
   ExportRasterOptions,
   MermaidSource,
   MermaidTheme,
-  RsmBackground,
+  RsmPattern,
   SearchState,
   SvgPanZoomSource,
 } from '../types';
 import { useMermaidViewer } from './useMermaidViewer';
 import { DEFAULT_THEME_OPTIONS, Toolbar, type ThemeOption } from './Toolbar';
 
-/** 背景循環順序:透明 → 純色 → 格線 → 透明。 */
-const BACKGROUND_CYCLE: RsmBackground[] = ['transparent', 'solid', 'grid'];
+/** 圖樣循環順序(快捷鍵 B):無 → 網點 → 網格 → 無。 */
+const PATTERN_CYCLE: RsmPattern[] = ['none', 'dots', 'grid'];
 
 export interface MermaidViewerProps {
   /** mermaid 原始碼字串(必填)。 */
@@ -30,12 +30,15 @@ export interface MermaidViewerProps {
   search?: boolean;
   /** 是否啟用匯出 SVG/PNG(toolbar 內)。預設 true。 */
   exportable?: boolean;
-  /** 是否顯示背景切換鈕(透明 / 純色 / 格線)。預設 true。 */
+  /** 是否顯示背景選擇器(底色色票 + 自訂色 + 網點 / 網格圖樣)。預設 true。 */
   background?: boolean;
-  /** 背景模式初始 / 受控值,預設 'grid'(點陣格線,對齊 VS Code);toolbar 變更存內部 state。 */
-  backgroundMode?: RsmBackground;
-  /** 純色背景顏色初始 / 受控值(hex);省略時跟隨主題 surface(亮 #ffffff / 暗 #111827)。 */
-  solidColor?: string;
+  /** 疊加圖樣初始 / 受控值,預設 'dots'(網點);toolbar 變更存內部 state。 */
+  pattern?: RsmPattern;
+  /**
+   * 底色初始 / 受控值(hex,如 `#EFF6FF`);null / 省略 = 透明(跟隨頁面底色)。
+   * toolbar 的色票與「自訂」色會更新此值。
+   */
+  solidColor?: string | null;
   /** 是否顯示全螢幕鈕(以跳窗形式覆蓋整個視窗,支援 RWD)。預設 true。 */
   fullscreen?: boolean;
   /** 進 / 出全螢幕時的回呼。 */
@@ -81,9 +84,10 @@ export interface MermaidViewerHandle {
   exitFullscreen: () => void;
   toggleFullscreen: () => void;
   isFullscreen: () => boolean;
-  setBackground: (mode: RsmBackground) => void;
-  cycleBackground: () => void;
-  getBackground: () => RsmBackground;
+  setPattern: (pattern: RsmPattern) => void;
+  cyclePattern: () => void;
+  getPattern: () => RsmPattern;
+  /** 設定底色(hex);null = 透明 / 跟隨頁面。 */
   setSolidColor: (color: string | null) => void;
   getSolidColor: () => string | null;
 }
@@ -148,17 +152,15 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
     const [matchInfo, setMatchInfo] = useState<SearchState>({ current: 0, total: 0 });
     const [exporting, setExporting] = useState(false);
 
-    // 背景模式:以 prop 為初始 / 受控值,toolbar 變更存內部 state;prop 改變時同步。
-    const [background, setBackgroundState] = useState<RsmBackground>(
-      props.backgroundMode ?? 'grid',
-    );
+    // 疊加圖樣:以 prop 為初始 / 受控值,toolbar 變更存內部 state;prop 改變時同步。
+    const [pattern, setPatternState] = useState<RsmPattern>(props.pattern ?? 'dots');
     useEffect(() => {
-      if (props.backgroundMode) {
-        setBackgroundState(props.backgroundMode);
+      if (props.pattern) {
+        setPatternState(props.pattern);
       }
-    }, [props.backgroundMode]);
+    }, [props.pattern]);
 
-    // 純色背景顏色:null = 跟隨主題 surface;使用者選色後釘住。prop 改變時同步。
+    // 底色:null = 透明(跟隨頁面);使用者選色票 / 自訂色後釘住。prop 改變時同步。
     const [solidColor, setSolidColorState] = useState<string | null>(props.solidColor ?? null);
     useEffect(() => {
       if (props.solidColor !== undefined) {
@@ -230,26 +232,27 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
     const exportPng = useCallback(async (): Promise<void> => {
       setExporting(true);
       try {
-        // 匯出背景跟隨畫布:透明 → 透明 PNG;純色 / 格線 → 用自選色或 paper 底色填底。
+        // 匯出背景跟隨畫布:透明底色 + 無圖樣 → 透明 PNG;否則用自選底色或 paper 填底。
         const paper = solidColor ?? defaultSolidColor(dark);
-        const bgOpt = background === 'transparent' ? { transparent: true } : { background: paper };
+        const transparent = solidColor === null && pattern === 'none';
+        const bgOpt = transparent ? { transparent: true } : { background: paper };
         await vm.downloadPng('diagram.png', { scale: 2, ...bgOpt });
       } catch (e) {
         onError?.(e instanceof Error ? e : new Error(String(e)));
       } finally {
         setExporting(false);
       }
-    }, [vm, onError, background, solidColor, dark]);
+    }, [vm, onError, pattern, solidColor, dark]);
 
-    const cycleBackground = useCallback((): void => {
-      setBackgroundState((prev) => {
-        const i = BACKGROUND_CYCLE.indexOf(prev);
-        return BACKGROUND_CYCLE[(i + 1) % BACKGROUND_CYCLE.length];
+    const cyclePattern = useCallback((): void => {
+      setPatternState((prev) => {
+        const i = PATTERN_CYCLE.indexOf(prev);
+        return PATTERN_CYCLE[(i + 1) % PATTERN_CYCLE.length];
       });
     }, []);
 
-    const setBackground = useCallback((mode: RsmBackground): void => {
-      setBackgroundState(mode);
+    const setPattern = useCallback((next: RsmPattern): void => {
+      setPatternState(next);
     }, []);
 
     const setSolidColor = useCallback((color: string | null): void => {
@@ -389,7 +392,7 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           toggleFullscreen();
         } else if (backgroundEnabled && (e.key === 'b' || e.key === 'B')) {
           e.preventDefault();
-          cycleBackground();
+          cyclePattern();
         }
       };
       root.addEventListener('keydown', onKey);
@@ -403,7 +406,7 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       isFullscreen,
       exitFullscreen,
       toggleFullscreen,
-      cycleBackground,
+      cyclePattern,
       fullscreenEnabled,
       backgroundEnabled,
     ]);
@@ -430,9 +433,9 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         exitFullscreen,
         toggleFullscreen,
         isFullscreen: () => isFullscreen,
-        setBackground,
-        cycleBackground,
-        getBackground: () => background,
+        setPattern,
+        cyclePattern,
+        getPattern: () => pattern,
         setSolidColor,
         getSolidColor: () => solidColor,
       }),
@@ -442,9 +445,9 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         exitFullscreen,
         toggleFullscreen,
         isFullscreen,
-        setBackground,
-        cycleBackground,
-        background,
+        setPattern,
+        cyclePattern,
+        pattern,
         setSolidColor,
         solidColor,
       ],
@@ -460,16 +463,16 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
     const rootClassName = [
       'rsm-root',
       dark ? 'rsm-dark' : '',
-      `rsm-bg-${background}`,
+      `rsm-pattern-${pattern}`,
       isFullscreen ? 'rsm-fullscreen' : '',
       className ?? '',
     ]
       .filter(Boolean)
       .join(' ');
 
-    // 自選純色透過 inline CSS 變數覆寫,未自選則交給 CSS 退回主題 surface。
+    // 底色透過 inline CSS 變數覆寫;未選(null)則交給 CSS 退回透明(跟隨頁面)。
     const rootStyle: React.CSSProperties = solidColor
-      ? { ...style, ['--rsm-solid-bg' as string]: solidColor }
+      ? { ...style, ['--rsm-canvas-bg' as string]: solidColor }
       : (style ?? {});
 
     return (
@@ -497,10 +500,10 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
             onExportSvg={exportSvg}
             onExportPng={exportPng}
             backgroundEnabled={backgroundEnabled}
-            background={background}
-            onCycleBackground={cycleBackground}
-            solidColor={solidColor ?? defaultSolidColor(dark)}
-            onSolidColorChange={setSolidColor}
+            surface={solidColor}
+            onSurfaceChange={setSolidColor}
+            pattern={pattern}
+            onPatternChange={setPattern}
             fullscreenEnabled={fullscreenEnabled}
             fullscreen={isFullscreen}
             onToggleFullscreen={toggleFullscreen}

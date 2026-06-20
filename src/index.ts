@@ -5,7 +5,7 @@
 export { MermaidViewer } from './react/MermaidViewer';
 export type { MermaidViewerProps, MermaidViewerHandle } from './react/MermaidViewer';
 export { MermaidDiagram } from './react/MermaidDiagram';
-export { Toolbar, DEFAULT_THEME_OPTIONS } from './react/Toolbar';
+export { Toolbar, DEFAULT_THEME_OPTIONS, BACKGROUND_PRESETS, PATTERN_OPTIONS } from './react/Toolbar';
 export type { ToolbarProps, ThemeOption } from './react/Toolbar';
 export { useMermaidViewer } from './react/useMermaidViewer';
 export type {
@@ -52,4 +52,6 @@ export type {
   ExportRasterOptions,
   RasterType,
   SearchState,
+  RsmPattern,
+  RsmBackgroundPreset,
 } from './types';

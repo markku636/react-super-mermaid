@@ -64,8 +64,23 @@ export type MermaidTheme =
 
 export type MermaidBaseTheme = 'default' | 'dark' | 'neutral' | 'forest';
 
-/** 畫布背景模式:透明(跟隨頁面) / 純色(surface) / 點陣格線。 */
+/**
+ * 畫布背景模式(舊版,已棄用)。新版把背景拆成兩個獨立維度:
+ * 底色(`solidColor`) + 疊加圖樣(`RsmPattern`)。保留型別僅為相容舊匯入。
+ * @deprecated 改用 `RsmPattern` + `solidColor`。
+ */
 export type RsmBackground = 'transparent' | 'solid' | 'grid';
+
+/** 畫布疊加圖樣:無 / 網點 / 網格線。可與任一底色(透明或純色)自由組合。 */
+export type RsmPattern = 'none' | 'dots' | 'grid';
+
+/** 一個底色預設色票;`value` 為 null 代表「預設 / 透明」(跟隨頁面底色)。 */
+export interface RsmBackgroundPreset {
+  /** 色票 hex(如 `#FFFFFF`);null = 透明 / 跟隨頁面。 */
+  value: string | null;
+  /** 顯示名稱(tooltip / aria-label)。 */
+  label: string;
+}
 
 export interface RenderDiagramOptions {
   /** mermaid 原始碼字串。 */

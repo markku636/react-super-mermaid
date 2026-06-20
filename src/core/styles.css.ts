@@ -16,6 +16,8 @@ export const RSM_CSS = `
   --rsm-canvas-bg: transparent;
   /* 點陣格線:對齊 VS Code 的 color-mix(foreground 9%) 公式。 */
   --rsm-grid-dot: color-mix(in srgb, var(--rsm-fg) 9%, transparent);
+  /* 網格線:比網點再淡一點,避免線條搶過圖表。 */
+  --rsm-grid-line: color-mix(in srgb, var(--rsm-fg) 7%, transparent);
   --rsm-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -122,7 +124,8 @@ export const RSM_CSS = `
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-  background: var(--rsm-canvas-bg);
+  /* 底色由 --rsm-canvas-bg 控制(預設透明,跟隨頁面);圖樣疊在其上(background-image)。 */
+  background-color: var(--rsm-canvas-bg, transparent);
 }
 .rsm-stage { width: 100%; height: 100%; }
 .rsm-root svg { cursor: grab; user-select: none; }
@@ -158,32 +161,157 @@ export const RSM_CSS = `
   --rsm-paper: #1e1e1e;
 }
 
-/* ── 背景模式 ── 透明(跟隨頁面) / 純色(可自選色,預設 paper) / 點陣格線(預設,對齊 VS Code)。
- * 純色用 --rsm-solid-bg 變數,未設時退回 --rsm-paper(VS Code editor-background);
- * toolbar 的色票會 inline 覆寫 --rsm-solid-bg。 */
-.rsm-root.rsm-bg-solid .rsm-canvas { background: var(--rsm-solid-bg, var(--rsm-paper)); }
-.rsm-root.rsm-bg-grid .rsm-canvas {
-  background-color: var(--rsm-solid-bg, var(--rsm-paper));
+/* ── 背景 ── 底色 + 疊加圖樣,兩者獨立。
+ * 底色:--rsm-canvas-bg(由色票 / 自訂色 inline 覆寫;未設 = 透明跟隨頁面)。
+ * 圖樣:.rsm-pattern-dots(網點) / .rsm-pattern-grid(網格線),疊在底色之上。 */
+.rsm-root.rsm-pattern-dots .rsm-canvas {
   background-image: radial-gradient(var(--rsm-grid-dot) 1px, transparent 1px);
   background-size: 18px 18px;
   background-position: -9px -9px;
 }
-
-/* 純色模式下出現在「背景」鈕旁的色票(原生 color input 美化成小方塊)。 */
-.rsm-color {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--rsm-border);
-  border-radius: 6px;
-  background: var(--rsm-surface);
-  cursor: pointer;
-  vertical-align: middle;
+.rsm-root.rsm-pattern-grid .rsm-canvas {
+  background-image:
+    linear-gradient(to right, var(--rsm-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--rsm-grid-line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: -1px -1px;
 }
-.rsm-color::-webkit-color-swatch-wrapper { padding: 2px; }
-.rsm-color::-webkit-color-swatch { border: 0; border-radius: 4px; }
-.rsm-color::-moz-color-swatch { border: 0; border-radius: 4px; }
-.rsm-color:focus { outline: none; border-color: var(--rsm-accent); }
+
+/* ── 背景選擇器(toolbar 內的色井按鈕 + 彈出面板)── */
+.rsm-bg { position: relative; display: inline-flex; }
+
+/* 觸發鈕左側的「色井」:反映目前底色;透明 / 預設時畫一道斜線表示「不覆寫」。 */
+.rsm-bg-well {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--rsm-fg) 28%, transparent);
+  background-color: var(--rsm-well-color, transparent);
+}
+.rsm-bg-well[data-empty="true"] {
+  background-color: var(--rsm-surface);
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    #ef4444 calc(50% - 1px),
+    #ef4444 calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+/* 彈出面板:卡片式、輕陰影、淡入。 */
+.rsm-bg-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  min-width: 232px;
+  border: 1px solid var(--rsm-border);
+  border-radius: 12px;
+  background: var(--rsm-surface);
+  color: var(--rsm-fg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+  animation: rsm-pop-in 0.13s ease-out;
+}
+@keyframes rsm-pop-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+.rsm-bg-section { display: flex; flex-direction: column; gap: 8px; }
+.rsm-bg-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--rsm-muted);
+}
+.rsm-bg-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* 色票:圓角小方塊;選中加同色外環。 */
+.rsm-swatch {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--rsm-fg) 16%, transparent);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.rsm-swatch:hover { transform: scale(1.12); }
+.rsm-swatch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--rsm-accent); }
+.rsm-swatch.rsm-selected { outline: 2px solid var(--rsm-accent); outline-offset: 2px; }
+.rsm-swatch[data-empty="true"] {
+  background-color: var(--rsm-surface);
+  background-image: linear-gradient(
+    to top right,
+    transparent calc(50% - 1px),
+    #ef4444 calc(50% - 1px),
+    #ef4444 calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+/* 自訂色票:覆一個隱形的原生 color input,未選時顯示 🎨。 */
+.rsm-swatch-custom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    conic-gradient(from 180deg, #f87171, #fbbf24, #34d399, #60a5fa, #a78bfa, #f87171);
+}
+.rsm-swatch-custom.rsm-has-color { background: none; }
+.rsm-swatch-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.rsm-swatch-custom-icon {
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+/* 圖樣切換:分段式按鈕(無 / 網點 / 網格)。 */
+.rsm-seg {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--rsm-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rsm-seg > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: var(--rsm-surface);
+  color: var(--rsm-fg);
+  padding: 5px 11px;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+.rsm-seg > button + button { border-left: 1px solid var(--rsm-border); }
+.rsm-seg > button:hover { background: var(--rsm-hover); }
+.rsm-seg > button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--rsm-accent) 14%, transparent);
+  color: var(--rsm-accent);
+  font-weight: 600;
+}
+.rsm-seg-glyph { font-size: 13px; line-height: 1; }
 
 /* ── 全螢幕跳窗 ── position:fixed 覆蓋整個視窗,RWD 友善。 */
 .rsm-root.rsm-fullscreen {

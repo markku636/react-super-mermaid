@@ -11,10 +11,10 @@ Key facts:
 
 ## Components and hooks
 
-- `MermaidViewer` — full viewer with toolbar (theme picker, search, zoom, export, fullscreen, background). Props: `code` (required string), `theme`, `dark`, `toolbar`, `panZoom`, `search`, `exportable`, `background`, `backgroundMode` (`transparent|solid|grid`), `fullscreen`, `onFullscreenChange`, `keyboard`, `seed`, `fontUrl`, `mermaid` (`{instance?,cdnUrl?}`), `svgPanZoom`, `mermaidConfig`, `injectStyles`, `className`, `style`, `onRender`, `onError`.
+- `MermaidViewer` — full viewer with toolbar (theme picker, search, zoom, export, fullscreen, background). Props: `code` (required string), `theme`, `dark`, `toolbar`, `panZoom`, `search`, `exportable`, `background` (show the background picker), `pattern` (`none|dots|grid`, default `dots`), `solidColor` (`string|null`; canvas surface color, `null` = transparent/follow page), `fullscreen`, `onFullscreenChange`, `keyboard`, `seed`, `fontUrl`, `mermaid` (`{instance?,cdnUrl?}`), `svgPanZoom`, `mermaidConfig`, `injectStyles`, `className`, `style`, `onRender`, `onError`. The background picker = preset surface swatches + a custom color well + an independent none/dots/grid pattern toggle (`BACKGROUND_PRESETS` / `PATTERN_OPTIONS` are exported).
 - `MermaidDiagram` — diagram only (equivalent to `<MermaidViewer toolbar={false} />`).
 - `useMermaidViewer` — hook backing the components for custom UIs.
-- Imperative ref handle (`MermaidViewerHandle`): `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setBackground / cycleBackground / getBackground`.
+- Imperative ref handle (`MermaidViewerHandle`): `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setPattern / cyclePattern / getPattern / setSolidColor / getSolidColor`.
 
 ## Framework-agnostic core API
 
@@ -32,7 +32,7 @@ Key facts:
 
 ## Keyboard shortcuts
 
-Focus the viewer: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` fullscreen · `b` cycle background · `Esc` close search / exit fullscreen.
+Focus the viewer: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` fullscreen · `b` cycle background pattern (none / dots / grid) · `Esc` close search / exit fullscreen.
 
 ## Links
 
