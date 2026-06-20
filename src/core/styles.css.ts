@@ -312,6 +312,7 @@ export const RSM_CSS = `
   padding: 6px 11px;
   font-size: 12px;
   line-height: 1.3;
+  white-space: nowrap;
   cursor: pointer;
   transition: background 0.1s ease, color 0.1s ease;
 }
