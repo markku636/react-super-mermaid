@@ -164,7 +164,7 @@ gitGraph
 - 🎨 **Beautified themes** — `colorful` (palette + shadows) and `sketch` (Excalidraw hand-drawn), plus native themes and `auto`.
 - 🧰 **Toolbox or diagram-only** — show the built-in toolbar, or just the chart with `toolbar={false}`.
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).
-- 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w` (via `svg-pan-zoom`).
+- 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w`, mouse wheel, and **touch gestures** (pinch-to-zoom + drag-to-pan) via `svg-pan-zoom`.
 - ⛶ **Fullscreen modal** — open the diagram in a viewport-filling, RWD-friendly popup (`f` / `Esc`); body scroll locked, auto re-fit.
 - ▦ **Background picker** — a swatch popover to set the canvas **surface** (preset colors + a custom color well) and an independent **pattern** (none / dots / grid lines, cycle with `b`). Surface + pattern combine freely and carry through to exports.
 - 📤 **Export** — SVG and high-res PNG/JPEG/WebP (1×/2×/4×, optional transparent background).
@@ -246,6 +246,7 @@ Resolution order is **injected → peer import → CDN**, memoized so mermaid lo
 | `dark` | `boolean` | auto (`prefers-color-scheme`) | |
 | `toolbar` | `boolean` | `true` | `false` → diagram only |
 | `panZoom` | `boolean` | `true` | |
+| `touchGestures` | `boolean` | `true` | pinch-to-zoom + drag-to-pan on touch screens (needs `panZoom`) |
 | `search` | `boolean` | `true` | toolbar search |
 | `exportable` | `boolean` | `true` | toolbar SVG/PNG export |
 | `background` | `boolean` | `true` | show the background picker (surface swatches + custom color + pattern toggle) |
@@ -309,6 +310,8 @@ Styles are injected automatically (`injectStyles` default `true`) — no CSS imp
 ## Keyboard shortcuts
 
 Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` toggle fullscreen · `b` cycle background pattern (none / dots / grid) · `Esc` close search / exit fullscreen.
+
+On touch screens, **pinch** to zoom and **drag with two fingers** to pan. Inline, a single finger still scrolls the page; in fullscreen a single finger pans the diagram.
 
 ## Next.js / SSR
 

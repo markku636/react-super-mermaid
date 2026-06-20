@@ -39,11 +39,15 @@ export interface PanZoomInstance {
   destroy: () => void;
   zoomBy: (factor: number) => void;
   zoom: (scale: number) => void;
+  /** 以指定點為錨點縮放(乘以 factor);手勢捏合縮放用,讓兩指中點維持在原位。 */
+  zoomAtPointBy: (factor: number, point: { x: number; y: number }) => void;
   getZoom: () => number;
   resize: () => void;
   fit: () => void;
   center: () => void;
   pan: (point: { x: number; y: number }) => void;
+  /** 相對平移(螢幕像素位移);手勢拖曳用。 */
+  panBy: (point: { x: number; y: number }) => void;
   getPan: () => { x: number; y: number };
   getSizes: () => {
     width: number;

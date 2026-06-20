@@ -26,6 +26,8 @@ export interface MermaidViewerProps {
   themeOptions?: ThemeOption[];
   /** 是否啟用 pan/zoom。預設 true。 */
   panZoom?: boolean;
+  /** 是否啟用觸控手勢(雙指捏合縮放 + 拖曳平移)。需 panZoom=true。預設 true。 */
+  touchGestures?: boolean;
   /** 是否啟用搜尋(toolbar 內)。預設 true。 */
   search?: boolean;
   /** 是否啟用匯出 SVG/PNG(toolbar 內)。預設 true。 */
@@ -141,6 +143,7 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       toolbar = true,
       themeOptions = DEFAULT_THEME_OPTIONS,
       panZoom = true,
+      touchGestures = true,
       search: searchEnabled = true,
       exportable = true,
       background: backgroundEnabled = true,
@@ -205,6 +208,7 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       mermaid,
       svgPanZoom,
       panZoom,
+      touchGestures,
       injectStyles,
       onRender,
       onError,

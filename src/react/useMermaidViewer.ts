@@ -36,6 +36,7 @@ export interface UseMermaidViewerOptions {
   mermaid?: MermaidSource;
   svgPanZoom?: SvgPanZoomSource;
   panZoom: boolean;
+  touchGestures: boolean;
   injectStyles: boolean;
   onRender?: (svg: SVGSVGElement) => void;
   onError?: (err: Error) => void;
@@ -74,6 +75,7 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     mermaid,
     svgPanZoom,
     panZoom,
+    touchGestures,
     injectStyles,
     onRender,
     onError,
@@ -167,7 +169,10 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
             return;
           }
           if (factory) {
-            pzRef.current = attachPanZoom(svg, factory, { onZoom: syncZoom });
+            pzRef.current = attachPanZoom(svg, factory, {
+              onZoom: syncZoom,
+              gestures: touchGestures,
+            });
             if (prevView) {
               pzRef.current.restore(prevView);
             }
@@ -196,7 +201,7 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, theme, dark, seed, fontUrl, mermaidConfigKey, panZoom, injectStyles]);
+  }, [code, theme, dark, seed, fontUrl, mermaidConfigKey, panZoom, touchGestures, injectStyles]);
 
   // 卸載時清掉 pan-zoom 監聽。
   useEffect(() => {

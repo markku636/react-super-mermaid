@@ -2,6 +2,7 @@
 // 並維護 baseZoom(fit 後的初始縮放)以換算顯示百分比。
 
 import type { PanZoomInstance, SvgPanZoomFactory } from '../types';
+import { createTouchGestureHandler } from './touch-gestures';
 
 export interface PanZoomView {
   zoom: number;
@@ -25,6 +26,8 @@ export interface AttachPanZoomOptions {
   minZoom?: number;
   maxZoom?: number;
   zoomScaleSensitivity?: number;
+  /** 是否啟用觸控手勢(雙指捏合縮放 + 拖曳平移)。預設 true。 */
+  gestures?: boolean;
   onZoom?: () => void;
 }
 
@@ -45,6 +48,8 @@ export function attachPanZoom(
     minZoom: opts.minZoom ?? 0.05,
     maxZoom: opts.maxZoom ?? 40,
     zoomScaleSensitivity: opts.zoomScaleSensitivity ?? 0.25,
+    // 觸控手勢:接管 touch 事件做捏合縮放 + 拖曳(覆寫 svg-pan-zoom 只取單指的內建行為)。
+    ...((opts.gestures ?? true) ? { customEventsHandler: createTouchGestureHandler() } : {}),
     onZoom: () => opts.onZoom?.(),
   });
   baseZoom = pz.getZoom() || 1;

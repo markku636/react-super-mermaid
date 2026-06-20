@@ -136,8 +136,13 @@ export const RSM_CSS = `
   background-color: var(--rsm-canvas-bg, transparent);
 }
 .rsm-stage { width: 100%; height: 100%; }
-.rsm-root svg { cursor: grab; user-select: none; }
+/* touch-action 決定觸控手勢歸誰:行內讓單指捲動頁面(pan-y),雙指捏合縮放交給本套件;
+ * 全螢幕(下方覆寫成 none)則單指平移、雙指縮放全由套件接管。 */
+.rsm-canvas { touch-action: pan-y; }
+.rsm-root svg { cursor: grab; user-select: none; touch-action: pan-y; }
 .rsm-root svg.rsm-grabbing { cursor: grabbing; }
+.rsm-root.rsm-fullscreen .rsm-canvas,
+.rsm-root.rsm-fullscreen svg { touch-action: none; }
 
 .rsm-overlay {
   position: absolute;
@@ -378,6 +383,9 @@ export const RSM_CSS = `
   .rsm-select { padding: 3px 6px; font-size: 12px; }
   .rsm-zoom > button { padding: 4px 8px; font-size: 12px; }
   .rsm-input { flex-basis: 150px; }
+  /* 換行時 margin-left:auto 會把後段鈕推到右邊、留下一大塊空白(看起來「排太空」)。
+   * 小螢幕關掉這個推擠,讓所有控制項由左到右等距緊湊排列、自然換行。 */
+  .rsm-toolbar-spacer { display: none; }
 }
 
 /* ── 標籤字重(量測階段就生效)──
