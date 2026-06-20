@@ -41,6 +41,10 @@ export interface ToolbarProps {
   backgroundEnabled: boolean;
   background: RsmBackground;
   onCycleBackground: () => void;
+  /** 純色模式色票目前的值(hex)。 */
+  solidColor: string;
+  /** 使用者在色票選了新顏色。 */
+  onSolidColorChange: (color: string) => void;
   fullscreenEnabled: boolean;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
@@ -73,6 +77,17 @@ export function Toolbar(props: ToolbarProps): React.JSX.Element {
         >
           {BACKGROUND_LABELS[props.background].icon} 背景：{BACKGROUND_LABELS[props.background].label}
         </button>
+      ) : null}
+
+      {props.backgroundEnabled && props.background === 'solid' ? (
+        <input
+          type="color"
+          className="rsm-color"
+          value={props.solidColor}
+          onChange={(e) => props.onSolidColorChange(e.target.value)}
+          title="選擇純色背景顏色"
+          aria-label="純色背景顏色"
+        />
       ) : null}
 
       <div className="rsm-toolbar-spacer" />

@@ -102,7 +102,7 @@ export async function rasterizeToBlob(
     }
     // JPEG 無 alpha,一律填背景;其餘格式僅在非透明時填。
     if (!transparent || mime === 'image/jpeg') {
-      ctx.fillStyle = opts.background ?? (opts.dark ? '#111827' : '#ffffff');
+      ctx.fillStyle = opts.background ?? (opts.dark ? '#1e1e1e' : '#ffffff');
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
     ctx.scale(scale, scale);

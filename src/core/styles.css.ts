@@ -11,8 +11,11 @@ export const RSM_CSS = `
   --rsm-accent: #2563eb;
   --rsm-hover: #f3f4f6;
   --rsm-surface: #ffffff;
+  /* --rsm-paper = 畫布底色,對齊 VS Code 擴充套件的 editor-background(亮)。 */
+  --rsm-paper: #ffffff;
   --rsm-canvas-bg: transparent;
-  --rsm-grid-dot: rgba(0, 0, 0, 0.08);
+  /* 點陣格線:對齊 VS Code 的 color-mix(foreground 9%) 公式。 */
+  --rsm-grid-dot: color-mix(in srgb, var(--rsm-fg) 9%, transparent);
   --rsm-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -144,23 +147,43 @@ export const RSM_CSS = `
 .rsm-root .rsm-hit { filter: drop-shadow(0 0 5px #f59e0b) drop-shadow(0 0 1.5px #f59e0b); }
 
 .rsm-root.rsm-dark {
-  --rsm-border: #374151;
-  --rsm-fg: #e5e7eb;
-  --rsm-muted: #9ca3af;
-  --rsm-accent: #60a5fa;
-  --rsm-hover: #1f2937;
-  --rsm-surface: #111827;
-  --rsm-grid-dot: rgba(255, 255, 255, 0.10);
+  /* 暗色面板對齊 VS Code Dark+ / Dark Modern 的中性灰(非藍調)。 */
+  --rsm-border: #3c3c3c;
+  --rsm-fg: #cccccc;
+  --rsm-muted: #9d9d9d;
+  --rsm-accent: #3794ff;
+  --rsm-hover: #2a2d2e;
+  --rsm-surface: #252526;
+  /* 畫布底色 = VS Code editor-background(暗);grid-dot 由 --rsm-fg 9% 自動推導。 */
+  --rsm-paper: #1e1e1e;
 }
 
-/* ── 背景模式 ── 透明(預設,跟隨頁面) / 純色(surface) / 點陣格線。 */
-.rsm-root.rsm-bg-solid .rsm-canvas { background: var(--rsm-surface); }
+/* ── 背景模式 ── 透明(跟隨頁面) / 純色(可自選色,預設 paper) / 點陣格線(預設,對齊 VS Code)。
+ * 純色用 --rsm-solid-bg 變數,未設時退回 --rsm-paper(VS Code editor-background);
+ * toolbar 的色票會 inline 覆寫 --rsm-solid-bg。 */
+.rsm-root.rsm-bg-solid .rsm-canvas { background: var(--rsm-solid-bg, var(--rsm-paper)); }
 .rsm-root.rsm-bg-grid .rsm-canvas {
-  background-color: var(--rsm-surface);
+  background-color: var(--rsm-solid-bg, var(--rsm-paper));
   background-image: radial-gradient(var(--rsm-grid-dot) 1px, transparent 1px);
   background-size: 18px 18px;
   background-position: -9px -9px;
 }
+
+/* 純色模式下出現在「背景」鈕旁的色票(原生 color input 美化成小方塊)。 */
+.rsm-color {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--rsm-border);
+  border-radius: 6px;
+  background: var(--rsm-surface);
+  cursor: pointer;
+  vertical-align: middle;
+}
+.rsm-color::-webkit-color-swatch-wrapper { padding: 2px; }
+.rsm-color::-webkit-color-swatch { border: 0; border-radius: 4px; }
+.rsm-color::-moz-color-swatch { border: 0; border-radius: 4px; }
+.rsm-color:focus { outline: none; border-color: var(--rsm-accent); }
 
 /* ── 全螢幕跳窗 ── position:fixed 覆蓋整個視窗,RWD 友善。 */
 .rsm-root.rsm-fullscreen {

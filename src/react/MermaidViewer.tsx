@@ -32,8 +32,10 @@ export interface MermaidViewerProps {
   exportable?: boolean;
   /** 是否顯示背景切換鈕(透明 / 純色 / 格線)。預設 true。 */
   background?: boolean;
-  /** 背景模式初始 / 受控值,預設 'transparent';toolbar 變更存內部 state。 */
+  /** 背景模式初始 / 受控值,預設 'grid'(點陣格線,對齊 VS Code);toolbar 變更存內部 state。 */
   backgroundMode?: RsmBackground;
+  /** 純色背景顏色初始 / 受控值(hex);省略時跟隨主題 surface(亮 #ffffff / 暗 #111827)。 */
+  solidColor?: string;
   /** 是否顯示全螢幕鈕(以跳窗形式覆蓋整個視窗,支援 RWD)。預設 true。 */
   fullscreen?: boolean;
   /** 進 / 出全螢幕時的回呼。 */
@@ -82,6 +84,13 @@ export interface MermaidViewerHandle {
   setBackground: (mode: RsmBackground) => void;
   cycleBackground: () => void;
   getBackground: () => RsmBackground;
+  setSolidColor: (color: string | null) => void;
+  getSolidColor: () => string | null;
+}
+
+/** 畫布底色 / 純色背景的預設顏色(對齊 VS Code editor-background)。 */
+function defaultSolidColor(dark: boolean): string {
+  return dark ? '#1e1e1e' : '#ffffff';
 }
 
 function usePrefersDark(explicit?: boolean): boolean {
@@ -141,13 +150,21 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
 
     // 背景模式:以 prop 為初始 / 受控值,toolbar 變更存內部 state;prop 改變時同步。
     const [background, setBackgroundState] = useState<RsmBackground>(
-      props.backgroundMode ?? 'transparent',
+      props.backgroundMode ?? 'grid',
     );
     useEffect(() => {
       if (props.backgroundMode) {
         setBackgroundState(props.backgroundMode);
       }
     }, [props.backgroundMode]);
+
+    // 純色背景顏色:null = 跟隨主題 surface;使用者選色後釘住。prop 改變時同步。
+    const [solidColor, setSolidColorState] = useState<string | null>(props.solidColor ?? null);
+    useEffect(() => {
+      if (props.solidColor !== undefined) {
+        setSolidColorState(props.solidColor);
+      }
+    }, [props.solidColor]);
 
     const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -213,13 +230,16 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
     const exportPng = useCallback(async (): Promise<void> => {
       setExporting(true);
       try {
-        await vm.downloadPng('diagram.png', { scale: 2 });
+        // 匯出背景跟隨畫布:透明 → 透明 PNG;純色 / 格線 → 用自選色或 paper 底色填底。
+        const paper = solidColor ?? defaultSolidColor(dark);
+        const bgOpt = background === 'transparent' ? { transparent: true } : { background: paper };
+        await vm.downloadPng('diagram.png', { scale: 2, ...bgOpt });
       } catch (e) {
         onError?.(e instanceof Error ? e : new Error(String(e)));
       } finally {
         setExporting(false);
       }
-    }, [vm, onError]);
+    }, [vm, onError, background, solidColor, dark]);
 
     const cycleBackground = useCallback((): void => {
       setBackgroundState((prev) => {
@@ -230,6 +250,10 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
 
     const setBackground = useCallback((mode: RsmBackground): void => {
       setBackgroundState(mode);
+    }, []);
+
+    const setSolidColor = useCallback((color: string | null): void => {
+      setSolidColorState(color);
     }, []);
 
     // 全螢幕用「跳窗」實作(position:fixed 覆蓋整個視窗),而非原生 Fullscreen API:
@@ -409,6 +433,8 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         setBackground,
         cycleBackground,
         getBackground: () => background,
+        setSolidColor,
+        getSolidColor: () => solidColor,
       }),
       [
         vm,
@@ -419,6 +445,8 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         setBackground,
         cycleBackground,
         background,
+        setSolidColor,
+        solidColor,
       ],
     );
 
@@ -439,11 +467,16 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       .filter(Boolean)
       .join(' ');
 
+    // 自選純色透過 inline CSS 變數覆寫,未自選則交給 CSS 退回主題 surface。
+    const rootStyle: React.CSSProperties = solidColor
+      ? { ...style, ['--rsm-solid-bg' as string]: solidColor }
+      : (style ?? {});
+
     return (
       <div
         ref={rootRef}
         className={rootClassName}
-        style={style}
+        style={rootStyle}
         tabIndex={keyboard ? 0 : undefined}
       >
         {toolbar ? (
@@ -466,6 +499,8 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
             backgroundEnabled={backgroundEnabled}
             background={background}
             onCycleBackground={cycleBackground}
+            solidColor={solidColor ?? defaultSolidColor(dark)}
+            onSolidColorChange={setSolidColor}
             fullscreenEnabled={fullscreenEnabled}
             fullscreen={isFullscreen}
             onToggleFullscreen={toggleFullscreen}
