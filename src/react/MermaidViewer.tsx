@@ -97,6 +97,28 @@ function defaultSolidColor(dark: boolean): string {
   return dark ? '#1e1e1e' : '#ffffff';
 }
 
+/**
+ * 依「實際畫布亮度」挑網點 / 網格線的墨色 —— 讓圖樣永遠跟底色對比、看得見。
+ * 舊版把墨色綁在主題前景色(--rsm-fg),所以「深色主題 + 使用者選了淺底色」會變成
+ * 淺墨疊淺底→看不見。這裡改成:有底色就量它的相對亮度,沒底色(透明)就看頁面亮暗。
+ * 深底→淺墨(slate-200);淺底→深墨(slate-900),濃度對齊 VS Code 的點陣手感。
+ */
+function patternInk(surface: string | null, dark: boolean): { dot: string; line: string } {
+  const m = surface ? /^#([0-9a-fA-F]{6})$/.exec(surface) : null;
+  let lightCanvas: boolean;
+  if (m) {
+    const r = parseInt(m[1].slice(0, 2), 16);
+    const g = parseInt(m[1].slice(2, 4), 16);
+    const b = parseInt(m[1].slice(4, 6), 16);
+    lightCanvas = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.5;
+  } else {
+    lightCanvas = !dark;
+  }
+  const ink = lightCanvas ? '15, 23, 42' : '226, 232, 240';
+  // 網點是 1px 小圓、墨量天生比連續網格線少,故點略濃於線,兩者視覺份量才相當。
+  return { dot: `rgba(${ink}, 0.34)`, line: `rgba(${ink}, 0.2)` };
+}
+
 function usePrefersDark(explicit?: boolean): boolean {
   const [autoDark, setAutoDark] = useState(false);
   useEffect(() => {
@@ -471,9 +493,14 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       .join(' ');
 
     // 底色透過 inline CSS 變數覆寫;未選(null)則交給 CSS 退回透明(跟隨頁面)。
-    const rootStyle: React.CSSProperties = solidColor
-      ? { ...style, ['--rsm-canvas-bg' as string]: solidColor }
-      : (style ?? {});
+    // 網點 / 網格墨色一律依「實際畫布亮度」算,確保任何底色(預設或自訂)上都看得見。
+    const ink = patternInk(solidColor, dark);
+    const rootStyle: React.CSSProperties = {
+      ...(style ?? {}),
+      ['--rsm-grid-dot' as string]: ink.dot,
+      ['--rsm-grid-line' as string]: ink.line,
+      ...(solidColor ? { ['--rsm-canvas-bg' as string]: solidColor } : {}),
+    };
 
     return (
       <div

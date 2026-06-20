@@ -79,6 +79,14 @@ export const RSM_CSS = `
 }
 .rsm-btn:disabled { opacity: 0.6; cursor: default; }
 
+/* 工具列控制項高度一致(樣式下拉 / 一般鈕 / 縮放群 / 背景鈕),避免高低不齊。 */
+.rsm-toolbar .rsm-btn,
+.rsm-toolbar .rsm-select,
+.rsm-toolbar .rsm-zoom { min-height: 30px; }
+.rsm-toolbar .rsm-btn,
+.rsm-toolbar .rsm-select { align-items: center; }
+.rsm-toolbar .rsm-zoom > button { display: inline-flex; align-items: center; justify-content: center; }
+
 .rsm-zoom {
   display: inline-flex;
   align-items: stretch;
@@ -209,7 +217,7 @@ export const RSM_CSS = `
   flex-direction: column;
   gap: 12px;
   padding: 12px;
-  min-width: 232px;
+  min-width: 260px;
   border: 1px solid var(--rsm-border);
   border-radius: 12px;
   background: var(--rsm-surface);
@@ -292,13 +300,16 @@ export const RSM_CSS = `
   overflow: hidden;
 }
 .rsm-seg > button {
+  flex: 1 1 0;
+  min-width: 58px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   border: 0;
   background: var(--rsm-surface);
   color: var(--rsm-fg);
-  padding: 5px 11px;
+  padding: 6px 11px;
   font-size: 12px;
   line-height: 1.3;
   cursor: pointer;

@@ -6,7 +6,13 @@ export function ensureStyles(): void {
   if (typeof document === 'undefined') {
     return;
   }
-  if (document.getElementById(RSM_STYLE_ID)) {
+  const existing = document.getElementById(RSM_STYLE_ID) as HTMLStyleElement | null;
+  if (existing) {
+    // 已注入過:若內容過時(版本升級 / HMR 換 bundle),就刷新——否則舊 CSS 會卡住,
+    // 新元件 markup 配舊樣式 → 例如背景彈窗變成行內排版而非浮層。比對成本低(字串相等)。
+    if (existing.textContent !== RSM_CSS) {
+      existing.textContent = RSM_CSS;
+    }
     return;
   }
   const style = document.createElement('style');
