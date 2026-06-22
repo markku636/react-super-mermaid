@@ -1,6 +1,6 @@
 {
   "name": "react-super-mermaid",
-  "version": "0.5.0",
+  "version": "0.6.16",
   "description": "Drop-in React Mermaid viewer: beautified colorful + Excalidraw sketch themes, pan/zoom, in-diagram search, and SVG/PNG export. Loads mermaid externally (injected, peer, or CDN). Zero-config styling, TypeScript.",
   "type": "module",
   "license": "MIT",
@@ -35,6 +35,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./editor": {
+      "types": "./dist/editor.d.ts",
+      "import": "./dist/editor.js",
+      "require": "./dist/editor.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -74,6 +79,7 @@
     "mermaid": "^11.15.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "roughjs": "^4.6.6",
     "svg-pan-zoom": "^3.6.2",
     "tsup": "^8.3.5",
     "typescript": "^5.6.3"

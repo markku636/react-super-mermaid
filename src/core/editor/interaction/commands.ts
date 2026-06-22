@@ -1,0 +1,273 @@
+// 命令 + 歷史(undo/redo)。命令為純函式:scene → { scene, patch }。
+// 歷史保存 before/after 兩個不可變場景(diagram 不大,快照成本低)+ patch(增量重繪提示)。
+
+import type {
+  EditorScene,
+  ElementStyle,
+  LineKind,
+  NodeShape,
+  Point,
+  SceneContainer,
+  SceneEdge,
+  SceneNode,
+} from '../scene/types';
+import {
+  addEdge,
+  addNode,
+  deleteEdges,
+  deleteNodes,
+  groupIntoContainer,
+  moveNodes,
+  reconnectEdge,
+  resizeNode,
+  setLabel,
+  setShape,
+} from '../scene/scene-ops';
+
+/** 增量重繪提示:哪些 id 變了。structural=true 代表拓樸變動(需重繞邊 / 重建)。 */
+export interface ScenePatch {
+  nodes?: string[];
+  edges?: string[];
+  containers?: string[];
+  structural?: boolean;
+}
+
+export interface CommandResult {
+  scene: EditorScene;
+  patch: ScenePatch;
+}
+
+/** 命令 = 給定場景算出新場景 + patch 的純函式。 */
+export type Command = (scene: EditorScene) => CommandResult;
+
+// ── 命令工廠 ──
+
+export function cmdAddNode(node: SceneNode): Command {
+  return (scene) => ({ scene: addNode(scene, node), patch: { nodes: [node.id], structural: true } });
+}
+
+export function cmdAddEdge(edge: SceneEdge): Command {
+  return (scene) => ({ scene: addEdge(scene, edge), patch: { edges: [edge.id], structural: true } });
+}
+
+/** 拖線到空白處 → 一步新增「節點 + 連到它的邊」(draw.io 招牌操作),只算一次 undo。 */
+export function cmdAddConnectedNode(node: SceneNode, edge: SceneEdge): Command {
+  return (scene) => ({
+    scene: addEdge(addNode(scene, node), edge),
+    patch: { nodes: [node.id], edges: [edge.id], structural: true },
+  });
+}
+
+/** 一次加入多個節點 + 邊(複製 / 貼上 用),只算一次 undo。 */
+export function cmdAddElements(nodes: SceneNode[], edges: SceneEdge[]): Command {
+  return (scene) => ({
+    scene: { ...scene, nodes: [...scene.nodes, ...nodes], edges: [...scene.edges, ...edges] },
+    patch: { nodes: nodes.map((n) => n.id), edges: edges.map((e) => e.id), structural: true },
+  });
+}
+
+export function cmdMoveNodes(ids: string[], dx: number, dy: number): Command {
+  const set = new Set(ids);
+  return (scene) => {
+    const next = moveNodes(scene, set, dx, dy);
+    // 受影響的邊 = 任一端在 ids 內。
+    const edges = next.edges.filter((e) => set.has(e.source) || set.has(e.target)).map((e) => e.id);
+    return { scene: next, patch: { nodes: ids, edges } };
+  };
+}
+
+export function cmdResizeNode(id: string, rect: { x: number; y: number; w: number; h: number }): Command {
+  return (scene) => {
+    const next = resizeNode(scene, id, rect);
+    const edges = next.edges.filter((e) => e.source === id || e.target === id).map((e) => e.id);
+    return { scene: next, patch: { nodes: [id], edges } };
+  };
+}
+
+export function cmdSetLabel(id: string, label: string): Command {
+  return (scene) => ({ scene: setLabel(scene, id, label), patch: { nodes: [id], edges: [id] } });
+}
+
+export function cmdSetShape(id: string, shape: NodeShape): Command {
+  return (scene) => ({ scene: setShape(scene, id, shape), patch: { nodes: [id] } });
+}
+
+/** 設定節點內聯樣式(底色 / 框線)。 */
+export function cmdSetNodeStyle(id: string, patch: Partial<ElementStyle>): Command {
+  return (scene) => ({
+    scene: {
+      ...scene,
+      nodes: scene.nodes.map((n) => (n.id === id ? { ...n, style: { ...n.style, ...patch } } : n)),
+    },
+    patch: { nodes: [id] },
+  });
+}
+
+export type AlignAxis = 'left' | 'centerX' | 'right' | 'top' | 'middleY' | 'bottom';
+
+/** 對齊多個選取節點到共同邊/中線。 */
+export function cmdAlignNodes(ids: string[], axis: AlignAxis): Command {
+  return (scene) => {
+    const sel = scene.nodes.filter((n) => ids.includes(n.id));
+    if (sel.length < 2) return { scene, patch: {} };
+    const minX = Math.min(...sel.map((n) => n.x));
+    const maxR = Math.max(...sel.map((n) => n.x + n.w));
+    const minY = Math.min(...sel.map((n) => n.y));
+    const maxB = Math.max(...sel.map((n) => n.y + n.h));
+    const idset = new Set(ids);
+    const nodes = scene.nodes.map((n) => {
+      if (!idset.has(n.id)) return n;
+      switch (axis) {
+        case 'left':
+          return { ...n, x: minX };
+        case 'right':
+          return { ...n, x: maxR - n.w };
+        case 'centerX':
+          return { ...n, x: (minX + maxR) / 2 - n.w / 2 };
+        case 'top':
+          return { ...n, y: minY };
+        case 'bottom':
+          return { ...n, y: maxB - n.h };
+        default:
+          return { ...n, y: (minY + maxB) / 2 - n.h / 2 };
+      }
+    });
+    return { scene: { ...scene, nodes }, patch: { nodes: ids } };
+  };
+}
+
+export function cmdReconnectEdge(edgeId: string, endpoint: 'source' | 'target', nodeId: string): Command {
+  return (scene) => ({
+    scene: reconnectEdge(scene, edgeId, endpoint, nodeId),
+    patch: { edges: [edgeId], structural: true },
+  });
+}
+
+export function cmdDeleteSelection(nodeIds: string[], edgeIds: string[]): Command {
+  const nset = new Set(nodeIds);
+  const eset = new Set(edgeIds);
+  return (scene) => {
+    let next = scene;
+    const removedEdgeIds: string[] = [...edgeIds];
+    if (nset.size > 0) {
+      const res = deleteNodes(next, nset);
+      next = res.scene;
+      for (const e of res.removedEdges) removedEdgeIds.push(e.id);
+    }
+    if (eset.size > 0) next = deleteEdges(next, eset);
+    return { scene: next, patch: { nodes: nodeIds, edges: removedEdgeIds, structural: true } };
+  };
+}
+
+export function cmdGroup(container: SceneContainer): Command {
+  return (scene) => ({
+    scene: groupIntoContainer(scene, container),
+    patch: { containers: [container.id], nodes: container.childNodeIds, structural: true },
+  });
+}
+
+export function cmdSetDirection(direction: 'TB' | 'TD' | 'BT' | 'LR' | 'RL'): Command {
+  return (scene) => {
+    if (scene.meta.type !== 'flowchart') return { scene, patch: {} };
+    return { scene: { ...scene, meta: { ...scene.meta, direction } }, patch: { structural: true } };
+  };
+}
+
+export function cmdAddWaypoint(edgeId: string, waypoints: Point[]): Command {
+  return (scene) => ({
+    scene: { ...scene, edges: scene.edges.map((e) => (e.id === edgeId ? { ...e, waypoints } : e)) },
+    patch: { edges: [edgeId] },
+  });
+}
+
+export function cmdSetLineKind(edgeId: string, lineKind: LineKind): Command {
+  return (scene) => ({
+    scene: { ...scene, edges: scene.edges.map((e) => (e.id === edgeId ? { ...e, lineKind } : e)) },
+    patch: { edges: [edgeId] },
+  });
+}
+
+/** 一次設定連線樣式(線型 / 箭頭),供右鍵選單用。 */
+export function cmdSetEdgeStyle(
+  edgeId: string,
+  patch: Partial<Pick<SceneEdge, 'lineKind' | 'arrowStart' | 'arrowEnd'>>,
+): Command {
+  return (scene) => ({
+    scene: { ...scene, edges: scene.edges.map((e) => (e.id === edgeId ? { ...e, ...patch } : e)) },
+    patch: { edges: [edgeId] },
+  });
+}
+
+// ── 歷史 ──
+
+interface HistoryEntry {
+  before: EditorScene;
+  after: EditorScene;
+  patch: ScenePatch;
+  label: string;
+}
+
+const MAX_HISTORY = 200;
+
+export class History {
+  private undoStack: HistoryEntry[] = [];
+  private redoStack: HistoryEntry[] = [];
+
+  /** 套用命令,推入歷史。回傳新場景 + patch。 */
+  run(scene: EditorScene, command: Command, label: string): CommandResult {
+    const { scene: after, patch } = command(scene);
+    this.undoStack.push({ before: scene, after, patch, label });
+    if (this.undoStack.length > MAX_HISTORY) this.undoStack.shift();
+    this.redoStack = [];
+    return { scene: after, patch };
+  }
+
+  /**
+   * 合併到上一筆(相同 label,如連續拖曳):把 after/patch 換掉,before 維持原本。
+   * 若上一筆 label 不符則退化為一般 run。
+   */
+  amend(scene: EditorScene, command: Command, label: string): CommandResult {
+    const last = this.undoStack[this.undoStack.length - 1];
+    if (!last || last.label !== label) return this.run(scene, command, label);
+    const { scene: after, patch } = command(last.before);
+    last.after = after;
+    last.patch = mergePatch(last.patch, patch);
+    this.redoStack = [];
+    return { scene: after, patch: last.patch };
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  undo(): { scene: EditorScene; patch: ScenePatch } | null {
+    const entry = this.undoStack.pop();
+    if (!entry) return null;
+    this.redoStack.push(entry);
+    return { scene: entry.before, patch: entry.patch };
+  }
+
+  redo(): { scene: EditorScene; patch: ScenePatch } | null {
+    const entry = this.redoStack.pop();
+    if (!entry) return null;
+    this.undoStack.push(entry);
+    return { scene: entry.after, patch: entry.patch };
+  }
+
+  clear(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+}
+
+function mergePatch(a: ScenePatch, b: ScenePatch): ScenePatch {
+  return {
+    nodes: [...new Set([...(a.nodes ?? []), ...(b.nodes ?? [])])],
+    edges: [...new Set([...(a.edges ?? []), ...(b.edges ?? [])])],
+    containers: [...new Set([...(a.containers ?? []), ...(b.containers ?? [])])],
+    structural: a.structural || b.structural,
+  };
+}

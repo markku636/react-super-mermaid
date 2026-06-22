@@ -4,7 +4,8 @@ import { defineConfig } from 'tsup';
 const USE_CLIENT = "'use client';\n";
 
 export default defineConfig({
-  entry: { index: 'src/index.ts' },
+  // index = React 元件入口(含 'use client');editor = 框架無關繪製/round-trip 引擎(零 React)。
+  entry: { index: 'src/index.ts', editor: 'src/editor.ts' },
   format: ['esm', 'cjs'],
   target: 'es2020',
   dts: true,

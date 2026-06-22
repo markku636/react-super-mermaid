@@ -14,6 +14,32 @@ export type {
   RenderStatus,
 } from './react/useMermaidViewer';
 
+// ── 繪製編輯器(Excalidraw 式,雙向 round-trip)──
+export { MermaidEditor } from './react/MermaidEditor';
+export type { MermaidEditorProps, MermaidEditorHandle } from './react/MermaidEditor';
+export { EditorToolbar } from './react/EditorToolbar';
+export type { EditorToolbarProps } from './react/EditorToolbar';
+export { useDiagramEditor } from './react/useDiagramEditor';
+export type { UseDiagramEditorOptions, UseDiagramEditorResult } from './react/useDiagramEditor';
+// 框架無關的繪製引擎也從主入口轉出(進階 / 非 React 用法可改 import 'react-super-mermaid/editor')。
+export {
+  createDiagramEditor,
+  registerFlowchartAdapter,
+  detectDiagramType,
+  emptyScene,
+  sceneToFlowchart,
+} from './core/editor';
+export type {
+  DiagramEditorHandle,
+  DiagramEditorOptions,
+  EditorScene,
+  SceneNode,
+  SceneEdge,
+  DiagramType,
+  NodeShape,
+  Tool,
+} from './core/editor';
+
 // ── core(框架無關) ──
 export { renderDiagram } from './core/render-pipeline';
 export { loadMermaid } from './core/load-mermaid';

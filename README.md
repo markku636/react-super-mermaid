@@ -29,6 +29,25 @@ Plus mermaid's native `default` / `dark` / `neutral` / `forest` and `auto`.
 
 > The previews above are styled with the package's real palettes. Run the demo to see live, interactive output (see [Demo](#demo)).
 
+## ✏️ Draw → Mermaid — `<MermaidEditor>`
+
+An **Excalidraw-style node/edge editor** whose output is clean Mermaid. Drag to place shapes, drag from a node edge to connect (or drag to empty space to spawn a connected node), double‑click to rename, right‑click for shape / colour / align, group into subgraphs, toggle flow direction, auto‑tidy the layout, and read or copy the live source. **Bidirectional** — pass existing `source` and it becomes a draggable diagram; every edit regenerates valid Mermaid.
+
+<p align="center">
+  <img src="assets/hero-editor.png" alt="MermaidEditor — draw to mermaid" width="92%" />
+</p>
+
+```tsx
+import { MermaidEditor } from 'react-super-mermaid';
+
+<MermaidEditor
+  source={`flowchart TD\n  A([Start]) --> B{OK?}\n  B -- Yes --> C[Done]`}
+  onMermaidChange={(code) => save(code)} // live mermaid out
+/>;
+```
+
+Highlights: one‑click shape palette · hover‑to‑connect · drag‑to‑empty creates a connected node · double‑click rename (nodes & edges) · right‑click menu (shape, colour, align, group) · `Ctrl+D` duplicate · `Ctrl+G` group · arrow‑key nudge · undo/redo · auto‑layout (整理) · built‑in source panel. The framework‑free engine is also exported at `react-super-mermaid/editor` (`createDiagramEditor`) for non‑React hosts.
+
 ## Diagram types
 
 Anything mermaid can draw, `<MermaidViewer>` renders — with pan/zoom, search and export on top. The `colorful` theme adds a modern palette, soft shadows and slate edges to flowchart / sequence / class / state / ER, plus vibrant per-type colouring for pie / gantt / mindmap / timeline / journey; `sketch` brings the Excalidraw hand-drawn look. Every theme (including mermaid's native ones) gets a font-weight legibility boost so labels stay crisp. The blocks below render live on GitHub.
