@@ -18,8 +18,10 @@ import {
   cmdAddNode,
   cmdAlignNodes,
   cmdDeleteSelection,
+  cmdDistributeNodes,
   cmdGroup,
   cmdMoveNodes,
+  cmdUngroup,
   cmdSetDirection,
   cmdSetEdgeStyle,
   cmdSetLabel,
@@ -112,6 +114,10 @@ export interface DiagramEditorHandle {
   setNodeColor(id: string, fill: string, stroke: string): void;
   /** 對齊多個選取節點。 */
   alignSelection(axis: AlignAxis): void;
+  /** 均分:3+ 個選取節點在水平/垂直方向等距分佈。 */
+  distributeSelection(axis: 'h' | 'v'): void;
+  /** 解除節點所屬的 subgraph 群組(若有)。 */
+  ungroupNode(nodeId: string): void;
 
   setDark(dark: boolean): void;
 
@@ -461,6 +467,9 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       addSep();
       addItem('改名', () => openEditor(id));
       addItem('複製', () => handle.duplicateSelection());
+      if (scene.nodes.find((n) => n.id === id)?.parentId) {
+        addItem('解除群組', () => handle.ungroupNode(id));
+      }
       if (pointer.getSelection().length > 1) {
         addItem('群組成 subgraph', () => handle.groupSelection());
         addSep();
@@ -470,6 +479,11 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         addItem('靠上對齊', () => handle.alignSelection('top'));
         addItem('垂直置中', () => handle.alignSelection('middleY'));
         addItem('靠下對齊', () => handle.alignSelection('bottom'));
+        if (pointer.getSelection().length > 2) {
+          addSep();
+          addItem('水平均分', () => handle.distributeSelection('h'));
+          addItem('垂直均分', () => handle.distributeSelection('v'));
+        }
         addSep();
       }
       addItem('刪除', () => handle.deleteSelection());
@@ -660,6 +674,14 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     alignSelection: (axis) => {
       const ids = pointer.getSelection().filter((id) => scene.nodes.some((n) => n.id === id));
       if (ids.length >= 2) pointerHost.runCommand(cmdAlignNodes(ids, axis), 'align');
+    },
+    distributeSelection: (axis) => {
+      const ids = pointer.getSelection().filter((id) => scene.nodes.some((n) => n.id === id));
+      if (ids.length >= 3) pointerHost.runCommand(cmdDistributeNodes(ids, axis), 'distribute');
+    },
+    ungroupNode: (nodeId) => {
+      const node = scene.nodes.find((n) => n.id === nodeId);
+      if (node?.parentId) pointerHost.runCommand(cmdUngroup(node.parentId), 'ungroup');
     },
 
     setDark: (d) => {

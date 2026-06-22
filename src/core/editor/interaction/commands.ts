@@ -166,6 +166,39 @@ export function cmdGroup(container: SceneContainer): Command {
   });
 }
 
+/** 解除群組:移除容器,並清掉其子節點的 parentId(節點本身保留)。 */
+export function cmdUngroup(containerId: string): Command {
+  return (scene) => ({
+    scene: {
+      ...scene,
+      containers: scene.containers.filter((c) => c.id !== containerId),
+      nodes: scene.nodes.map((n) => (n.parentId === containerId ? { ...n, parentId: undefined } : n)),
+    },
+    patch: { structural: true },
+  });
+}
+
+/** 均分:把 3+ 個選取節點在水平('h')或垂直('v')方向等距分佈(頭尾固定)。 */
+export function cmdDistributeNodes(ids: string[], axis: 'h' | 'v'): Command {
+  return (scene) => {
+    const sel = scene.nodes.filter((n) => ids.includes(n.id));
+    if (sel.length < 3) return { scene, patch: {} };
+    const cOf = (n: SceneNode): number => (axis === 'h' ? n.x + n.w / 2 : n.y + n.h / 2);
+    const sorted = [...sel].sort((a, b) => cOf(a) - cOf(b));
+    const firstC = cOf(sorted[0]);
+    const lastC = cOf(sorted[sorted.length - 1]);
+    const step = (lastC - firstC) / (sorted.length - 1);
+    const target = new Map<string, number>();
+    sorted.forEach((n, i) => target.set(n.id, firstC + step * i));
+    const nodes = scene.nodes.map((n) => {
+      const c = target.get(n.id);
+      if (c == null) return n;
+      return axis === 'h' ? { ...n, x: c - n.w / 2 } : { ...n, y: c - n.h / 2 };
+    });
+    return { scene: { ...scene, nodes }, patch: { nodes: ids } };
+  };
+}
+
 export function cmdSetDirection(direction: 'TB' | 'TD' | 'BT' | 'LR' | 'RL'): Command {
   return (scene) => {
     if (scene.meta.type !== 'flowchart') return { scene, patch: {} };

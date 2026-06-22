@@ -58,7 +58,7 @@ type Mode =
   | { kind: 'rubber-edge'; sourceId: string; from: Point }
   | { kind: 'reconnect-edge'; edgeId: string; endpoint: 'source' | 'target'; anchorFixed: Point }
   | { kind: 'marquee'; startWorld: Point; additive: boolean }
-  | { kind: 'pan'; lastClient: Point };
+  | { kind: 'pan'; lastClient: Point; deselectAt?: Point };
 
 export class PointerController {
   private tool: Tool = 'select';
@@ -314,9 +314,14 @@ export class PointerController {
       return;
     }
 
-    // 空白 → 框選。
-    this.mode = { kind: 'marquee', startWorld: world, additive: e.shiftKey };
-    if (!e.shiftKey) this.clearSelection();
+    // 空白處:Shift+拖曳 → 框選(保留多選能力);一般拖曳 → 平移畫布(放開後仍是選取工具);
+    // 純點擊未拖曳 → 取消選取。
+    if (e.shiftKey) {
+      this.mode = { kind: 'marquee', startWorld: world, additive: true };
+      return;
+    }
+    this.mode = { kind: 'pan', lastClient: { x: e.clientX, y: e.clientY }, deselectAt: { x: e.clientX, y: e.clientY } };
+    this.svg.style.cursor = 'grabbing';
   };
 
   /** 閒置時:滑過節點顯示連線控制點(讓「點到節點就能拉線」直覺可發現)。 */
@@ -499,6 +504,10 @@ export class PointerController {
     }
     if (m.kind === 'pan') {
       this.svg.style.cursor = this.tool === 'pan' ? 'grab' : 'default';
+      // 從空白處按下且幾乎沒拖曳 → 視為點擊空白 → 取消選取。
+      if (m.deselectAt && Math.hypot(e.clientX - m.deselectAt.x, e.clientY - m.deselectAt.y) < 4) {
+        this.clearSelection();
+      }
     }
   };
 
