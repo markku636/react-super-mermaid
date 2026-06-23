@@ -649,9 +649,20 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       addSep();
       addItem('刪除', () => handle.deleteSelection());
     } else if (scene.diagramType === 'sequence') {
-      // sequence:空白右鍵 → 新增參與者 / 新增訊息(可從零建構)。
-      addItem('新增參與者', () => pointerHost.runCommand(cmdAddSeqParticipant(), 'add-participant'));
-      addItem('新增訊息', () => pointerHost.runCommand(cmdAddSeqMessage(), 'add-message'));
+      // sequence:空白右鍵 → 新增參與者 / 新增訊息(可從零建構),新增後直接進入編輯。
+      addItem('新增參與者', () => {
+        const ids = new Set(scene.sequence?.participants.map((p) => p.id) ?? []);
+        let n = 1;
+        while (ids.has(`P${n}`)) n += 1;
+        const newId = `P${n}`;
+        pointerHost.runCommand(cmdAddSeqParticipant(), 'add-participant');
+        setTimeout(() => openEditor(newId), 0);
+      });
+      addItem('新增訊息', () => {
+        const idx = scene.sequence?.statements.length ?? 0;
+        pointerHost.runCommand(cmdAddSeqMessage(), 'add-message');
+        setTimeout(() => openSeqMessageEditor(idx), 0);
+      });
       addSep();
       addItem('整理排版', () => void handle.tidy());
     } else {
