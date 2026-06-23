@@ -22,11 +22,9 @@ function escapeLabel(label: string, kind?: SceneNode['labelKind']): string {
     return `"\`${inner}\`"`;
   }
   if (isBareSafe(label)) return label;
-  const escaped = label
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/#/g, '&#35;')
-    .replace(/\r?\n/g, '<br/>');
+  // 引號內 mermaid 保留 & # ( ) 等字面值;只需轉義會破壞解析的 " 與換行。
+  // (先前還轉 &→&amp;、#→&#35;,但 mermaid 不會還原 → 每次 round-trip 重複轉義成 &amp;amp; 而資料漸壞。)
+  const escaped = label.replace(/"/g, '&quot;').replace(/\r?\n/g, '<br/>');
   return `"${escaped}"`;
 }
 
