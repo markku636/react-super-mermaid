@@ -15,6 +15,7 @@ interface ClassMemberLike {
   text?: string;
   parameters?: string;
   returnType?: string;
+  classifier?: string;
 }
 interface ClassNodeLike {
   id: string;
@@ -72,15 +73,16 @@ function arrowFromClass(t: string | undefined): ArrowHead {
 }
 
 /** 重建成員字串:`+String name`。 */
+// classifier:* = 抽象、$ = 靜態(mermaid 分開存)。保留進字串以免 round-trip 丟失。
 function memberText(m: ClassMemberLike): string {
   const vis = m.visibility ?? '';
-  return `${vis}${m.id ?? ''}`.trim();
+  return `${vis}${m.id ?? ''}${m.classifier ?? ''}`.trim();
 }
-/** 重建方法字串:`+makeSound() void`。 */
+/** 重建方法字串:`+makeSound() void`(classifier 接在括號後,如 `+area()* double`)。 */
 function methodText(m: ClassMemberLike): string {
   const vis = m.visibility ?? '';
   const ret = m.returnType ? ` ${m.returnType}` : '';
-  return `${vis}${m.id ?? ''}(${m.parameters ?? ''})${ret}`.trim();
+  return `${vis}${m.id ?? ''}(${m.parameters ?? ''})${m.classifier ?? ''}${ret}`.trim();
 }
 
 function classSize(label: string, rows: string[]): { w: number; h: number } {

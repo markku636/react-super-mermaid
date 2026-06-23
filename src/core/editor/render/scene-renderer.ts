@@ -271,8 +271,18 @@ export class SceneRenderer {
       );
       for (const r of rows) {
         const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
-        row.textContent = genericDisplay(r);
-        row.setAttribute('style', 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;');
+        // classifier:抽象(*)→ 斜體、靜態($)→ 底線(UML 慣例),顯示時去掉標記。
+        let text = r;
+        let extra = '';
+        const afterParen = text.match(/\)([*$])(\s|$)/);
+        const trailing = afterParen ? null : text.match(/([*$])\s*$/);
+        const mark = afterParen?.[1] ?? trailing?.[1];
+        if (mark === '*') extra = 'font-style:italic;';
+        else if (mark === '$') extra = 'text-decoration:underline;';
+        if (afterParen) text = text.replace(/\)[*$]/, ')');
+        else if (trailing) text = text.replace(/[*$]\s*$/, '');
+        row.textContent = genericDisplay(text);
+        row.setAttribute('style', `white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${extra}`);
         sec.appendChild(row as unknown as Node);
       }
       root.appendChild(sec as unknown as Node);
