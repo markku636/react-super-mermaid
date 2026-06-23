@@ -9,7 +9,7 @@ import { moveNodes } from '../scene/scene-ops';
 import type { EditorScene, SceneNode } from '../scene/types';
 import { svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, updateEdgeGeometry } from './edges';
-import { INK, INK_DARK, paletteByIndex, seedFor } from './palette';
+import { INK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -263,10 +263,12 @@ export class SceneRenderer {
     while (this.containersLayer.firstChild) this.containersLayer.removeChild(this.containersLayer.firstChild);
     if (scene.containers.length === 0) return;
     const byId = new Map(scene.nodes.map((n) => [n.id, n] as const));
-    const ink = this.dark ? INK_DARK : INK;
     const PAD = 18;
     const LABEL_H = 22;
+    let ci = 0;
     for (const c of scene.containers) {
+      // 對齊 Edit Diagram:每個 subgraph 取叢集底色 + 同色標題(色相循序)。
+      const cp = clusterByIndex(ci++);
       const rects = c.childNodeIds
         .map((id) => byId.get(id))
         .filter((n): n is SceneNode => Boolean(n))
@@ -283,10 +285,9 @@ export class SceneRenderer {
         width: w,
         height: h,
         rx: 8,
-        fill: this.dark ? 'rgba(148,163,184,0.06)' : 'rgba(100,116,139,0.06)',
-        stroke: this.dark ? '#64748b' : '#94a3b8',
+        fill: cp.fill,
+        stroke: cp.stroke,
         'stroke-width': 1.5,
-        'stroke-dasharray': '6 5',
       });
       box.style.pointerEvents = 'none';
       this.containersLayer.appendChild(box);
@@ -297,7 +298,7 @@ export class SceneRenderer {
         div.textContent = c.label;
         div.setAttribute(
           'style',
-          `font:600 12px/${LABEL_H}px var(--rsm-editor-font);color:${ink};opacity:0.75;` +
+          `font:700 12px/${LABEL_H}px var(--rsm-editor-font);color:${cp.stroke};` +
             'padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
         );
         fo.appendChild(div as unknown as Node);
