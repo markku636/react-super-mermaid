@@ -31,7 +31,7 @@ Plus mermaid's native `default` / `dark` / `neutral` / `forest` and `auto`.
 
 ## ✏️ Draw → Mermaid — `<MermaidEditor>`
 
-An **Excalidraw-style visual editor** whose output is clean Mermaid, covering **six diagram types**: **flowchart, state, ER, class, mindmap, and sequence**. Drag to place shapes, drag from a node edge to connect (or drag to empty space to spawn a connected node), double‑click to rename (and to edit ER attributes / class members / sequence messages), right‑click for shape / colour / align / type‑specific actions, group into subgraphs, toggle flow direction, auto‑tidy the layout, and read / copy / export (SVG·PNG) the live source. Colours match the Colorful preview theme exactly. **Bidirectional** — pass existing `source` and it becomes an editable diagram; every edit regenerates valid Mermaid (round‑trip idempotent).
+An **Excalidraw-style visual editor** whose output is clean Mermaid, covering **six diagram types**: **flowchart, state, ER, class, mindmap, and sequence**. Drag to place shapes, drag from a node edge to connect (or drag to empty space to spawn a connected node), double‑click to rename (and to edit ER attributes / class members / sequence messages), right‑click for shape / colour / align / type‑specific actions, group into subgraphs, toggle flow direction, auto‑tidy the layout, **edit the Mermaid source two‑way** (Apply / Ctrl+Enter re‑renders the diagram), **copy the diagram to the clipboard as an image**, and export SVG·PNG. Start from a **template** on the empty canvas and press **`?`** for the keyboard‑shortcut overlay. Colours match the Colorful preview theme exactly, and `classDef`/`style`/`linkStyle`, generics, abstract/static members, ER crow's‑foot and markdown labels all render faithfully. **Bidirectional** — pass existing `source` and it becomes an editable diagram; every edit regenerates valid Mermaid (round‑trip idempotent).
 
 <p align="center">
   <img src="assets/hero-editor.png" alt="MermaidEditor — draw to mermaid" width="92%" />
@@ -46,7 +46,7 @@ import { MermaidEditor } from 'react-super-mermaid';
 />;
 ```
 
-Highlights: six diagram types · one‑click shape palette · hover‑to‑connect · drag‑to‑empty creates a connected node · empty‑drag pans · double‑click rename / edit cell content · right‑click menus (shape, colour, align, group; ER/class/sequence type‑specific) · build sequences from scratch (add participants / messages) · `Ctrl+D` duplicate · `Ctrl+G` group · arrow‑key nudge · undo/redo · auto‑layout (整理) · built‑in source panel · SVG/PNG export. The framework‑free engine is also exported at `react-super-mermaid/editor` (`createDiagramEditor`) for non‑React hosts.
+Highlights: six diagram types · one‑click shape palette (11 shapes via right‑click) · hover‑to‑connect · drag‑to‑empty creates a connected node · empty‑drag pans · double‑click rename / edit cell content · right‑click menus (shape, colour, align, group; ER/class/sequence type‑specific) · build sequences from scratch (add participants / messages / notes) · edge **reconnect** · `Ctrl+D` duplicate · `Ctrl+G` group · arrow‑key nudge · undo/redo · auto‑layout (整理) · **editable** source panel · SVG/PNG export · **copy‑to‑clipboard** · **starter templates** on the empty canvas · **`?` shortcut help** · light/dark. The framework‑free engine is also exported at `react-super-mermaid/editor` (`createDiagramEditor`) for non‑React hosts.
 
 ## Diagram types
 
