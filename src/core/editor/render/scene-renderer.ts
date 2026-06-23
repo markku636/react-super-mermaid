@@ -150,6 +150,12 @@ export class SceneRenderer {
     }
     g.appendChild(shapesG);
 
+    // ER 實體 / class:多隔間框(標題列 + 屬性/成員列),貼近「Edit Diagram」預覽外觀。
+    if (node.data?.kind === 'er') {
+      this.fillErEntity(g, node);
+      return;
+    }
+
     // label foreignObject(置中):一律深色墨字(節點底色都是淺色)+ 跟隨 look 的字體 → 清晰。
     if (node.label) {
       const fo = svgEl('foreignObject', { x: 0, y: 0, width: node.w, height: node.h });
@@ -165,6 +171,44 @@ export class SceneRenderer {
       fo.appendChild(div as unknown as Node);
       g.appendChild(fo);
     }
+  }
+
+  /** ER 實體框:標題列(實體名)+ 屬性列。外框矩形已由 fillNodeContent 畫好,這裡疊內容。 */
+  private fillErEntity(g: SVGGElement, node: SceneNode): void {
+    const attrs = node.data?.kind === 'er' ? node.data.attributes : [];
+    const fo = svgEl('foreignObject', { x: 0, y: 0, width: node.w, height: node.h });
+    fo.style.pointerEvents = 'none';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;width:100%;height:100%;box-sizing:border-box;' +
+        `overflow:hidden;font:13px/1.4 var(--rsm-editor-font);color:${INK};`,
+    );
+    const title = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    title.textContent = node.label;
+    title.setAttribute(
+      'style',
+      `font-weight:700;text-align:center;padding:5px 8px;border-bottom:1px solid ${INK};` +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
+    );
+    root.appendChild(title as unknown as Node);
+    if (attrs.length) {
+      const body = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+      body.setAttribute('style', 'flex:1;padding:3px 8px;overflow:hidden;');
+      for (const a of attrs) {
+        const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+        const keys = a.keys && a.keys.length ? ` ${a.keys.join(',')}` : '';
+        row.textContent = `${a.type ?? ''} ${a.name}${keys}`.trim();
+        row.setAttribute(
+          'style',
+          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;',
+        );
+        body.appendChild(row as unknown as Node);
+      }
+      root.appendChild(body as unknown as Node);
+    }
+    fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
   }
 
   private static geomKey(n: SceneNode): string {

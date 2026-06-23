@@ -129,7 +129,10 @@ export type EdgeData =
       cardinalitySource?: string;
       cardinalityTarget?: string;
     }
-  | { kind: 'er'; identifying: boolean };
+  | { kind: 'er'; identifying: boolean; cardStart?: ErCardinality; cardEnd?: ErCardinality };
+
+/** ER 連線端的基數(crow's foot)。 */
+export type ErCardinality = 'zeroOrOne' | 'onlyOne' | 'zeroOrMore' | 'oneOrMore';
 
 export interface SceneEdge {
   id: string;
