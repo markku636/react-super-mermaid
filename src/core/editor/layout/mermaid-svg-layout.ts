@@ -87,15 +87,23 @@ export const mermaidSvgLayout: LayoutEngine = {
     const shiftX = PADDING - minX;
     const shiftY = PADDING - minY;
 
+    // mermaid 以自身字型量節點;編輯器標籤用較大的 14px → 短標籤(如 "DB")可能在抓到的
+    // 框內換行。對每個節點以編輯器字型估一個下限,只把過窄/過矮者撐大(不縮小 mermaid 佈局)。
+    const labelMin = (label: string): { w: number; h: number } => {
+      const lines = label.split(/<br\s*\/?>|\n/);
+      const longest = lines.reduce((m, s) => Math.max(m, s.length), 0);
+      return { w: longest * 9 + 22, h: lines.length * 19 + 14 };
+    };
     const nodes: SceneNode[] = scene.nodes.map((n) => {
       const b = positions.get(n.id);
       if (!b) return n;
+      const min = n.label ? labelMin(n.label) : { w: 0, h: 0 };
       return {
         ...n,
         x: b.cx - b.w / 2 + shiftX,
         y: b.cy - b.h / 2 + shiftY,
-        w: b.w,
-        h: b.h,
+        w: Math.max(b.w, min.w),
+        h: Math.max(b.h, min.h),
       };
     });
 
