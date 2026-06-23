@@ -23,6 +23,9 @@ const CSS = `
 .rsm-editor-toolbar .rsm-tb-spacer{flex:1 1 auto;}
 .rsm-shape-btn{display:inline-flex;align-items:center;gap:4px;}
 .rsm-shape-btn .rsm-shape-glyph{font-size:15px;line-height:1;}
+/* 下拉選單:選項一律深字淺底(原生 option 在暗色下常白底白字,看不清)。 */
+.rsm-editor-toolbar select{color:inherit;}
+.rsm-editor-toolbar select option{background:#ffffff;color:#1f2937;}
 
 /* 右鍵選單 */
 .rsm-ctx{position:absolute;z-index:40;min-width:128px;padding:4px;border-radius:8px;

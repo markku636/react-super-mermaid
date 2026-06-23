@@ -6,7 +6,7 @@
 //   但以 `layoutOwner:'engine'` 標記其座標為衍生值。
 // - 型別差異收進判別式 data / meta;新增圖種只加 variant,不動共用形狀。
 
-export type DiagramType = 'flowchart' | 'sequence' | 'class' | 'er' | 'state';
+export type DiagramType = 'flowchart' | 'sequence' | 'class' | 'er' | 'state' | 'mindmap';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
 export type NodeShape =
@@ -82,6 +82,7 @@ export type NodeData =
   | { kind: 'sequence'; actor: boolean }
   | { kind: 'class'; members: string[]; methods: string[]; stereotype?: string }
   | { kind: 'er'; attributes: ErAttribute[] }
+  | { kind: 'mindmap'; shapeType: number }
   | { kind: 'note'; text: string };
 
 export interface ErAttribute {
@@ -177,7 +178,8 @@ export type SceneMeta =
   | { type: 'state'; direction?: FlowDirection }
   | { type: 'sequence'; autonumber: boolean }
   | { type: 'class'; direction?: FlowDirection }
-  | { type: 'er'; direction?: FlowDirection };
+  | { type: 'er'; direction?: FlowDirection }
+  | { type: 'mindmap' };
 
 /** round-trip 時 DB 看不到 / 尚未模型化的內容,逐字保留。 */
 export interface SceneRaw {
@@ -215,7 +217,9 @@ export function emptyScene(diagramType: DiagramType = 'flowchart'): EditorScene 
           ? { type: 'sequence', autonumber: false }
           : diagramType === 'class'
             ? { type: 'class' }
-            : { type: 'er' };
+            : diagramType === 'mindmap'
+              ? { type: 'mindmap' }
+              : { type: 'er' };
   return {
     version: 1,
     diagramType,
