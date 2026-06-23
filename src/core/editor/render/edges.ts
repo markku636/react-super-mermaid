@@ -1,9 +1,8 @@
 // 連線繪製:plain <path> + 正確掛載的箭頭 marker + 粗透明 hit path + label。
 // 邊用平滑曲線(非 rough)以確保箭頭端點對齊;節點才是手繪主視覺。
 
-import { edgeAnchors } from '../scene/geometry';
 import type { ArrowHead, EditorScene, Point, SceneEdge } from '../scene/types';
-import { getNode } from '../scene/scene-ops';
+import { getNode, resolveEdgeAnchors } from '../scene/scene-ops';
 import { svgEl, XHTML_NS } from './dom';
 import { INK, INK_DARK } from './palette';
 
@@ -153,7 +152,7 @@ function parallelMid(scene: EditorScene, edge: SceneEdge, start: Point, end: Poi
 
 /** 計算一條邊的折線點(start anchor → waypoints → end anchor)。 */
 export function edgePoints(scene: EditorScene, edge: SceneEdge): Point[] | null {
-  const anchors = edgeAnchors(edge, getNode(scene, edge.source), getNode(scene, edge.target));
+  const anchors = resolveEdgeAnchors(scene, edge);
   if (!anchors) return null;
   if (edge.waypoints && edge.waypoints.length) return [anchors.start, ...edge.waypoints, anchors.end];
   const mid = parallelMid(scene, edge, anchors.start, anchors.end);

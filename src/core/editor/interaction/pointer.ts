@@ -4,14 +4,20 @@
 
 import {
   boundingBox,
-  edgeAnchors,
   nodeRect,
   perimeterAnchor,
   rectCenter,
   rectsIntersect,
   type Rect,
 } from '../scene/geometry';
-import { getNode, makeEdge, makeNode, nextEdgeId, nextNodeId } from '../scene/scene-ops';
+import {
+  getNode,
+  makeEdge,
+  makeNode,
+  nextEdgeId,
+  nextNodeId,
+  resolveEdgeAnchors,
+} from '../scene/scene-ops';
 import type { EditorScene, NodeShape, Point, SceneNode } from '../scene/types';
 import {
   cmdAddConnectedNode,
@@ -263,7 +269,7 @@ export class PointerController {
     for (const eid of this.selection) {
       const edge = scene0.edges.find((x) => x.id === eid);
       if (!edge) continue;
-      const anchors = edgeAnchors(edge, getNode(scene0, edge.source), getNode(scene0, edge.target));
+      const anchors = resolveEdgeAnchors(scene0, edge);
       if (!anchors) continue;
       if (Math.hypot(world.x - anchors.start.x, world.y - anchors.start.y) <= reconnectHitR) {
         this.mode = { kind: 'reconnect-edge', edgeId: eid, endpoint: 'source', anchorFixed: anchors.end };

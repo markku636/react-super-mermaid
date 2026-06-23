@@ -10,6 +10,8 @@ import type {
   SceneEdge,
   SceneNode,
 } from './types';
+import type { Rect } from './geometry';
+import { boundingBox, nodeRect, perimeterAnchor, rectCenter, shapeAnchor } from './geometry';
 
 let nodeCounter = 0;
 let edgeCounter = 0;
@@ -39,6 +41,41 @@ export function _resetIdCounters(): void {
 
 export function getNode(scene: EditorScene, id: string): SceneNode | undefined {
   return scene.nodes.find((n) => n.id === id);
+}
+
+// 容器外框內距(對齊 scene-renderer.renderContainers,讓連到容器的邊錨在實際畫出的框上)。
+const C_PAD = 18;
+const C_LABEL_H = 22;
+
+/** 容器(複合狀態 / subgraph)依其子節點 bbox + 內距推得的外框矩形。 */
+export function containerRect(scene: EditorScene, id: string): Rect | null {
+  const c = scene.containers.find((k) => k.id === id);
+  if (!c) return null;
+  const rects = c.childNodeIds
+    .map((cid) => getNode(scene, cid))
+    .filter((n): n is SceneNode => Boolean(n))
+    .map(nodeRect);
+  const bb = boundingBox(rects);
+  if (!bb) return null;
+  return { x: bb.x - C_PAD, y: bb.y - C_PAD - C_LABEL_H, w: bb.w + C_PAD * 2, h: bb.h + C_PAD * 2 + C_LABEL_H };
+}
+
+/** 邊的兩端錨點,支援節點 *與容器*(複合狀態)端點。容器端用矩形周界錨點。 */
+export function resolveEdgeAnchors(
+  scene: EditorScene,
+  edge: SceneEdge,
+): { start: Point; end: Point } | null {
+  const sNode = getNode(scene, edge.source);
+  const tNode = getNode(scene, edge.target);
+  const sRect = sNode ? nodeRect(sNode) : containerRect(scene, edge.source);
+  const tRect = tNode ? nodeRect(tNode) : containerRect(scene, edge.target);
+  if (!sRect || !tRect) return null;
+  const sc = rectCenter(sRect);
+  const tc = rectCenter(tRect);
+  return {
+    start: sNode ? shapeAnchor(sNode, tc) : perimeterAnchor(sRect, tc),
+    end: tNode ? shapeAnchor(tNode, sc) : perimeterAnchor(tRect, sc),
+  };
 }
 
 export function getEdge(scene: EditorScene, id: string): SceneEdge | undefined {
