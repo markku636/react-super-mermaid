@@ -459,14 +459,18 @@ export class SceneRenderer {
     }
 
     // 參與者方框:頂端(帶 data-node-id 供選取 / 雙擊改名)+ 底端(裝飾)。
+    // clean 風套用與一般節點相同的柔和陰影,視覺一致。
+    const shadow = this.look === 'clean' ? `url(#${NODE_SHADOW_ID})` : '';
     const txt = this.dark ? '#e9ecef' : '#1f2937';
     for (const c of cols) {
       const top = svgEl('g', { 'data-node-id': c.id, class: 'rsm-node' });
       const tb = svgEl('rect', { x: c.x, y: c.y, width: c.w, height: c.h, rx: c.actor ? 16 : 6, fill: fillBox, stroke: ink, 'stroke-width': 1.5 });
+      if (shadow) tb.style.filter = shadow;
       top.appendChild(tb);
       top.appendChild(this.seqText(c.cx, c.y + c.h / 2 + 1, c.label, txt, 13, 700, 'middle'));
       g.appendChild(top);
       const bb = svgEl('rect', { x: c.x, y: bottomY + 4, width: c.w, height: HEAD_H, rx: c.actor ? 16 : 6, fill: fillBox, stroke: ink, 'stroke-width': 1.5 });
+      if (shadow) bb.style.filter = shadow;
       bb.style.pointerEvents = 'none';
       g.appendChild(bb);
       g.appendChild(this.seqText(c.cx, bottomY + 4 + HEAD_H / 2 + 1, c.label, txt, 13, 700, 'middle'));
