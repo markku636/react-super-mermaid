@@ -217,6 +217,19 @@ export function cmdAddSeqMessage(): Command {
   };
 }
 
+/** sequence:新增 note(預設 over 第一位參與者;新增後可直接編輯文字)。 */
+export function cmdAddSeqNote(): Command {
+  return (scene) => {
+    if (!scene.sequence || scene.sequence.participants.length === 0) return { scene, patch: {} };
+    const actors = scene.sequence.participants[0].id;
+    const statements = [
+      ...scene.sequence.statements,
+      { kind: 'note' as const, placement: 'over' as const, actors, text: 'note' },
+    ];
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
 /** sequence:刪除參與者(同步移除鏡像 node、相關訊息,並重排剩餘欄位)。 */
 export function cmdDeleteSeqParticipant(id: string): Command {
   return (scene) => {

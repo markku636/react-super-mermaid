@@ -18,6 +18,7 @@ import {
   cmdAddElements,
   cmdAddNode,
   cmdAddSeqMessage,
+  cmdAddSeqNote,
   cmdAddSeqParticipant,
   cmdDeleteSeqParticipant,
   cmdDeleteSeqStatement,
@@ -667,6 +668,11 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       addItem('新增訊息', () => {
         const idx = scene.sequence?.statements.length ?? 0;
         pointerHost.runCommand(cmdAddSeqMessage(), 'add-message');
+        setTimeout(() => openSeqMessageEditor(idx), 0);
+      });
+      addItem('新增筆記', () => {
+        const idx = scene.sequence?.statements.length ?? 0;
+        pointerHost.runCommand(cmdAddSeqNote(), 'add-note');
         setTimeout(() => openSeqMessageEditor(idx), 0);
       });
       addSep();
