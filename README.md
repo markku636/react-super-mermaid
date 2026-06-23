@@ -31,7 +31,7 @@ Plus mermaid's native `default` / `dark` / `neutral` / `forest` and `auto`.
 
 ## ✏️ Draw → Mermaid — `<MermaidEditor>`
 
-An **Excalidraw-style node/edge editor** whose output is clean Mermaid. Drag to place shapes, drag from a node edge to connect (or drag to empty space to spawn a connected node), double‑click to rename, right‑click for shape / colour / align, group into subgraphs, toggle flow direction, auto‑tidy the layout, and read or copy the live source. **Bidirectional** — pass existing `source` and it becomes a draggable diagram; every edit regenerates valid Mermaid.
+An **Excalidraw-style visual editor** whose output is clean Mermaid, covering **six diagram types**: **flowchart, state, ER, class, mindmap, and sequence**. Drag to place shapes, drag from a node edge to connect (or drag to empty space to spawn a connected node), double‑click to rename (and to edit ER attributes / class members / sequence messages), right‑click for shape / colour / align / type‑specific actions, group into subgraphs, toggle flow direction, auto‑tidy the layout, and read / copy / export (SVG·PNG) the live source. Colours match the Colorful preview theme exactly. **Bidirectional** — pass existing `source` and it becomes an editable diagram; every edit regenerates valid Mermaid (round‑trip idempotent).
 
 <p align="center">
   <img src="assets/hero-editor.png" alt="MermaidEditor — draw to mermaid" width="92%" />
@@ -46,7 +46,7 @@ import { MermaidEditor } from 'react-super-mermaid';
 />;
 ```
 
-Highlights: one‑click shape palette · hover‑to‑connect · drag‑to‑empty creates a connected node · double‑click rename (nodes & edges) · right‑click menu (shape, colour, align, group) · `Ctrl+D` duplicate · `Ctrl+G` group · arrow‑key nudge · undo/redo · auto‑layout (整理) · built‑in source panel. The framework‑free engine is also exported at `react-super-mermaid/editor` (`createDiagramEditor`) for non‑React hosts.
+Highlights: six diagram types · one‑click shape palette · hover‑to‑connect · drag‑to‑empty creates a connected node · empty‑drag pans · double‑click rename / edit cell content · right‑click menus (shape, colour, align, group; ER/class/sequence type‑specific) · build sequences from scratch (add participants / messages) · `Ctrl+D` duplicate · `Ctrl+G` group · arrow‑key nudge · undo/redo · auto‑layout (整理) · built‑in source panel · SVG/PNG export. The framework‑free engine is also exported at `react-super-mermaid/editor` (`createDiagramEditor`) for non‑React hosts.
 
 ## Diagram types
 
