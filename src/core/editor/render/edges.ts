@@ -56,6 +56,57 @@ export function buildMarkers(dark: boolean): SVGMarkerElement[] {
   });
 }
 
+/**
+ * ER 基數記號(crow's foot):於實體邊界端依基數畫「內層(基數:一=短橫 / 多=鳥足)+
+ * 外層(模態:強制=短橫 / 可選=圓圈)」。p=實體邊界點,u=沿線往外的單位向量。
+ */
+function drawErCardinality(
+  g: SVGGElement,
+  p: Point,
+  u: Point,
+  card: 'zeroOrOne' | 'onlyOne' | 'zeroOrMore' | 'oneOrMore',
+  ink: string,
+  dark: boolean,
+): void {
+  const bg = dark ? '#23232e' : '#ffffff';
+  const vx = -u.y;
+  const vy = u.x; // 垂直單位向量
+  const at = (d: number): Point => ({ x: p.x + u.x * d, y: p.y + u.y * d });
+  const tick = (d: number, h: number): string => {
+    const c = at(d);
+    return `M${c.x + vx * h},${c.y + vy * h} L${c.x - vx * h},${c.y - vy * h}`;
+  };
+  const stroke = (d: string): void => {
+    g.appendChild(svgEl('path', { d, stroke: ink, 'stroke-width': 1.4, fill: 'none', 'stroke-linecap': 'round' }));
+  };
+  const isMany = card === 'zeroOrMore' || card === 'oneOrMore';
+  const isOptional = card === 'zeroOrOne' || card === 'zeroOrMore';
+  // 內層基數
+  if (isMany) {
+    const tip = at(15);
+    const b = at(0);
+    const bp = { x: b.x + vx * 7, y: b.y + vy * 7 };
+    const bm = { x: b.x - vx * 7, y: b.y - vy * 7 };
+    stroke(`M${tip.x},${tip.y} L${bp.x},${bp.y} M${tip.x},${tip.y} L${b.x},${b.y} M${tip.x},${tip.y} L${bm.x},${bm.y}`);
+  } else {
+    stroke(tick(11, 7));
+  }
+  // 外層模態
+  if (isOptional) {
+    const c = at(22);
+    g.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 5, fill: bg, stroke: ink, 'stroke-width': 1.4 }));
+  } else {
+    stroke(tick(19, 7));
+  }
+}
+
+function unit(from: Point, to: Point): Point {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: dx / len, y: dy / len };
+}
+
 function pathThrough(points: Point[]): string {
   if (points.length < 2) return '';
   const [first, ...rest] = points;
@@ -107,6 +158,14 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
   if (endMk) vis.setAttribute('marker-end', `url(#${endMk})`);
   if (startMk) vis.setAttribute('marker-start', `url(#${startMk})`);
   g.appendChild(vis);
+
+  // ER 基數記號(crow's foot):兩端各依 cardStart / cardEnd 繪製。
+  if (edge.data?.kind === 'er' && pts && pts.length >= 2) {
+    const s = pts[0];
+    const e = pts[pts.length - 1];
+    if (edge.data.cardStart) drawErCardinality(g, s, unit(s, pts[1]), edge.data.cardStart, ink, dark);
+    if (edge.data.cardEnd) drawErCardinality(g, e, unit(e, pts[pts.length - 2]), edge.data.cardEnd, ink, dark);
+  }
 
   // label。
   if (edge.label && pts) {
