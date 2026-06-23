@@ -99,11 +99,12 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
     fo.style.overflow = 'visible';
     const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     div.textContent = edge.label;
+    // 標籤底色一律淺(白底膠囊),故文字一律用深墨色(對齊 Edit Diagram,且修暗色模式下淺字白底看不清)。
     div.setAttribute(
       'style',
       'display:flex;align-items:center;justify-content:center;height:28px;' +
-        `font:13px/1.2 var(--rsm-editor-font);color:${ink};` +
-        'background:var(--rsm-edge-label-bg,#ffffffcc);border-radius:4px;padding:0 4px;text-align:center;white-space:nowrap;',
+        `font:600 13px/1.2 var(--rsm-editor-font);color:${INK};` +
+        'background:var(--rsm-edge-label-bg,#ffffffe6);border-radius:4px;padding:0 5px;text-align:center;white-space:nowrap;',
     );
     fo.appendChild(div as unknown as Node);
     g.appendChild(fo);
