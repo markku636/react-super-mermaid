@@ -128,9 +128,16 @@ export function sceneToFlowchart(scene: EditorScene): SerializeResult {
   }
 
   // 7. 節點內聯樣式(編輯器設的底色 / 框線)→ mermaid `style <id> fill:..,stroke:..`。
+  //    來自原文的 style 行已在 §8 逐字回吐(且可能含本層不解析的屬性),這裡只補「編輯器新設」的。
+  const styledInRaw = new Set<string>();
+  for (const s of scene.raw?.styleLines ?? []) {
+    const m = s.trim().match(/^style\s+([^\s]+)\s/);
+    if (m) for (const id of m[1].split(',')) styledInRaw.add(id.trim());
+  }
   for (const n of scene.nodes) {
     const st = n.style;
     if (!st || st.classRef) continue; // classRef 已在宣告時用 :::name 輸出
+    if (styledInRaw.has(n.id)) continue; // 原文已有 style 行 → 由 §8 回吐,避免重複
     const parts: string[] = [];
     if (st.fill) parts.push(`fill:${st.fill}`);
     if (st.stroke) parts.push(`stroke:${st.stroke}`);

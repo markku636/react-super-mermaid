@@ -53,23 +53,23 @@ interface FlowEdgeLike {
   style?: string[];
 }
 
-/** linkStyle 解析後的 per-edge style 陣列(如 ["stroke:#e11","stroke-width:3px"])→ ElementStyle。 */
-function edgeStyleFromArray(styles: string[] | undefined): ElementStyle | undefined {
+/** style/linkStyle/classDef 的屬性陣列(如 ["fill:#bbf","stroke:#e11","stroke-width:3px"])→ ElementStyle。 */
+function parseStyleProps(styles: string[] | undefined): ElementStyle | undefined {
   if (!styles || !styles.length) return undefined;
-  let stroke: string | undefined;
-  let strokeWidth: number | undefined;
+  const out: ElementStyle = {};
   for (const s of styles) {
     const idx = s.indexOf(':');
     if (idx < 0) continue;
     const k = s.slice(0, idx).trim();
     const v = s.slice(idx + 1).trim();
-    if (k === 'stroke' && v && v !== 'none') stroke = v;
+    if (k === 'fill' && v && v !== 'none') out.fill = v;
+    else if (k === 'stroke' && v && v !== 'none') out.stroke = v;
     else if (k === 'stroke-width') {
       const n = parseFloat(v);
-      if (!Number.isNaN(n)) strokeWidth = n;
-    }
+      if (!Number.isNaN(n)) out.strokeWidth = n;
+    } else if (k === 'color' && v) out.color = v;
   }
-  return stroke || strokeWidth ? { stroke, strokeWidth } : undefined;
+  return Object.keys(out).length ? out : undefined;
 }
 
 interface FlowSubGraphLike {
@@ -109,6 +109,7 @@ function prescan(src: string): {
   comments: string[];
   styleLines: string[];
   clickLines: string[];
+  classDefs: Map<string, string[]>;
 } {
   let body = src;
   let frontmatter: string | undefined;
@@ -123,13 +124,21 @@ function prescan(src: string): {
   const comments: string[] = [];
   const styleLines: string[] = [];
   const clickLines: string[] = [];
+  // getClasses() 常為空 → 自原文解析 classDef NAME[,NAME2] fill:...,stroke:... 供節點上色。
+  const classDefs = new Map<string, string[]>();
   for (const raw of body.split('\n')) {
     const line = raw.trim();
     if (line.startsWith('%%')) comments.push(line);
-    else if (/^(classDef|class|style|linkStyle)\b/.test(line)) styleLines.push(line);
-    else if (/^(click|href)\b/.test(line)) clickLines.push(line);
+    else if (/^(classDef|class|style|linkStyle)\b/.test(line)) {
+      styleLines.push(line);
+      const cd = line.match(/^classDef\s+(\S+)\s+(.+)$/);
+      if (cd) {
+        const props = cd[2].split(',').map((s) => s.trim());
+        for (const name of cd[1].split(',')) classDefs.set(name.trim(), props);
+      }
+    } else if (/^(click|href)\b/.test(line)) clickLines.push(line);
   }
-  return { frontmatter, comments, styleLines, clickLines };
+  return { frontmatter, comments, styleLines, clickLines, classDefs };
 }
 
 async function getFlowDb(text: string, mermaid: MermaidLike): Promise<FlowDbLike | undefined> {
@@ -238,8 +247,12 @@ export async function flowDbToScene(text: string, mermaid: MermaidLike): Promise
       data: { kind: 'flowchart' },
       sourceIndex: idx++,
     };
-    if (v.classes && v.classes.length > 0) {
-      node.style = { classRef: v.classes[0] };
+    // 節點上色:classDef(由 classRef 解析)+ 行內 style(v.styles,優先)合併。
+    const classRef = v.classes && v.classes.length > 0 ? v.classes[0] : undefined;
+    const classProps = classRef ? parseStyleProps(pre.classDefs.get(classRef)) : undefined;
+    const inlineProps = parseStyleProps(v.styles);
+    if (classRef || classProps || inlineProps) {
+      node.style = { ...classProps, ...inlineProps, ...(classRef ? { classRef } : {}) };
     }
     nodes.push(node);
   }
@@ -258,7 +271,7 @@ export async function flowDbToScene(text: string, mermaid: MermaidLike): Promise
       arrowStart: arrow.arrowStart,
       arrowEnd: arrow.arrowEnd,
       minLen: arrow.minLen,
-      style: edgeStyleFromArray(fe.style),
+      style: parseStyleProps(fe.style),
       data: { kind: 'flowchart' },
       sourceIndex: eIdx++,
     });
