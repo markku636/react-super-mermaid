@@ -123,11 +123,41 @@ function midpoint(points: Point[]): Point {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }
 
+/**
+ * 平行邊(同一對節點之間多條 / 雙向)彼此外凸避免重疊:回傳一個垂直位移後的中點。
+ * 單一邊(絕大多數)回 null → 維持原本兩點直線,零影響。
+ */
+function parallelMid(scene: EditorScene, edge: SceneEdge, start: Point, end: Point): Point | null {
+  const a = edge.source < edge.target ? edge.source : edge.target;
+  const b = edge.source < edge.target ? edge.target : edge.source;
+  const sibs = scene.edges.filter((e) => {
+    const x = e.source < e.target ? e.source : e.target;
+    const y = e.source < e.target ? e.target : e.source;
+    return x === a && y === b;
+  });
+  if (sibs.length <= 1) return null;
+  const idx = sibs.findIndex((e) => e.id === edge.id);
+  const offset = (idx - (sibs.length - 1) / 2) * 22;
+  if (offset === 0) return null;
+  // 用「規範方向」(小 id → 大 id)算垂直軸,確保同對的各邊往兩側分開。
+  const na = getNode(scene, a);
+  const nb = getNode(scene, b);
+  if (!na || !nb) return null;
+  const dx = nb.x + nb.w / 2 - (na.x + na.w / 2);
+  const dy = nb.y + nb.h / 2 - (na.y + na.h / 2);
+  const len = Math.hypot(dx, dy) || 1;
+  const px = -dy / len;
+  const py = dx / len;
+  return { x: (start.x + end.x) / 2 + px * offset, y: (start.y + end.y) / 2 + py * offset };
+}
+
 /** 計算一條邊的折線點(start anchor → waypoints → end anchor)。 */
 export function edgePoints(scene: EditorScene, edge: SceneEdge): Point[] | null {
   const anchors = edgeAnchors(edge, getNode(scene, edge.source), getNode(scene, edge.target));
   if (!anchors) return null;
-  return [anchors.start, ...(edge.waypoints ?? []), anchors.end];
+  if (edge.waypoints && edge.waypoints.length) return [anchors.start, ...edge.waypoints, anchors.end];
+  const mid = parallelMid(scene, edge, anchors.start, anchors.end);
+  return mid ? [anchors.start, mid, anchors.end] : [anchors.start, anchors.end];
 }
 
 /** 建立一條邊的 <g data-edge-id>(可見路徑 + hit path + label)。 */
