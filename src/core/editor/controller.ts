@@ -17,6 +17,8 @@ import {
   cmdAddConnectedNode,
   cmdAddElements,
   cmdAddNode,
+  cmdAddSeqMessage,
+  cmdAddSeqParticipant,
   cmdAlignNodes,
   cmdDeleteSelection,
   cmdDistributeNodes,
@@ -626,6 +628,12 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       });
       addSep();
       addItem('刪除', () => handle.deleteSelection());
+    } else if (scene.diagramType === 'sequence') {
+      // sequence:空白右鍵 → 新增參與者 / 新增訊息(可從零建構)。
+      addItem('新增參與者', () => pointerHost.runCommand(cmdAddSeqParticipant(), 'add-participant'));
+      addItem('新增訊息', () => pointerHost.runCommand(cmdAddSeqMessage(), 'add-message'));
+      addSep();
+      addItem('整理排版', () => void handle.tidy());
     } else {
       const world = viewport.screenToWorld(e.clientX, e.clientY);
       addItem('在此新增節點', () => {

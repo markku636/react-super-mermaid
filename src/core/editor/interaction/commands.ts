@@ -167,6 +167,56 @@ export function cmdGroup(container: SceneContainer): Command {
   });
 }
 
+/** sequence:新增參與者(附加一欄,座標沿用 parse 的欄位佈局 GAP=56)。 */
+export function cmdAddSeqParticipant(): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const ids = new Set(scene.sequence.participants.map((p) => p.id));
+    let n = 1;
+    while (ids.has(`P${n}`)) n += 1;
+    const id = `P${n}`;
+    const label = id;
+    const w = Math.max(96, label.length * 9 + 28);
+    const seqNodes = scene.nodes.filter((x) => x.data?.kind === 'sequence');
+    const last = seqNodes[seqNodes.length - 1];
+    const x = last ? last.x + last.w + 56 : 40;
+    const node: SceneNode = {
+      id,
+      shape: 'participant',
+      label,
+      x,
+      y: 12,
+      w,
+      h: 40,
+      data: { kind: 'sequence', actor: false },
+      sourceIndex: scene.nodes.length,
+    };
+    return {
+      scene: {
+        ...scene,
+        nodes: [...scene.nodes, node],
+        sequence: { ...scene.sequence, participants: [...scene.sequence.participants, { id, label, actor: false }] },
+      },
+      patch: { structural: true },
+    };
+  };
+}
+
+/** sequence:新增一條訊息(預設在前兩個參與者之間)。 */
+export function cmdAddSeqMessage(): Command {
+  return (scene) => {
+    if (!scene.sequence || scene.sequence.participants.length === 0) return { scene, patch: {} };
+    const ps = scene.sequence.participants;
+    const from = ps[0].id;
+    const to = ps[Math.min(1, ps.length - 1)].id;
+    const statements = [
+      ...scene.sequence.statements,
+      { kind: 'message' as const, from, to, arrow: '->>', text: 'message' },
+    ];
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
 /** sequence:改某條訊息的文字(scene.sequence.statements[index])。 */
 export function cmdSetSeqMessageText(index: number, text: string): Command {
   return (scene) => {
