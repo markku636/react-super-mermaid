@@ -150,8 +150,26 @@ function parallelMid(scene: EditorScene, edge: SceneEdge, start: Point, end: Poi
   return { x: (start.x + end.x) / 2 + px * offset, y: (start.y + end.y) / 2 + py * offset };
 }
 
+/** 自迴圈(A→A):從節點右緣繞出、再回到頂緣,避免兩端錨點重合成零長度。 */
+function selfLoopPoints(scene: EditorScene, edge: SceneEdge): Point[] | null {
+  const n = getNode(scene, edge.source);
+  if (!n) return null;
+  const { x, y, w, h } = n;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const out = Math.max(22, Math.min(46, h * 0.7));
+  return [
+    { x: x + w, y: cy - h * 0.18 }, // 右緣出
+    { x: x + w + out, y: cy - h * 0.18 },
+    { x: x + w + out, y: y - out },
+    { x: cx + w * 0.18, y: y - out },
+    { x: cx + w * 0.18, y: y }, // 頂緣入(箭頭朝下)
+  ];
+}
+
 /** 計算一條邊的折線點(start anchor → waypoints → end anchor)。 */
 export function edgePoints(scene: EditorScene, edge: SceneEdge): Point[] | null {
+  if (edge.source === edge.target) return selfLoopPoints(scene, edge);
   const anchors = resolveEdgeAnchors(scene, edge);
   if (!anchors) return null;
   if (edge.waypoints && edge.waypoints.length) return [anchors.start, ...edge.waypoints, anchors.end];
