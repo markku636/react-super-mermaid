@@ -418,12 +418,20 @@ export class SceneRenderer {
     for (const c of cols) g.appendChild(line(c.cx, HEAD_Y + HEAD_H, c.cx, bottomY, { dash: true, w: 1 }));
 
     // 訊息 + note
+    let autoNum = 0;
     for (const d of drawn) {
       if (d.kind === 'msg' && d.s.kind === 'message') {
         const s = d.s;
         const x1 = cxOf(s.from);
         const x2 = cxOf(s.to);
         const dashed = s.arrow.includes('--');
+        // autonumber:在來源端畫一個編號圓圈(對齊 mermaid 行為)。
+        if (seq.autonumber) {
+          autoNum += 1;
+          const nx = s.from === s.to ? x1 : x1 + (x2 > x1 ? 9 : -9);
+          g.appendChild(svgEl('circle', { cx: nx, cy: d.y, r: 9, fill: this.dark ? '#26262b' : '#ffffff', stroke: ink, 'stroke-width': 1 }));
+          g.appendChild(this.seqText(nx, d.y + 1, String(autoNum), ink, 10, 700, 'middle'));
+        }
         let rect: { x: number; y: number; w: number; h: number };
         if (s.from === s.to) {
           const r = 20;
