@@ -139,6 +139,8 @@ export interface DiagramEditorHandle {
   downloadPng(filename?: string, opts?: ExportRasterOptions): Promise<void>;
   /** 把目前圖以 PNG 寫入剪貼簿(對標 draw.io / Excalidraw 的「複製為圖片」)。需安全環境 + 使用者手勢。 */
   copyPngToClipboard(opts?: ExportRasterOptions): Promise<void>;
+  /** 顯示 / 隱藏鍵盤快捷鍵說明浮層(? 鍵亦可)。 */
+  toggleHelp(show?: boolean): void;
 
   /** 用既有 render-pipeline 在 container 渲染目前場景的「美化預覽」。 */
   renderPreview(container: HTMLElement, theme?: MermaidTheme): Promise<void>;
@@ -498,9 +500,72 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   };
 
   // 鍵盤(掛在 host;編輯文字時 textarea 已 stopPropagation)。
+  // 鍵盤快捷鍵說明浮層(對標 Excalidraw 的「?」)。
+  const HELP_ROWS: Array<[string, string]> = [
+    ['V', '選取 / 移動'],
+    ['E', '連線(從節點拉線)'],
+    ['N', '新增節點工具'],
+    ['雙擊節點', '編輯文字'],
+    ['雙擊空白', '在該處新增節點'],
+    ['Tab', '在選取節點旁新增相連節點'],
+    ['Del / ⌫', '刪除選取'],
+    ['Ctrl/⌘ Z / Y', '復原 / 重做'],
+    ['Ctrl/⌘ C / V', '複製 / 貼上'],
+    ['Ctrl/⌘ D', '原地複製'],
+    ['Ctrl/⌘ G', '群組 subgraph'],
+    ['Ctrl/⌘ A', '全選'],
+    ['方向鍵', '微調位置'],
+    ['右鍵', '情境選單(外形 / 顏色 / 對齊)'],
+    ['Esc', '取消選取 / 關閉'],
+    ['?', '顯示 / 隱藏此說明'],
+  ];
+  let helpOverlay: HTMLElement | null = null;
+  const toggleHelp = (show?: boolean): void => {
+    const want = show ?? !helpOverlay;
+    if (!want) {
+      helpOverlay?.remove();
+      helpOverlay = null;
+      return;
+    }
+    if (helpOverlay) return;
+    helpOverlay = document.createElement('div');
+    helpOverlay.className = 'rsm-help-overlay';
+    const panel = document.createElement('div');
+    panel.className = 'rsm-help-panel';
+    const h = document.createElement('div');
+    h.className = 'rsm-help-title';
+    h.textContent = '鍵盤快捷鍵';
+    panel.appendChild(h);
+    const grid = document.createElement('div');
+    grid.className = 'rsm-help-grid';
+    for (const [key, desc] of HELP_ROWS) {
+      const kb = document.createElement('kbd');
+      kb.textContent = key;
+      const d = document.createElement('span');
+      d.textContent = desc;
+      grid.appendChild(kb);
+      grid.appendChild(d);
+    }
+    panel.appendChild(grid);
+    helpOverlay.appendChild(panel);
+    helpOverlay.addEventListener('pointerdown', (ev) => {
+      if (ev.target === helpOverlay) toggleHelp(false); // 點背景關閉
+    });
+    host.appendChild(helpOverlay);
+  };
+
   const onKeyDown = (e: KeyboardEvent): void => {
     const active = document.activeElement;
     if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT')) return;
+    if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+      e.preventDefault();
+      toggleHelp();
+      return;
+    }
+    if (helpOverlay && e.key === 'Escape') {
+      toggleHelp(false);
+      return;
+    }
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     if (mod && k === 'z' && !e.shiftKey) {
@@ -944,6 +1009,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       const blob = await handle.exportPng(rasterOpts);
       downloadBlob(blob, filename);
     },
+    toggleHelp: (show) => toggleHelp(show),
     copyPngToClipboard: async (rasterOpts) => {
       const nav = (globalThis as { navigator?: Navigator }).navigator;
       const CI = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
@@ -976,6 +1042,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       host.removeEventListener('contextmenu', onContextMenu);
       closeContextMenu();
       emptyHint.remove();
+      helpOverlay?.remove();
       svg.remove();
       host.classList.remove('rsm-editor-root', 'rsm-dark', 'rsm-clean');
       listeners.clear();

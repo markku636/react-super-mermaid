@@ -35,6 +35,20 @@ const CSS = `
 .rsm-editor-root.rsm-dark .rsm-empty-hint{color:#6b7280;}
 .rsm-empty-hint.rsm-empty-show{opacity:0.9;}
 
+/* 鍵盤快捷鍵說明浮層(? 開啟,點背景 / Esc 關閉)。 */
+.rsm-help-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:rgba(15,18,25,0.32);z-index:30;}
+.rsm-help-panel{background:var(--rsm-editor-bg,#fff);color:inherit;border-radius:12px;padding:18px 22px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:min(92%,460px);max-height:84%;overflow:auto;
+  border:1px solid var(--rsm-border,#e5e7eb);}
+.rsm-editor-root.rsm-dark .rsm-help-panel{background:#23232e;border-color:#3a3a40;}
+.rsm-help-title{font-weight:700;font-size:15px;margin-bottom:12px;}
+.rsm-help-grid{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;align-items:center;font-size:13px;}
+.rsm-help-grid kbd{justify-self:start;font-family:ui-monospace,monospace;font-size:12px;
+  background:var(--rsm-editor-dot,#eef0f3);color:inherit;border-radius:5px;padding:2px 7px;white-space:nowrap;
+  border:1px solid rgba(0,0,0,0.12);}
+.rsm-editor-root.rsm-dark .rsm-help-grid kbd{background:#15151b;border-color:#3a3a40;}
+
 /* 右鍵選單 */
 .rsm-ctx{position:absolute;z-index:40;min-width:128px;padding:4px;border-radius:8px;
   background:var(--rsm-ctx-bg,#1f1f23);color:var(--rsm-ctx-fg,#e8e8ea);

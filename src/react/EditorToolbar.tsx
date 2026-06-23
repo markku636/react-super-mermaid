@@ -154,6 +154,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       >
         {copied ? '✓ 已複製' : '⧉ 複製'}
       </button>
+      <button type="button" className="rsm-btn" onClick={() => h?.toggleHelp()} title="鍵盤快捷鍵說明（?）">
+        ?
+      </button>
     </div>
   );
 }
