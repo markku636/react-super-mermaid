@@ -571,6 +571,28 @@ function styleXychart(svg: Element): void {
   });
 }
 
+function styleQuadrant(svg: Element): void {
+  // 4 個象限底色:mermaid 預設給幾乎一樣的淺紫(#ECECFF/#f1f1ff/#f6f6ff/#fbfbff)難以區分 →
+  // 換成 4 個柔和但可辨識的分區色(對標付費優先級矩陣)。比對那幾個固定底色,改不到就略過。
+  const QUAD_TINTS = ['#EFF6FF', '#ECFDF5', '#FEFCE8', '#FEF2F2'];
+  const palePat = /^#(ececff|f1f1ff|f6f6ff|fbfbff)$/i;
+  Array.from(svg.querySelectorAll<SVGElement>('rect'))
+    .filter((r) => palePat.test((r.style.fill || r.getAttribute('fill') || '').trim()))
+    .slice(0, 4)
+    .forEach((r, i) => {
+      r.style.fill = QUAD_TINTS[i % QUAD_TINTS.length];
+    });
+  // 資料點:colorful 主題下點的 fill 被算成 hsl(...NaN%) 而失效(變黑小點)→ 給鮮明色 + 白描邊 + 放大。
+  Array.from(svg.querySelectorAll<SVGElement>('circle')).forEach((c, i) => {
+    c.style.fill = PIE_PALETTE[i % PIE_PALETTE.length];
+    c.style.stroke = '#FFFFFF';
+    c.style.strokeWidth = '1.5px';
+    if (Number(c.getAttribute('r') ?? '0') < 7) {
+      c.setAttribute('r', '7');
+    }
+  });
+}
+
 /**
  * 字體清晰度:對「任何主題」渲染出的圖加重文字字重,小字與縮圖也讀得清楚。
  * 只動 font-weight(不改色),故對原生 neutral/forest/dark 主題也安全,不會打架。
@@ -662,5 +684,7 @@ export function colorizeDiagram(root: ParentNode, opts: ColorizeOptions = {}): v
     styleJourney(svg);
   } else if (kind === 'xychart') {
     styleXychart(svg);
+  } else if (kind === 'quadrantChart') {
+    styleQuadrant(svg);
   }
 }

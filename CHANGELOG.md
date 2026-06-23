@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.80 — quadrant chart: distinct zones + visible points
+
+- **Improvement/fix** (chart viewer): quadrant charts rendered with 4
+  near-identical pale-lavender zones (indistinguishable) and data points whose
+  colourful-theme fill computed to `hsl(…,NaN%)` — i.e. invisible/black dots.
+  The colourizer now gives the 4 quadrants distinct soft tints (blue/green/
+  yellow/red, like a paid priority matrix) and recolours points to vibrant
+  palette colours with a white outline + minimum radius.
+
 ## 0.6.79 — vibrant xychart bars
 
 - **Improvement** (chart viewer): xychart (bar/line) charts weren't colourized,
