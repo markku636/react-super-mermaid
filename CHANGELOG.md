@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.77 — robust empty/whitespace source
+
+- **Fix**: loading an empty or whitespace-only source threw
+  `UnknownDiagramError: No diagram type detected` from the layout path
+  (`mermaid-svg-layout` fed empty text to `mermaid.render`). Now guarded —
+  empty scene / blank code skips layout and returns as-is, so the empty-canvas
+  hint shows gracefully (e.g. opening an empty mermaid block in VS Code).
+
 ## 0.6.76 — runtime sketch/clean look toggle (Excalidraw homage)
 
 - **`setLook(look)` / `getLook()`** on the editor handle: switch the canvas

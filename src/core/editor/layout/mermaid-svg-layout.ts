@@ -39,6 +39,9 @@ function readBox(g: SVGGraphicsElement): { cx: number; cy: number; w: number; h:
 export const mermaidSvgLayout: LayoutEngine = {
   async layout(scene: EditorScene, ctx: LayoutContext): Promise<EditorScene> {
     assertBrowser('mermaidSvgLayout');
+    // 空場景 / 空白原始碼:mermaid render 會丟 "No diagram type detected"。無需排版,原樣返回
+    // (空白畫布提示會顯示),避免載入空 / 純空白圖時拋例外。
+    if (scene.nodes.length === 0 || !ctx.code.trim()) return scene;
     const mermaid = await loadMermaid({ source: ctx.mermaid });
 
     // pristine 渲染(htmlLabels:false)→ 節點是 <rect>,getBBox 可靠。
