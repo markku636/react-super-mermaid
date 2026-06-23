@@ -175,17 +175,19 @@ export class SceneRenderer {
       return;
     }
 
-    // label foreignObject(置中):一律深色墨字(節點底色都是淺色)+ 跟隨 look 的字體 → 清晰。
+    // label foreignObject(置中):預設深色墨字(節點底色多為淺色);classDef/style 指定 color 時尊重之
+    // (例如深底 fill + color:#fff)。
     if (node.label) {
       const fo = svgEl('foreignObject', { x: 0, y: 0, width: node.w, height: node.h });
       fo.style.pointerEvents = 'none';
       const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
       div.textContent = node.label.replace(/<br\s*\/?>/g, '\n');
+      const textColor = node.style?.color ?? INK;
       div.setAttribute(
         'style',
         'display:flex;align-items:center;justify-content:center;width:100%;height:100%;' +
           'box-sizing:border-box;padding:4px 8px;font:600 14px/1.3 var(--rsm-editor-font);' +
-          `color:${INK};text-align:center;white-space:pre-wrap;word-break:break-word;overflow:hidden;`,
+          `color:${textColor};text-align:center;white-space:pre-wrap;word-break:break-word;overflow:hidden;`,
       );
       fo.appendChild(div as unknown as Node);
       g.appendChild(fo);
