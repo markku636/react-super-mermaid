@@ -90,13 +90,18 @@ function classSize(label: string, rows: string[]): { w: number; h: number } {
   return { w, h };
 }
 
-function prescan(src: string): { comments: string[] } {
+function prescan(src: string): { comments: string[]; generics: Map<string, string> } {
   const comments: string[] = [];
+  // 類別自身的泛型參數(class Foo~T~)被 mermaid getData 丟棄 → 從原文撈回。
+  const generics = new Map<string, string>();
+  const reGeneric = /\bclass\s+(\w+)~([^~]+)~/g;
+  let m: RegExpExecArray | null;
+  while ((m = reGeneric.exec(src)) !== null) generics.set(m[1], m[2]);
   for (const raw of src.split('\n')) {
     const line = raw.trim();
     if (line.startsWith('%%')) comments.push(line);
   }
-  return { comments };
+  return { comments, generics };
 }
 
 async function getClassDb(text: string, mermaid: MermaidLike): Promise<ClassDbLike | undefined> {
@@ -175,7 +180,7 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
       w: size.w,
       h: size.h,
       parentId: dn.parentId ?? null,
-      data: { kind: 'class', members, methods, stereotype },
+      data: { kind: 'class', members, methods, stereotype, generic: pre.generics.get(dn.id) },
       sourceIndex: nIdx++,
     });
   }

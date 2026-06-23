@@ -64,7 +64,12 @@ export function sceneToClass(scene: EditorScene): SerializeResult {
     const members = data?.members ?? [];
     const methods = data?.methods ?? [];
     const stereotype = data?.stereotype;
-    const named = n.label && n.label !== n.id ? `${n.id}["${n.label}"]` : n.id;
+    // 泛型類別 → `Id~T~`;自訂標籤 → `Id["label"]`;否則裸 id。
+    const named = data?.generic
+      ? `${n.id}~${data.generic}~`
+      : n.label && n.label !== n.id
+        ? `${n.id}["${n.label}"]`
+        : n.id;
     if (members.length || methods.length || stereotype) {
       lines.push(`${pad}class ${named} {`);
       if (stereotype) lines.push(`${pad}${INDENT}<<${stereotype}>>`);

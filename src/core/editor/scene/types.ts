@@ -80,7 +80,7 @@ export type NodeData =
   | { kind: 'flowchart' }
   | { kind: 'state'; isStart?: boolean; isEnd?: boolean; composite?: boolean }
   | { kind: 'sequence'; actor: boolean }
-  | { kind: 'class'; members: string[]; methods: string[]; stereotype?: string }
+  | { kind: 'class'; members: string[]; methods: string[]; stereotype?: string; generic?: string }
   | { kind: 'er'; attributes: ErAttribute[] }
   | { kind: 'mindmap'; shapeType: number }
   | { kind: 'note'; text: string };

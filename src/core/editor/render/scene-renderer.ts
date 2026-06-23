@@ -255,10 +255,13 @@ export class SceneRenderer {
       d.setAttribute('style', style);
       return d;
     };
+    // mermaid 泛型語法 ~T~ 在顯示時呈現為 <T>(序列化仍保留 ~T~)。
+    const genericDisplay = (s: string): string => s.replace(/~([^~]+)~/g, '<$1>');
     const title = mkSection(
       `font-weight:700;text-align:center;padding:4px 8px;border-bottom:1px solid ${INK};white-space:pre-wrap;`,
     );
-    title.textContent = (data?.stereotype ? `«${data.stereotype}»\n` : '') + node.label;
+    const nameWithGeneric = data?.generic ? `${node.label}~${data.generic}~` : node.label;
+    title.textContent = (data?.stereotype ? `«${data.stereotype}»\n` : '') + genericDisplay(nameWithGeneric);
     root.appendChild(title as unknown as Node);
     const addRows = (rows: string[], borderTop: boolean, fill: boolean): void => {
       if (!rows.length) return;
@@ -268,7 +271,7 @@ export class SceneRenderer {
       );
       for (const r of rows) {
         const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
-        row.textContent = r;
+        row.textContent = genericDisplay(r);
         row.setAttribute('style', 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;');
         sec.appendChild(row as unknown as Node);
       }
