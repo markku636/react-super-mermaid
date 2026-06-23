@@ -260,10 +260,11 @@ export class SceneRenderer {
     );
     title.textContent = (data?.stereotype ? `«${data.stereotype}»\n` : '') + node.label;
     root.appendChild(title as unknown as Node);
-    const addRows = (rows: string[], borderTop: boolean): void => {
+    const addRows = (rows: string[], borderTop: boolean, fill: boolean): void => {
       if (!rows.length) return;
+      // 最後一個隔間 flex:1 撐到框底(UML 標準外觀,消除框底浮空空白)。
       const sec = mkSection(
-        `flex:0 0 auto;padding:3px 8px;${borderTop ? `border-top:1px solid ${INK};` : ''}`,
+        `flex:${fill ? '1 1 auto' : '0 0 auto'};padding:3px 8px;${borderTop ? `border-top:1px solid ${INK};` : ''}`,
       );
       for (const r of rows) {
         const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
@@ -273,8 +274,10 @@ export class SceneRenderer {
       }
       root.appendChild(sec as unknown as Node);
     };
-    addRows(data?.members ?? [], false);
-    addRows(data?.methods ?? [], (data?.members?.length ?? 0) > 0);
+    const hasMembers = (data?.members?.length ?? 0) > 0;
+    const hasMethods = (data?.methods?.length ?? 0) > 0;
+    addRows(data?.members ?? [], false, !hasMethods);
+    addRows(data?.methods ?? [], hasMembers, true);
     fo.appendChild(root as unknown as Node);
     g.appendChild(fo);
   }
