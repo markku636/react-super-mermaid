@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.82 — journey chart dark-aware
+
+- **Fix**: in dark mode, user-journey task boxes used solid light fills with
+  light text — nearly unreadable (faint grey on light blue). Now dark mode uses
+  the translucent palette (soft dark tints) for tasks + forces light text, so
+  labels read clearly. Light mode unchanged.
+
 ## 0.6.81 — quadrant zones dark-aware
 
 - **Fix**: the quadrant zone tints added in 0.6.80 were light-only, so in dark

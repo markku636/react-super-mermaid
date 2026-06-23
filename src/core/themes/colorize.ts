@@ -527,14 +527,17 @@ function styleMindmap(svg: Element): void {
 }
 
 /** Journey:依任務型別替圓點上色,笑臉維持不動。 */
-function styleJourney(svg: Element): void {
+function styleJourney(svg: Element, dark: boolean): void {
+  // 任務方塊:亮色用實心淺色票(深字可讀);暗色改用半透明色票(CLUSTER_PALETTE,在深底是柔和深色塊),
+  // 配下方強制亮字,避免「淺底+淺字」在暗色幾乎看不見。
+  const taskPalette = dark ? CLUSTER_PALETTE : NODE_PALETTE;
   const tasks = Array.from(
     svg.querySelectorAll<SVGElement>('circle[class*="task-type"], rect[class*="task-type"]'),
   );
   tasks.forEach((shape) => {
     const m = (shape.getAttribute('class') ?? '').match(/task-type-(\d+)/);
     if (m) {
-      const entry = NODE_PALETTE[Number(m[1]) % NODE_PALETTE.length];
+      const entry = taskPalette[Number(m[1]) % taskPalette.length];
       shape.style.fill = entry.fill;
       shape.style.stroke = entry.stroke;
     }
@@ -547,6 +550,11 @@ function styleJourney(svg: Element): void {
       rect.style.stroke = entry.stroke;
     }
   });
+  if (dark) {
+    Array.from(svg.querySelectorAll<SVGElement>('text')).forEach((t) => {
+      t.style.fill = '#E2E8F0';
+    });
+  }
 }
 
 function styleXychart(svg: Element): void {
@@ -690,7 +698,7 @@ export function colorizeDiagram(root: ParentNode, opts: ColorizeOptions = {}): v
   } else if (kind === 'mindmap') {
     styleMindmap(svg);
   } else if (kind === 'journey') {
-    styleJourney(svg);
+    styleJourney(svg, dark);
   } else if (kind === 'xychart') {
     styleXychart(svg);
   } else if (kind === 'quadrantChart') {
