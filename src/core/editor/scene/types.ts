@@ -193,6 +193,26 @@ export interface SceneRaw {
   fullSource?: string;
 }
 
+/** sequence 圖以「依序的陳述串」建模(時間序,不吃通用 node/edge)。參與者另鏡像成 nodes 供選取。 */
+export interface SeqParticipant {
+  id: string;
+  label: string;
+  actor: boolean;
+}
+export type SeqStatement =
+  | { kind: 'message'; from: string; to: string; arrow: string; text: string; activate?: '+' | '-' }
+  | { kind: 'note'; placement: 'left of' | 'right of' | 'over'; actors: string; text: string }
+  | { kind: 'fragment'; keyword: string; label: string } // loop/alt/else/opt/par/and/critical/option/break/rect/box/...
+  | { kind: 'end' }
+  | { kind: 'activate'; actor: string }
+  | { kind: 'deactivate'; actor: string }
+  | { kind: 'raw'; text: string }; // 未模型化的行,逐字保留
+export interface SequenceData {
+  autonumber: boolean;
+  participants: SeqParticipant[];
+  statements: SeqStatement[];
+}
+
 export interface EditorScene {
   version: 1;
   diagramType: DiagramType;
@@ -200,6 +220,8 @@ export interface EditorScene {
   nodes: SceneNode[];
   edges: SceneEdge[];
   containers: SceneContainer[];
+  /** sequence 專屬資料(diagramType==='sequence' 時)。 */
+  sequence?: SequenceData;
   /** 逐字保留的 YAML frontmatter(--- ... ---)。 */
   frontmatter?: string;
   raw?: SceneRaw;
