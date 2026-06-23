@@ -256,6 +256,31 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   const overlay = new Overlay(renderer.overlayLayer);
   const history = new History();
 
+  // 空白畫布引導提示(對標 Excalidraw / draw.io)。grace 期間隱藏,避免載入既有圖時閃現。
+  const emptyHint = document.createElement('div');
+  emptyHint.className = 'rsm-empty-hint';
+  host.appendChild(emptyHint);
+  let emptyHintGrace = true;
+  const graceTimer = setTimeout(() => {
+    emptyHintGrace = false;
+    updateEmptyHint();
+  }, 600);
+  function updateEmptyHint(): void {
+    const seqHasParts = scene.diagramType === 'sequence' && (scene.sequence?.participants.length ?? 0) > 0;
+    const empty = scene.nodes.length === 0 && scene.containers.length === 0 && !seqHasParts;
+    if (emptyHintGrace || !empty) {
+      emptyHint.classList.remove('rsm-empty-show');
+      return;
+    }
+    emptyHint.textContent =
+      scene.diagramType === 'sequence'
+        ? '空白序列圖 — 在空白處按右鍵：新增參與者 / 訊息'
+        : scene.diagramType === 'mindmap'
+          ? '空白心智圖 — 在空白處按右鍵新增節點'
+          : '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
+    emptyHint.classList.add('rsm-empty-show');
+  }
+
   let scene: EditorScene = opts.scene ?? emptyScene('flowchart');
   let diagramType: DiagramType = scene.diagramType;
   let createShape: NodeShape = 'rectangle';
@@ -297,6 +322,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     diagramType = next.diagramType;
     if (opts2.render !== false) renderer.render(scene);
     refreshOverlay();
+    updateEmptyHint();
     emit('change', scene);
     emit('historychange', { canUndo: history.canUndo(), canRedo: history.canRedo() });
     emitMermaidDebounced();
@@ -922,11 +948,13 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
     destroy: () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      clearTimeout(graceTimer);
       cancelTextEdit?.();
       pointer.destroy();
       host.removeEventListener('keydown', onKeyDown);
       host.removeEventListener('contextmenu', onContextMenu);
       closeContextMenu();
+      emptyHint.remove();
       svg.remove();
       host.classList.remove('rsm-editor-root', 'rsm-dark', 'rsm-clean');
       listeners.clear();

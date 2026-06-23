@@ -28,6 +28,13 @@ const CSS = `
 .rsm-editor-toolbar select option{background:#ffffff;color:#1f2937;}
 .rsm-tb-hint{font-size:12px;opacity:0.7;padding:0 8px;align-self:center;white-space:nowrap;}
 
+/* 空白畫布引導提示:置中、不擋互動、淡入(grace 期間靠 JS 不加 show class 而隱藏)。 */
+.rsm-empty-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  pointer-events:none;text-align:center;padding:0 24px;opacity:0;transition:opacity .35s ease;
+  font:500 15px/1.7 var(--rsm-editor-font);color:var(--rsm-editor-dot,#9aa0aa);}
+.rsm-editor-root.rsm-dark .rsm-empty-hint{color:#6b7280;}
+.rsm-empty-hint.rsm-empty-show{opacity:0.9;}
+
 /* 右鍵選單 */
 .rsm-ctx{position:absolute;z-index:40;min-width:128px;padding:4px;border-radius:8px;
   background:var(--rsm-ctx-bg,#1f1f23);color:var(--rsm-ctx-fg,#e8e8ea);
