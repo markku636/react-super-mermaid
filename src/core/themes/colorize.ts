@@ -571,10 +571,13 @@ function styleXychart(svg: Element): void {
   });
 }
 
-function styleQuadrant(svg: Element): void {
+function styleQuadrant(svg: Element, dark: boolean): void {
   // 4 個象限底色:mermaid 預設給幾乎一樣的淺紫(#ECECFF/#f1f1ff/#f6f6ff/#fbfbff)難以區分 →
-  // 換成 4 個柔和但可辨識的分區色(對標付費優先級矩陣)。比對那幾個固定底色,改不到就略過。
-  const QUAD_TINTS = ['#EFF6FF', '#ECFDF5', '#FEFCE8', '#FEF2F2'];
+  // 換成 4 個柔和但可辨識的分區色(對標付費優先級矩陣)。暗色用半透明深色疊加,亮色用淺色票。
+  // 比對那幾個固定底色,改不到就略過。
+  const QUAD_TINTS = dark
+    ? ['rgba(59,130,246,0.20)', 'rgba(34,197,94,0.20)', 'rgba(234,179,8,0.20)', 'rgba(239,68,68,0.20)']
+    : ['#EFF6FF', '#ECFDF5', '#FEFCE8', '#FEF2F2'];
   const palePat = /^#(ececff|f1f1ff|f6f6ff|fbfbff)$/i;
   Array.from(svg.querySelectorAll<SVGElement>('rect'))
     .filter((r) => palePat.test((r.style.fill || r.getAttribute('fill') || '').trim()))
@@ -582,15 +585,21 @@ function styleQuadrant(svg: Element): void {
     .forEach((r, i) => {
       r.style.fill = QUAD_TINTS[i % QUAD_TINTS.length];
     });
-  // 資料點:colorful 主題下點的 fill 被算成 hsl(...NaN%) 而失效(變黑小點)→ 給鮮明色 + 白描邊 + 放大。
+  // 資料點:colorful 主題下點的 fill 被算成 hsl(...NaN%) 而失效(變黑小點)→ 給鮮明色 + 描邊 + 放大。
   Array.from(svg.querySelectorAll<SVGElement>('circle')).forEach((c, i) => {
     c.style.fill = PIE_PALETTE[i % PIE_PALETTE.length];
-    c.style.stroke = '#FFFFFF';
+    c.style.stroke = dark ? '#0F172A' : '#FFFFFF';
     c.style.strokeWidth = '1.5px';
     if (Number(c.getAttribute('r') ?? '0') < 7) {
       c.setAttribute('r', '7');
     }
   });
+  // 暗色:象限標題 / 軸標籤 / 點標籤確保亮色,在深底可讀(mermaid 有時留深字)。
+  if (dark) {
+    Array.from(svg.querySelectorAll<SVGElement>('text')).forEach((t) => {
+      t.style.fill = '#E2E8F0';
+    });
+  }
 }
 
 /**
@@ -685,6 +694,6 @@ export function colorizeDiagram(root: ParentNode, opts: ColorizeOptions = {}): v
   } else if (kind === 'xychart') {
     styleXychart(svg);
   } else if (kind === 'quadrantChart') {
-    styleQuadrant(svg);
+    styleQuadrant(svg, dark);
   }
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.81 — quadrant zones dark-aware
+
+- **Fix**: the quadrant zone tints added in 0.6.80 were light-only, so in dark
+  mode they showed as jarring bright rectangles. Now dark mode uses translucent
+  dark tints + forces light label/axis text — consistent with the dark theme.
+
 ## 0.6.80 — quadrant chart: distinct zones + visible points
 
 - **Improvement/fix** (chart viewer): quadrant charts rendered with 4
