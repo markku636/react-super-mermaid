@@ -41,7 +41,7 @@ import {
   type Command,
 } from './interaction/commands';
 import { NODE_PALETTE } from './render/palette';
-import { makeEdge, makeNode, nextEdgeId, nextNodeId } from './scene/scene-ops';
+import { containerRect, makeEdge, makeNode, nextEdgeId, nextNodeId } from './scene/scene-ops';
 import { PointerController, type PointerHost, type Tool } from './interaction/pointer';
 import { openTextEditor } from './interaction/text-edit';
 import { Viewport } from './interaction/viewport';
@@ -752,7 +752,13 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       vp.removeAttribute('transform');
       vp.style.transform = '';
     }
-    const bb = boundingBox(scene.nodes.map(nodeRect));
+    // 用與 fit() 相同的內容範圍:sequence 用 renderer.getContentBounds()(節點只含頂端參與者列,
+    // 用 node bbox 會把訊息 / 生命線裁掉);其餘退回節點 + 容器 bbox。
+    const containerRects = scene.containers
+      .map((c) => containerRect(scene, c.id))
+      .filter((r): r is NonNullable<typeof r> => Boolean(r));
+    const bb =
+      renderer.getContentBounds() ?? boundingBox([...scene.nodes.map(nodeRect), ...containerRects]);
     const pad = 24;
     if (bb) {
       clone.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.w + pad * 2} ${bb.h + pad * 2}`);
