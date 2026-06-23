@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.76 — runtime sketch/clean look toggle (Excalidraw homage)
+
+- **`setLook(look)` / `getLook()`** on the editor handle: switch the canvas
+  between **`clean`** (crisp rounded shapes + soft shadow, matches the Colorful
+  preview) and **`sketch`** (rough.js hand-drawn outlines + handwritten font, à
+  la Excalidraw) **at runtime** — rebuilds defs (shadow only in clean) + clears
+  the rough cache + re-renders. Previously the look was fixed at creation.
+- New **✏ 手繪** toolbar toggle (React `EditorToolbar` + VS Code) exposes it; the
+  React `MermaidEditor` defaults the look to `clean`.
+
 ## 0.6.40 – 0.6.63 — full-fidelity rendering, styling & polish
 
 A sweep (driven by screenshot QA across every type, shape and theme) closing

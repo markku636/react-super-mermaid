@@ -118,6 +118,22 @@ export class SceneRenderer {
     if (this.scene) this.render(this.scene);
   }
 
+  getLook(): EditorLook {
+    return this.look;
+  }
+
+  /** 切換手繪(sketch)/ 簡潔(clean)風:重建 defs(陰影只 clean 用)+ 清快取全部重畫。 */
+  setLook(look: EditorLook): void {
+    if (look === this.look) return;
+    this.look = look;
+    while (this.defs.firstChild) this.defs.removeChild(this.defs.firstChild);
+    for (const m of buildMarkers(this.dark)) this.defs.appendChild(m);
+    if (this.look === 'clean') this.appendShadowFilter();
+    this.nodeCache.clear();
+    while (this.nodesLayer.firstChild) this.nodesLayer.removeChild(this.nodesLayer.firstChild);
+    if (this.scene) this.render(this.scene);
+  }
+
   private buildNodeGroup(node: SceneNode): SVGGElement {
     const g = svgEl('g', { 'data-node-id': node.id, class: 'rsm-node' });
     g.setAttribute('transform', `translate(${node.x},${node.y})`);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { DiagramEditorHandle } from '../core/editor/controller';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { NodeShape } from '../core/editor/scene/types';
+import type { EditorLook } from '../core/editor/render/scene-renderer';
 
 export interface EditorToolbarProps {
   handle: DiagramEditorHandle | null;
@@ -14,6 +15,8 @@ export interface EditorToolbarProps {
   onToggleSource?: () => void;
   /** 目前圖種(決定顯示哪些建立控制項)。 */
   diagramType?: string;
+  /** 目前外觀(clean / sketch),供手繪切換鈕初始狀態。 */
+  look?: EditorLook;
 }
 
 // 常用外形:直接顯示成按鈕,點一下就在畫布中央放一個節點(免下拉選單、免再點畫布)。
@@ -31,6 +34,12 @@ const SHAPES: Array<{ shape: NodeShape; glyph: string; label: string }> = [
 export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const { handle: h, tool } = props;
   const [copied, setCopied] = useState(false);
+  const [look, setLookState] = useState<EditorLook>(props.look ?? 'clean');
+  const toggleLook = (): void => {
+    const next: EditorLook = look === 'sketch' ? 'clean' : 'sketch';
+    h?.setLook(next);
+    setLookState(next);
+  };
   const copyImage = (): void => {
     void h
       ?.copyPngToClipboard()
@@ -153,6 +162,14 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
         title="複製圖片到剪貼簿"
       >
         {copied ? '✓ 已複製' : '⧉ 複製'}
+      </button>
+      <button
+        type="button"
+        className={`rsm-btn${look === 'sketch' ? ' rsm-btn-active' : ''}`}
+        onClick={toggleLook}
+        title="手繪外觀（Excalidraw 風）↔ 簡潔"
+      >
+        ✏ 手繪
       </button>
       <button type="button" className="rsm-btn" onClick={() => h?.toggleHelp()} title="鍵盤快捷鍵說明（?）">
         ?

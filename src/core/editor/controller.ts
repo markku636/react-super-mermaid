@@ -141,6 +141,9 @@ export interface DiagramEditorHandle {
   copyPngToClipboard(opts?: ExportRasterOptions): Promise<void>;
   /** 顯示 / 隱藏鍵盤快捷鍵說明浮層(? 鍵亦可)。 */
   toggleHelp(show?: boolean): void;
+  /** 切換手繪(sketch)/ 簡潔(clean)外觀(致敬 Excalidraw 的手繪風)。 */
+  setLook(look: EditorLook): void;
+  getLook(): EditorLook;
 
   /** 用既有 render-pipeline 在 container 渲染目前場景的「美化預覽」。 */
   renderPreview(container: HTMLElement, theme?: MermaidTheme): Promise<void>;
@@ -1037,6 +1040,11 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       downloadBlob(blob, filename);
     },
     toggleHelp: (show) => toggleHelp(show),
+    setLook: (look) => {
+      renderer.setLook(look);
+      refreshOverlay();
+    },
+    getLook: () => renderer.getLook(),
     copyPngToClipboard: async (rasterOpts) => {
       const nav = (globalThis as { navigator?: Navigator }).navigator;
       const CI = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
