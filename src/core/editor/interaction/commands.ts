@@ -263,12 +263,12 @@ export function cmdToggleSeqArrow(index: number): Command {
   };
 }
 
-/** sequence:改某條訊息的文字(scene.sequence.statements[index])。 */
+/** sequence:改某條訊息 / note 的文字(scene.sequence.statements[index])。 */
 export function cmdSetSeqMessageText(index: number, text: string): Command {
   return (scene) => {
     if (!scene.sequence) return { scene, patch: {} };
     const statements = scene.sequence.statements.map((s, i) =>
-      i === index && s.kind === 'message' ? { ...s, text } : s,
+      i === index && (s.kind === 'message' || s.kind === 'note') ? { ...s, text } : s,
     );
     return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
   };

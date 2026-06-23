@@ -502,6 +502,12 @@ export class SceneRenderer {
         nbox.style.pointerEvents = 'none';
         g.appendChild(nbox);
         g.appendChild(this.seqText(nx + w / 2, d.y + 1, s.text, ink, 11, 400, 'middle'));
+        // 雙擊可編輯 note 文字:與訊息共用 data-seq-msg 命中機制。
+        const nrect = { x: nx, y: d.y - 12, w, h: 26 };
+        this.seqMsgRects.set(d.idx, nrect);
+        const nhit = svgEl('rect', { x: nrect.x, y: nrect.y, width: nrect.w, height: nrect.h, fill: 'transparent', 'data-seq-msg': String(d.idx) });
+        nhit.style.cursor = 'text';
+        g.appendChild(nhit);
       }
     }
 

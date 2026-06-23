@@ -568,12 +568,13 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       menu.appendChild(s);
     };
     if (seqMsgEl) {
-      // sequence 訊息右鍵:編輯文字 / 切換箭頭 / 刪除。
+      // sequence 訊息 / note 右鍵:編輯文字 /(訊息才有)切換箭頭 / 刪除。
       const idx = Number(seqMsgEl.getAttribute('data-seq-msg'));
+      const isNote = scene.sequence?.statements[idx]?.kind === 'note';
       addItem('編輯文字', () => openSeqMessageEditor(idx));
-      addItem('切換實/虛箭頭', () => pointerHost.runCommand(cmdToggleSeqArrow(idx), 'seq-arrow'));
+      if (!isNote) addItem('切換實/虛箭頭', () => pointerHost.runCommand(cmdToggleSeqArrow(idx), 'seq-arrow'));
       addSep();
-      addItem('刪除訊息', () => pointerHost.runCommand(cmdDeleteSeqStatement(idx), 'del-seq-msg'));
+      addItem(isNote ? '刪除筆記' : '刪除訊息', () => pointerHost.runCommand(cmdDeleteSeqStatement(idx), 'del-seq-msg'));
     } else if (
       nodeEl &&
       scene.nodes.find((n) => n.id === nodeEl.getAttribute('data-node-id'))?.data?.kind === 'sequence'
