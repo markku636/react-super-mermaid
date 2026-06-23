@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { DiagramEditorHandle } from '../core/editor/controller';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { NodeShape } from '../core/editor/scene/types';
@@ -29,6 +30,18 @@ const SHAPES: Array<{ shape: NodeShape; glyph: string; label: string }> = [
 /** 內建工具列。重用 .rsm-toolbar / .rsm-btn class。toolbar={false} 時 host 可改用 ref 自建。 */
 export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const { handle: h, tool } = props;
+  const [copied, setCopied] = useState(false);
+  const copyImage = (): void => {
+    void h
+      ?.copyPngToClipboard()
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1400);
+      })
+      .catch(() => {
+        /* 環境不支援剪貼簿圖片 → 靜默忽略,使用者仍可用 PNG 下載 */
+      });
+  };
   const toolBtn = (t: Tool, label: string, title: string): React.JSX.Element => (
     <button
       type="button"
@@ -132,6 +145,14 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       </button>
       <button type="button" className="rsm-btn" onClick={() => void h?.downloadPng()} title="匯出 PNG">
         PNG
+      </button>
+      <button
+        type="button"
+        className="rsm-btn"
+        onClick={copyImage}
+        title="複製圖片到剪貼簿"
+      >
+        {copied ? '✓ 已複製' : '⧉ 複製'}
       </button>
     </div>
   );

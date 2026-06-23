@@ -137,6 +137,8 @@ export interface DiagramEditorHandle {
   exportPng(opts?: ExportRasterOptions): Promise<Blob>;
   downloadSvg(filename?: string): void;
   downloadPng(filename?: string, opts?: ExportRasterOptions): Promise<void>;
+  /** 把目前圖以 PNG 寫入剪貼簿(對標 draw.io / Excalidraw 的「複製為圖片」)。需安全環境 + 使用者手勢。 */
+  copyPngToClipboard(opts?: ExportRasterOptions): Promise<void>;
 
   /** 用既有 render-pipeline 在 container 渲染目前場景的「美化預覽」。 */
   renderPreview(container: HTMLElement, theme?: MermaidTheme): Promise<void>;
@@ -941,6 +943,15 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     downloadPng: async (filename = 'diagram.png', rasterOpts) => {
       const blob = await handle.exportPng(rasterOpts);
       downloadBlob(blob, filename);
+    },
+    copyPngToClipboard: async (rasterOpts) => {
+      const nav = (globalThis as { navigator?: Navigator }).navigator;
+      const CI = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+      if (!nav?.clipboard?.write || !CI) {
+        throw new Error('此環境不支援將圖片寫入剪貼簿。');
+      }
+      const blob = await handle.exportPng(rasterOpts);
+      await nav.clipboard.write([new CI({ [blob.type]: blob })]);
     },
 
     renderPreview: async (container, theme = 'colorful') => {
