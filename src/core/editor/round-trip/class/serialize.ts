@@ -31,7 +31,11 @@ function relationLine(e: SceneEdge): string {
   const right = RIGHT_MARKER[e.arrowEnd] ?? '';
   const line = e.lineKind === 'dotted' ? '..' : '--';
   const label = e.label && e.label.length > 0 ? ` : ${e.label}` : '';
-  return `${e.source} ${left}${line}${right} ${e.target}${label}`;
+  // 基數標籤:`Source "1" --> "*" Target`(來源側緊接 source、目標側緊接 target 前)。
+  const cd = e.data?.kind === 'class' ? e.data : undefined;
+  const c1 = cd?.cardinalitySource ? ` "${cd.cardinalitySource}"` : '';
+  const c2 = cd?.cardinalityTarget ? ` "${cd.cardinalityTarget}"` : '';
+  return `${e.source}${c1} ${left}${line}${right}${c2} ${e.target}${label}`;
 }
 
 export function sceneToClass(scene: EditorScene): SerializeResult {

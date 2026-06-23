@@ -34,8 +34,16 @@ interface ClassEdgeLike {
   arrowTypeEnd?: string;
   pattern?: string;
 }
+interface ClassRelationLike {
+  id1: string;
+  id2: string;
+  title?: string;
+  relationTitle1?: string;
+  relationTitle2?: string;
+}
 interface ClassDbLike {
   getData?: () => { nodes: ClassNodeLike[]; edges: ClassEdgeLike[] };
+  getRelations?: () => ClassRelationLike[];
   getDirection?: () => string;
 }
 
@@ -154,9 +162,18 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
     });
   }
 
+  // 基數標籤(getData edges 不含,要從 getRelations 補:relationTitle1/2)。依 id1|id2|title 配對。
+  const relCard = new Map<string, { c1?: string; c2?: string }>();
+  for (const r of db.getRelations?.() ?? []) {
+    const key = `${r.id1}|${r.id2}|${r.title ?? ''}`;
+    if (!relCard.has(key)) relCard.set(key, { c1: r.relationTitle1, c2: r.relationTitle2 });
+  }
   const edges: SceneEdge[] = [];
   let eIdx = 0;
   for (const de of data.edges) {
+    const card = relCard.get(`${de.start}|${de.end}|${de.label ?? ''}`);
+    const cardinalitySource = card?.c1 && card.c1 !== 'none' ? card.c1 : undefined;
+    const cardinalityTarget = card?.c2 && card.c2 !== 'none' ? card.c2 : undefined;
     edges.push({
       id: de.id ?? `e${eIdx}`,
       source: de.start,
@@ -165,7 +182,7 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
       lineKind: de.pattern === 'dashed' ? 'dotted' : 'solid',
       arrowStart: arrowFromClass(de.arrowTypeStart),
       arrowEnd: arrowFromClass(de.arrowTypeEnd),
-      data: { kind: 'class', relation: 'association' },
+      data: { kind: 'class', relation: 'association', cardinalitySource, cardinalityTarget },
       sourceIndex: eIdx++,
     });
   }
