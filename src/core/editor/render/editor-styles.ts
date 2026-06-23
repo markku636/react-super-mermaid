@@ -26,6 +26,7 @@ const CSS = `
 /* 下拉選單:選項一律深字淺底(原生 option 在暗色下常白底白字,看不清)。 */
 .rsm-editor-toolbar select{color:inherit;}
 .rsm-editor-toolbar select option{background:#ffffff;color:#1f2937;}
+.rsm-tb-hint{font-size:12px;opacity:0.7;padding:0 8px;align-self:center;white-space:nowrap;}
 
 /* 右鍵選單 */
 .rsm-ctx{position:absolute;z-index:40;min-width:128px;padding:4px;border-radius:8px;

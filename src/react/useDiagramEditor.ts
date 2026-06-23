@@ -42,6 +42,8 @@ export interface UseDiagramEditorResult {
   selection: string[];
   /** 即時產生的 mermaid 原始碼(供內建「原始碼」面板)。 */
   code: string;
+  /** 目前圖種(供工具列依型別顯示對應控制項)。 */
+  diagramType: string;
 }
 
 export function useDiagramEditor(opts: UseDiagramEditorOptions): UseDiagramEditorResult {
@@ -54,6 +56,7 @@ export function useDiagramEditor(opts: UseDiagramEditorOptions): UseDiagramEdito
   const [zoomPercent, setZoomPercent] = useState(100);
   const [selection, setSelection] = useState<string[]>([]);
   const [code, setCode] = useState('');
+  const [diagramType, setDiagramType] = useState<string>('flowchart');
 
   // 回呼用 ref 包,避免重建編輯器。
   const cbRef = useRef(opts);
@@ -74,14 +77,17 @@ export function useDiagramEditor(opts: UseDiagramEditorOptions): UseDiagramEdito
     handleRef.current = ed;
     setHandle(ed);
     setCode(ed.toMermaid());
+    setDiagramType(ed.getScene().diagramType);
     const offs = [
       ed.on('change', (s) => {
         cbRef.current.onChange?.(s as EditorScene);
+        setDiagramType((s as EditorScene).diagramType);
         setCode(ed.toMermaid());
       }),
       ed.on('mermaidchange', (t) => {
         cbRef.current.onMermaidChange?.(t as string);
         setCode(t as string);
+        setDiagramType(ed.getScene().diagramType);
       }),
       ed.on('error', (e) => cbRef.current.onError?.(e)),
       ed.on('toolchange', (t) => setTool(t as Tool)),
@@ -118,5 +124,5 @@ export function useDiagramEditor(opts: UseDiagramEditorOptions): UseDiagramEdito
     if (handleRef.current && opts.dark !== undefined) handleRef.current.setDark(opts.dark);
   }, [opts.dark]);
 
-  return { hostRef, handle, tool, canUndo, canRedo, zoomPercent, selection, code };
+  return { hostRef, handle, tool, canUndo, canRedo, zoomPercent, selection, code, diagramType };
 }

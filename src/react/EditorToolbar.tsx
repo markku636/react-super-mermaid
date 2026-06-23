@@ -11,6 +11,8 @@ export interface EditorToolbarProps {
   /** 「原始碼」面板是否開啟(由 MermaidEditor 控制)。 */
   showSource?: boolean;
   onToggleSource?: () => void;
+  /** 目前圖種(決定顯示哪些建立控制項)。 */
+  diagramType?: string;
 }
 
 // 常用外形:直接顯示成按鈕,點一下就在畫布中央放一個節點(免下拉選單、免再點畫布)。
@@ -38,39 +40,53 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
     </button>
   );
 
+  // sequence 不吃自由拖曳建點/連線(改右鍵新增參與者/訊息);mindmap/sequence 無流程方向。
+  const isSeq = props.diagramType === 'sequence';
+  const hasDirection =
+    props.diagramType === 'flowchart' ||
+    props.diagramType === 'state' ||
+    props.diagramType === 'class' ||
+    props.diagramType === 'er' ||
+    props.diagramType === undefined;
+
   return (
     <div className="rsm-toolbar rsm-editor-toolbar">
       {toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
-      {toolBtn('edge-create', '↘ 連線', '從節點拉出連線（E）')}
+      {!isSeq && toolBtn('edge-create', '↘ 連線', '從節點拉出連線（E）')}
       {toolBtn('pan', '✋ 平移', '平移畫布')}
 
-      <span className="rsm-tb-sep" aria-hidden="true" />
+      {!isSeq && <span className="rsm-tb-sep" aria-hidden="true" />}
 
-      {/* 一鍵新增節點(常用外形直接攤開) */}
-      {SHAPES.map((s) => (
-        <button
-          key={s.shape}
-          type="button"
-          className="rsm-btn rsm-shape-btn"
-          title={`新增${s.label}節點`}
-          onClick={() => h?.addNode(s.shape)}
+      {/* 一鍵新增節點(常用外形直接攤開);sequence 不適用(用右鍵新增參與者/訊息) */}
+      {!isSeq &&
+        SHAPES.map((s) => (
+          <button
+            key={s.shape}
+            type="button"
+            className="rsm-btn rsm-shape-btn"
+            title={`新增${s.label}節點`}
+            onClick={() => h?.addNode(s.shape)}
+          >
+            <span className="rsm-shape-glyph">{s.glyph}</span>
+            {s.label}
+          </button>
+        ))}
+
+      {isSeq && <span className="rsm-tb-hint">右鍵空白處：新增參與者 / 訊息</span>}
+
+      {hasDirection && (
+        <select
+          className="rsm-btn"
+          title="流程方向"
+          defaultValue="TB"
+          onChange={(e) => h?.setDirection(e.target.value as 'TB' | 'LR' | 'BT' | 'RL')}
         >
-          <span className="rsm-shape-glyph">{s.glyph}</span>
-          {s.label}
-        </button>
-      ))}
-
-      <select
-        className="rsm-btn"
-        title="流程方向"
-        defaultValue="TB"
-        onChange={(e) => h?.setDirection(e.target.value as 'TB' | 'LR' | 'BT' | 'RL')}
-      >
-        <option value="TB">↓ 由上而下</option>
-        <option value="LR">→ 由左而右</option>
-        <option value="BT">↑ 由下而上</option>
-        <option value="RL">← 由右而左</option>
-      </select>
+          <option value="TB">↓ 由上而下</option>
+          <option value="LR">→ 由左而右</option>
+          <option value="BT">↑ 由下而上</option>
+          <option value="RL">← 由右而左</option>
+        </select>
+      )}
 
       <span className="rsm-tb-spacer" />
 

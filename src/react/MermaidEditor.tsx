@@ -78,6 +78,7 @@ export const MermaidEditor = forwardRef<MermaidEditorHandle, MermaidEditorProps>
             zoomPercent={ed.zoomPercent}
             showSource={showSource}
             onToggleSource={() => setShowSource((s) => !s)}
+            diagramType={ed.diagramType}
           />
         ) : null}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
