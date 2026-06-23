@@ -1,7 +1,7 @@
 // 場景 → classDiagram 文字。確定性、永遠輸出合法 mermaid。
 
 import type { DataLossWarning, SerializeResult } from '../../adapters/types';
-import type { ArrowHead, EditorScene, SceneEdge } from '../../scene/types';
+import type { ArrowHead, EditorScene, SceneEdge, SceneNode } from '../../scene/types';
 
 const INDENT = '    ';
 
@@ -55,21 +55,42 @@ export function sceneToClass(scene: EditorScene): SerializeResult {
     inEdge.add(e.source);
     inEdge.add(e.target);
   }
-  for (const n of [...scene.nodes].sort(bySourceIndex)) {
+  const emitClass = (n: SceneNode, pad: string): void => {
     const data = n.data?.kind === 'class' ? n.data : undefined;
     const members = data?.members ?? [];
     const methods = data?.methods ?? [];
     const stereotype = data?.stereotype;
     const named = n.label && n.label !== n.id ? `${n.id}["${n.label}"]` : n.id;
     if (members.length || methods.length || stereotype) {
-      lines.push(`${INDENT}class ${named} {`);
-      if (stereotype) lines.push(`${INDENT}${INDENT}<<${stereotype}>>`);
-      for (const m of members) lines.push(`${INDENT}${INDENT}${m}`);
-      for (const m of methods) lines.push(`${INDENT}${INDENT}${m}`);
-      lines.push(`${INDENT}}`);
-    } else if (!inEdge.has(n.id)) {
-      lines.push(`${INDENT}class ${named}`);
+      lines.push(`${pad}class ${named} {`);
+      if (stereotype) lines.push(`${pad}${INDENT}<<${stereotype}>>`);
+      for (const m of members) lines.push(`${pad}${INDENT}${m}`);
+      for (const m of methods) lines.push(`${pad}${INDENT}${m}`);
+      lines.push(`${pad}}`);
+    } else {
+      lines.push(`${pad}class ${named}`);
     }
+  };
+  const byId = new Map(scene.nodes.map((n) => [n.id, n] as const));
+  const inNamespace = new Set<string>();
+  // namespace 區塊:成員一律宣告於其內。
+  for (const c of [...scene.containers].sort(bySourceIndex)) {
+    lines.push(`${INDENT}namespace ${c.label || c.id} {`);
+    for (const cid of c.childNodeIds) {
+      const n = byId.get(cid);
+      if (n) {
+        inNamespace.add(cid);
+        emitClass(n, INDENT + INDENT);
+      }
+    }
+    lines.push(`${INDENT}}`);
+  }
+  // 頂層類別(不在 namespace);無內容且已被關係宣告者略過。
+  for (const n of [...scene.nodes].sort(bySourceIndex)) {
+    if (inNamespace.has(n.id)) continue;
+    const data = n.data?.kind === 'class' ? n.data : undefined;
+    const hasBody = (data?.members?.length || data?.methods?.length || data?.stereotype) as unknown as boolean;
+    if (hasBody || !inEdge.has(n.id)) emitClass(n, INDENT);
   }
 
   // 2. 關係(穩定排序)。

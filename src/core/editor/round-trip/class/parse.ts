@@ -1,7 +1,7 @@
 // classDiagram 文字 → 場景。透過 mermaid 解析後 DB 的 getData() 取得類別(成員/方法)與關係。
 
 import type { ParseResult, ParseWarning } from '../../adapters/types';
-import type { ArrowHead, EditorScene, FlowDirection, SceneEdge, SceneNode } from '../../scene/types';
+import type { ArrowHead, EditorScene, FlowDirection, SceneContainer, SceneEdge, SceneNode } from '../../scene/types';
 import type { MermaidLike } from '../../../../types';
 
 interface MermaidApiLike {
@@ -21,6 +21,7 @@ interface ClassNodeLike {
   label?: string;
   shape?: string;
   isGroup?: boolean;
+  parentId?: string;
   members?: ClassMemberLike[];
   methods?: ClassMemberLike[];
   annotations?: string[];
@@ -142,9 +143,25 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
   const direction = normalizeDirection(db.getDirection?.());
 
   const nodes: SceneNode[] = [];
+  const containers: SceneContainer[] = [];
   let nIdx = 0;
+  let cIdx = 0;
   for (const dn of data.nodes) {
-    if (dn.isGroup) continue; // namespace 群組(後續處理);v1 略過容器
+    if (dn.isGroup) {
+      // namespace → 容器(保留分組,序列化回 `namespace X { }`)。
+      containers.push({
+        id: dn.id,
+        label: dn.label ?? dn.id,
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0,
+        parentId: dn.parentId ?? null,
+        childNodeIds: [],
+        sourceIndex: cIdx++,
+      });
+      continue;
+    }
     const members = (dn.members ?? []).map(memberText).filter(Boolean);
     const methods = (dn.methods ?? []).map(methodText).filter(Boolean);
     const stereotype = dn.annotations && dn.annotations.length ? dn.annotations[0] : undefined;
@@ -157,10 +174,14 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
       y: 0,
       w: size.w,
       h: size.h,
+      parentId: dn.parentId ?? null,
       data: { kind: 'class', members, methods, stereotype },
       sourceIndex: nIdx++,
     });
   }
+  // 指派 namespace 子成員。
+  const cById = new Map(containers.map((c) => [c.id, c] as const));
+  for (const n of nodes) if (n.parentId && cById.has(n.parentId)) cById.get(n.parentId)!.childNodeIds.push(n.id);
 
   // 基數標籤(getData edges 不含,要從 getRelations 補:relationTitle1/2)。依 id1|id2|title 配對。
   const relCard = new Map<string, { c1?: string; c2?: string }>();
@@ -194,7 +215,7 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
       meta: { type: 'class', direction },
       nodes,
       edges,
-      containers: [],
+      containers,
       raw: { comments: pre.comments },
       layoutOwner: 'engine',
     },
