@@ -70,6 +70,26 @@ export function buildNodeDrawables(
       return [gen.path(stadiumPath(w, h), options)];
     case 'circle':
       return [gen.circle(w / 2, h / 2, Math.min(w, h), options)];
+    case 'state':
+      return [gen.path(roundedRectPath(w, h, 10), options)];
+    case 'stateStart': {
+      // [*] 起點:實心小圓點。
+      const ink = options.stroke ?? '#1e1e1e';
+      return [gen.circle(w / 2, h / 2, Math.min(w, h), { ...options, fill: ink, fillStyle: 'solid' })];
+    }
+    case 'stateEnd': {
+      // [*] 終點:外圈 + 實心內圈。
+      const d = Math.min(w, h);
+      const ink = options.stroke ?? '#1e1e1e';
+      return [
+        gen.circle(w / 2, h / 2, d, { ...options, fill: undefined }),
+        gen.circle(w / 2, h / 2, Math.max(4, d - 7), { ...options, fill: ink, fillStyle: 'solid' }),
+      ];
+    }
+    case 'choice':
+      return [gen.polygon([[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]], options)];
+    case 'fork':
+      return [gen.rectangle(0, 0, w, h, { ...options, fill: options.stroke ?? '#1e1e1e', fillStyle: 'solid' })];
     case 'doubleCircle': {
       const d = Math.min(w, h);
       return [gen.circle(w / 2, h / 2, d, options), gen.circle(w / 2, h / 2, d - 10, { ...options, fill: undefined })];

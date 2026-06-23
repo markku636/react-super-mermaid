@@ -17,6 +17,7 @@ export type {
   DataLossWarning,
 } from './adapters/types';
 export { flowchartAdapter, registerFlowchartAdapter } from './adapters/flowchart';
+export { stateAdapter, registerStateAdapter } from './adapters/state';
 
 export type { EditorLook } from './render/scene-renderer';
 export { mermaidSvgLayout } from './layout/mermaid-svg-layout';

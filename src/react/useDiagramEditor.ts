@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { createDiagramEditor, type DiagramEditorHandle } from '../core/editor/controller';
 import { registerFlowchartAdapter } from '../core/editor/adapters/flowchart';
+import { registerStateAdapter } from '../core/editor/adapters/state';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
 import type { MermaidSource } from '../types';
 
-// 確保 flowchart adapter 在 React 端被註冊一次。
+// 確保各圖種 adapter 在 React 端被註冊一次。
 registerFlowchartAdapter();
+registerStateAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;
