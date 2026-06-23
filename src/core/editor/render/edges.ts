@@ -15,25 +15,42 @@ export function markerIdFor(head: ArrowHead, dark: boolean): string | null {
 /** 建立箭頭 marker 定義(掛進 defs)。 */
 export function buildMarkers(dark: boolean): SVGMarkerElement[] {
   const ink = dark ? INK_DARK : INK;
-  const heads: ArrowHead[] = ['arrow', 'dot', 'cross'];
+  // hollow marker 內填底色,避免連線從中穿過(近似畫布底色)。
+  const bg = dark ? '#23232e' : '#ffffff';
+  // 各 head 的 marker box 尺寸 / 參考點(tip 對齊節點邊界)。
+  const specs: Record<string, { vb: string; refX: number; refY: number; w: number; h: number }> = {
+    arrow: { vb: '0 0 12 12', refX: 10, refY: 6, w: 9, h: 9 },
+    dot: { vb: '0 0 12 12', refX: 6, refY: 6, w: 9, h: 9 },
+    cross: { vb: '0 0 12 12', refX: 6, refY: 6, w: 9, h: 9 },
+    triangle: { vb: '0 0 16 16', refX: 15, refY: 8, w: 15, h: 15 },
+    diamond: { vb: '0 0 20 16', refX: 19, refY: 8, w: 18, h: 14 },
+    diamondFilled: { vb: '0 0 20 16', refX: 19, refY: 8, w: 18, h: 14 },
+  };
+  const heads: ArrowHead[] = ['arrow', 'dot', 'cross', 'triangle', 'diamond', 'diamondFilled'];
   return heads.map((head) => {
+    const sp = specs[head];
     const m = svgEl('marker', {
       id: markerIdFor(head, dark) as string,
-      viewBox: '0 0 12 12',
-      refX: head === 'arrow' ? 10 : 6,
-      refY: 6,
-      markerWidth: 9,
-      markerHeight: 9,
+      viewBox: sp.vb,
+      refX: sp.refX,
+      refY: sp.refY,
+      markerWidth: sp.w,
+      markerHeight: sp.h,
       orient: 'auto-start-reverse',
     });
     if (head === 'arrow') {
-      const p = svgEl('path', { d: 'M1,1 L11,6 L1,11 z', fill: ink, stroke: ink });
-      m.appendChild(p);
+      m.appendChild(svgEl('path', { d: 'M1,1 L11,6 L1,11 z', fill: ink, stroke: ink }));
     } else if (head === 'dot') {
       m.appendChild(svgEl('circle', { cx: 6, cy: 6, r: 4, fill: ink }));
+    } else if (head === 'cross') {
+      m.appendChild(svgEl('path', { d: 'M2,2 L10,10 M10,2 L2,10', stroke: ink, 'stroke-width': 1.8, fill: 'none' }));
+    } else if (head === 'triangle') {
+      // 空心三角(繼承 / 實作):尖端朝節點。
+      m.appendChild(svgEl('path', { d: 'M1,1 L15,8 L1,15 z', fill: bg, stroke: ink, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }));
     } else {
-      const p = svgEl('path', { d: 'M2,2 L10,10 M10,2 L2,10', stroke: ink, 'stroke-width': 1.8, fill: 'none' });
-      m.appendChild(p);
+      // 菱形(聚合空心 / 組合實心):近端頂點觸及節點。
+      const fill = head === 'diamondFilled' ? ink : bg;
+      m.appendChild(svgEl('path', { d: 'M19,8 L10,2 L1,8 L10,14 z', fill, stroke: ink, 'stroke-width': 1.3, 'stroke-linejoin': 'round' }));
     }
     return m;
   });
@@ -97,15 +114,18 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
     const fo = svgEl('foreignObject', { x: mid.x - 60, y: mid.y - 14, width: 120, height: 28, class: 'rsm-edge-label' });
     fo.style.pointerEvents = 'none';
     fo.style.overflow = 'visible';
+    // 置中容器透明,白底膠囊由內層 span 包住文字(緊貼字寬,避免相鄰標籤白底連成一條寬帶)。
     const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
-    div.textContent = edge.label;
+    div.setAttribute('style', 'display:flex;align-items:center;justify-content:center;height:28px;');
+    const span = document.createElementNS(XHTML_NS, 'span') as unknown as HTMLSpanElement;
+    span.textContent = edge.label;
     // 標籤底色一律淺(白底膠囊),故文字一律用深墨色(對齊 Edit Diagram,且修暗色模式下淺字白底看不清)。
-    div.setAttribute(
+    span.setAttribute(
       'style',
-      'display:flex;align-items:center;justify-content:center;height:28px;' +
-        `font:600 13px/1.2 var(--rsm-editor-font);color:${INK};` +
-        'background:var(--rsm-edge-label-bg,#ffffffe6);border-radius:4px;padding:0 5px;text-align:center;white-space:nowrap;',
+      `font:600 13px/1.2 var(--rsm-editor-font);color:${INK};` +
+        'background:var(--rsm-edge-label-bg,#ffffffe6);border-radius:4px;padding:1px 6px;white-space:nowrap;',
     );
+    div.appendChild(span as unknown as Node);
     fo.appendChild(div as unknown as Node);
     g.appendChild(fo);
   }
