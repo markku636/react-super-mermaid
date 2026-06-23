@@ -3,7 +3,7 @@
 
 import type { ArrowHead, EditorScene, Point, SceneEdge } from '../scene/types';
 import { getNode, resolveEdgeAnchors } from '../scene/scene-ops';
-import { svgEl, XHTML_NS } from './dom';
+import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { INK, INK_DARK } from './palette';
 
 export function markerIdFor(head: ArrowHead, dark: boolean): string | null {
@@ -225,7 +225,8 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
     const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     div.setAttribute('style', 'display:flex;align-items:center;justify-content:center;height:28px;');
     const span = document.createElementNS(XHTML_NS, 'span') as unknown as HTMLSpanElement;
-    span.textContent = edge.label;
+    if (edge.labelKind === 'markdown') appendInlineMarkdown(span as unknown as HTMLElement, edge.label);
+    else span.textContent = edge.label;
     // 膠囊底色隨主題(--rsm-edge-label-bg 淺/深),文字色也須隨主題,否則暗色=深字深底看不見。
     const labelInk = dark ? INK_DARK : INK;
     const labelBg = dark ? 'rgba(30,30,30,0.85)' : '#ffffffe6';

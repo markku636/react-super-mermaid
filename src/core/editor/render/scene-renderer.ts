@@ -7,7 +7,7 @@ import { ensureSketchFont } from '../../themes/sketch';
 import { boundingBox } from '../scene/geometry';
 import { moveNodes } from '../scene/scene-ops';
 import type { EditorScene, SceneNode } from '../scene/types';
-import { svgEl, XHTML_NS } from './dom';
+import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
@@ -34,35 +34,6 @@ const ROUGH_LOOKS: Record<EditorLook, { roughness: number; bowing: number; strok
   sketch: { roughness: 1.05, bowing: 0.8, strokeWidth: 1.6, fillStyle: 'solid' },
   clean: { roughness: 0, bowing: 0, strokeWidth: 1.5, fillStyle: 'solid' },
 };
-
-/**
- * markdown label(mermaid 反引號標籤)行內格式:**粗體** / *斜體* / `程式碼` / <br>。
- * 以建立 DOM 節點呈現(非 innerHTML)→ 無注入風險。
- */
-function appendInlineMarkdown(parent: HTMLElement, text: string): void {
-  const lines = text.split(/<br\s*\/?>/);
-  const re = /(\*\*|__)(.+?)\1|(\*|_)(.+?)\3|`([^`]+)`/g;
-  lines.forEach((line, li) => {
-    if (li > 0) parent.appendChild(document.createElementNS(XHTML_NS, 'br') as unknown as Node);
-    let last = 0;
-    let m: RegExpExecArray | null;
-    re.lastIndex = 0;
-    while ((m = re.exec(line)) !== null) {
-      if (m.index > last) parent.appendChild(document.createTextNode(line.slice(last, m.index)));
-      let tag: 'strong' | 'em' | 'code';
-      let content: string;
-      if (m[1]) { tag = 'strong'; content = m[2]; }
-      else if (m[3]) { tag = 'em'; content = m[4]; }
-      else { tag = 'code'; content = m[5]; }
-      const el = document.createElementNS(XHTML_NS, tag) as unknown as HTMLElement;
-      el.textContent = content;
-      if (tag === 'code') el.setAttribute('style', 'font-family:monospace;font-size:0.9em;');
-      parent.appendChild(el as unknown as Node);
-      last = re.lastIndex;
-    }
-    if (last < line.length) parent.appendChild(document.createTextNode(line.slice(last)));
-  });
-}
 
 export class SceneRenderer {
   private gen: RoughGeneratorLike;
