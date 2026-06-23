@@ -270,6 +270,14 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     emptyHintGrace = false;
     updateEmptyHint();
   }, 600);
+  // 空白畫布的起手範本(對標付費工具的範本庫)。
+  const STARTERS: Array<[string, string]> = [
+    ['流程圖', 'flowchart TD\n  A[開始] --> B{判斷}\n  B -->|是| C[處理]\n  B -->|否| D[結束]'],
+    ['序列圖', 'sequenceDiagram\n  使用者->>系統: 請求\n  系統-->>使用者: 回應'],
+    ['類別圖', 'classDiagram\n  class Animal {\n    +name string\n    +move()\n  }\n  Animal <|-- Dog'],
+    ['ER 圖', 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n  ORDER {\n    int id PK\n    int customerId FK\n  }'],
+    ['心智圖', 'mindmap\n  root((主題))\n    分支A\n    分支B\n      子項'],
+  ];
   function updateEmptyHint(): void {
     const seqHasParts = scene.diagramType === 'sequence' && (scene.sequence?.participants.length ?? 0) > 0;
     const empty = scene.nodes.length === 0 && scene.containers.length === 0 && !seqHasParts;
@@ -277,12 +285,31 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       emptyHint.classList.remove('rsm-empty-show');
       return;
     }
-    emptyHint.textContent =
+    while (emptyHint.firstChild) emptyHint.removeChild(emptyHint.firstChild);
+    const hintText = document.createElement('div');
+    hintText.className = 'rsm-empty-text';
+    hintText.textContent =
       scene.diagramType === 'sequence'
         ? '空白序列圖 — 在空白處按右鍵：新增參與者 / 訊息'
         : scene.diagramType === 'mindmap'
           ? '空白心智圖 — 在空白處按右鍵新增節點'
           : '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
+    emptyHint.appendChild(hintText);
+    const sub = document.createElement('div');
+    sub.className = 'rsm-empty-sub';
+    sub.textContent = '或從範本開始：';
+    emptyHint.appendChild(sub);
+    const row = document.createElement('div');
+    row.className = 'rsm-empty-starters';
+    for (const [label, src] of STARTERS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'rsm-empty-starter';
+      btn.textContent = label;
+      btn.addEventListener('click', () => void handle.loadSource(src).catch(() => {}));
+      row.appendChild(btn);
+    }
+    emptyHint.appendChild(row);
     emptyHint.classList.add('rsm-empty-show');
   }
 

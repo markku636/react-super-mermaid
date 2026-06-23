@@ -29,11 +29,19 @@ const CSS = `
 .rsm-tb-hint{font-size:12px;opacity:0.7;padding:0 8px;align-self:center;white-space:nowrap;}
 
 /* 空白畫布引導提示:置中、不擋互動、淡入(grace 期間靠 JS 不加 show class 而隱藏)。 */
-.rsm-empty-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  pointer-events:none;text-align:center;padding:0 24px;opacity:0;transition:opacity .35s ease;
+.rsm-empty-hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;pointer-events:none;text-align:center;padding:0 24px;opacity:0;transition:opacity .35s ease;
   font:500 15px/1.7 var(--rsm-editor-font);color:var(--rsm-editor-dot,#9aa0aa);}
 .rsm-editor-root.rsm-dark .rsm-empty-hint{color:#6b7280;}
-.rsm-empty-hint.rsm-empty-show{opacity:0.9;}
+.rsm-empty-hint.rsm-empty-show{opacity:0.95;}
+.rsm-empty-sub{font-size:13px;opacity:0.8;margin-top:4px;}
+.rsm-empty-starters{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;pointer-events:auto;}
+.rsm-empty-starter{font:500 13px var(--rsm-editor-font);padding:6px 14px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--rsm-border,#d7d7de);background:var(--rsm-editor-bg,#fff);color:var(--rsm-editor-fg,#374151);
+  transition:background .15s ease,border-color .15s ease;}
+.rsm-empty-starter:hover{border-color:#3b82f6;color:#3b82f6;}
+.rsm-editor-root.rsm-dark .rsm-empty-starter{background:#23232e;border-color:#3a3a40;color:#c9d1d9;}
+.rsm-editor-root.rsm-dark .rsm-empty-starter:hover{border-color:#60a5fa;color:#60a5fa;}
 
 /* 鍵盤快捷鍵說明浮層(? 開啟,點背景 / Esc 關閉)。 */
 .rsm-help-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
