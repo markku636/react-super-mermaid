@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.78 — pie legend colours match slices
+
+- **Fix** (chart viewer): in colourful/auto themes, a pie chart's legend
+  swatches didn't match their slice colours from the 3rd item on. Mermaid fills
+  slices with hex/hsl but legend swatches with rgb, and the colourizer aligned
+  them by canonical colour — which normalised hex↔rgb but not hsl↔rgb. Now the
+  legend aligns to slices by **index** (they're 1:1 in data order), so every
+  swatch matches its slice regardless of colour format.
+
 ## 0.6.77 — robust empty/whitespace source
 
 - **Fix**: loading an empty or whitespace-only source threw

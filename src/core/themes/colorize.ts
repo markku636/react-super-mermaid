@@ -387,18 +387,25 @@ function stylePie(svg: Element, dark: boolean): void {
     return c;
   };
 
+  const sliceNewColors: string[] = [];
   for (const slice of slices) {
     const old = slice.style.fill || slice.getAttribute('fill') || '';
     const c = newColorFor(old);
+    sliceNewColors.push(c);
     slice.style.fill = c;
     slice.style.opacity = '1'; // 原生深色主題的 pieOpacity < 1 會讓扇形發灰 → 拉回不透明。
     slice.style.stroke = dark ? '#0F172A' : '#FFFFFF';
     slice.style.strokeWidth = '2px';
     slice.style.strokeLinejoin = 'round';
   }
-  for (const sw of swatches) {
-    const old = sw.style.fill || sw.getAttribute('fill') || '';
-    const c = newColorFor(old);
+  // 圖例色塊:依「索引」對齊對應扇形的新色(扇形與圖例同資料順序)。不可改用舊色比對——
+  // mermaid 扇形填 hex/hsl、圖例填 rgb,canonColor 對 hsl↔rgb 正規化不一致 → 第三項起圖例與扇形錯色。
+  for (let i = 0; i < swatches.length; i++) {
+    const sw = swatches[i];
+    const c =
+      i < sliceNewColors.length
+        ? sliceNewColors[i]
+        : newColorFor(sw.style.fill || sw.getAttribute('fill') || '');
     sw.style.fill = c;
     sw.style.stroke = c;
     sw.setAttribute('rx', '3');
