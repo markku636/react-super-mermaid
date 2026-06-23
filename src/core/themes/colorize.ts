@@ -178,13 +178,14 @@ function paintShapes(group: Element, entry: PaletteEntry): void {
   }
 }
 
-function darkenNodeText(group: Element): void {
-  // 底色為淺色 pastel,節點文字在深淺色主題下都必須是深色才看得清楚。
+function darkenNodeText(group: Element, dark = false): void {
+  // 亮色:底色是淺 pastel → 深字才清楚;暗色:底色改半透明深色票 → 亮字才清楚。
+  const c = dark ? '#E2E8F0' : NODE_TEXT;
   for (const el of Array.from(group.querySelectorAll<SVGTextElement>('text, tspan'))) {
-    el.style.fill = NODE_TEXT;
+    el.style.fill = c;
   }
   for (const el of Array.from(group.querySelectorAll<HTMLElement>('.nodeLabel, span, p'))) {
-    el.style.color = NODE_TEXT;
+    el.style.color = c;
   }
 }
 
@@ -468,12 +469,14 @@ function styleGantt(svg: Element, dark: boolean): void {
 }
 
 /** Timeline:同一 section 的節點共用一色(以 section-N class 取得)。 */
-function styleTimeline(svg: Element): void {
+function styleTimeline(svg: Element, dark: boolean): void {
+  // 亮色用實心淺色票(深字);暗色用半透明色票(深底柔和塊)+ 亮字,避免淺塊在暗色刺眼 / 淺字看不見。
+  const palette = dark ? CLUSTER_PALETTE : NODE_PALETTE;
   const nodes = Array.from(svg.querySelectorAll<SVGGElement>('g[class*="timeline-node"]'));
   nodes.forEach((node, i) => {
     const m = (node.getAttribute('class') ?? '').match(/section-(-?\d+)/);
     const section = m ? Number(m[1]) : i;
-    const entry = section < 0 ? NODE_PALETTE[7] : NODE_PALETTE[section % NODE_PALETTE.length];
+    const entry = section < 0 ? palette[7] : palette[section % palette.length];
     const backgrounds = Array.from(node.querySelectorAll<SVGElement>('.node-bkg'));
     if (backgrounds.length > 0) {
       for (const bkg of backgrounds) {
@@ -484,23 +487,33 @@ function styleTimeline(svg: Element): void {
     } else {
       paintShapes(node, entry);
     }
-    darkenNodeText(node);
+    darkenNodeText(node, dark);
   });
+  if (dark) {
+    // 標題 / 期間軸等節點外的文字也轉亮色。
+    Array.from(svg.querySelectorAll<SVGElement>('text, tspan')).forEach((t) => {
+      if (!t.style.fill || t.style.fill === NODE_TEXT) {
+        t.style.fill = '#E2E8F0';
+      }
+    });
+  }
 }
 
 /** Mindmap:以 section-N class 為鍵,讓同一分支的兄弟節點共用一色。 */
-function styleMindmap(svg: Element): void {
+function styleMindmap(svg: Element, dark: boolean): void {
   const nodes = Array.from(svg.querySelectorAll<SVGGElement>('g.mindmap-node'));
   if (nodes.length === 0) {
     return;
   }
+  // 亮色實心淺色票(深字);暗色半透明色票(深底)+ 亮字。
+  const palette = dark ? CLUSTER_PALETTE : NODE_PALETTE;
   for (const node of nodes) {
     const m = (node.getAttribute('class') ?? '').match(/section-(-?\d+)/);
     const section = m ? Number(m[1]) : 0;
     const entry =
       section < 0
-        ? NODE_PALETTE[7] // root → violet
-        : NODE_PALETTE[section % NODE_PALETTE.length];
+        ? palette[7] // root → violet
+        : palette[section % palette.length];
     for (const shape of Array.from(
       node.querySelectorAll<SVGElement>('path, rect, circle, ellipse'),
     )) {
@@ -511,7 +524,7 @@ function styleMindmap(svg: Element): void {
       shape.style.stroke = entry.stroke;
       shape.style.strokeWidth = '1.4px';
     }
-    darkenNodeText(node);
+    darkenNodeText(node, dark);
   }
   for (const edge of Array.from(svg.querySelectorAll<SVGElement>('path[class*="edge"]'))) {
     const m = (edge.getAttribute('class') ?? '').match(/section-edge-(-?\d+)/);
@@ -694,9 +707,9 @@ export function colorizeDiagram(root: ParentNode, opts: ColorizeOptions = {}): v
   } else if (kind === 'gantt') {
     styleGantt(svg, dark);
   } else if (kind === 'timeline') {
-    styleTimeline(svg);
+    styleTimeline(svg, dark);
   } else if (kind === 'mindmap') {
-    styleMindmap(svg);
+    styleMindmap(svg, dark);
   } else if (kind === 'journey') {
     styleJourney(svg, dark);
   } else if (kind === 'xychart') {

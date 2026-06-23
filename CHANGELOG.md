@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.83 — timeline + mindmap dark-aware
+
+- **Fix**: in dark mode, timeline period/event cards and mindmap nodes used
+  solid light pastel fills with dark text — bright cards + hard-to-read labels on
+  a dark canvas. Both now use translucent palette tints + light text in dark
+  mode (`darkenNodeText` is dark-aware). Light mode unchanged. Completes
+  dark-mode consistency across all colourized chart types.
+
 ## 0.6.82 — journey chart dark-aware
 
 - **Fix**: in dark mode, user-journey task boxes used solid light fills with
