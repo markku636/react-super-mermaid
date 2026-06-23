@@ -217,6 +217,52 @@ export function cmdAddSeqMessage(): Command {
   };
 }
 
+/** sequence:刪除參與者(同步移除鏡像 node、相關訊息,並重排剩餘欄位)。 */
+export function cmdDeleteSeqParticipant(id: string): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const participants = scene.sequence.participants.filter((p) => p.id !== id);
+    const statements = scene.sequence.statements.filter(
+      (s) => s.kind !== 'message' || (s.from !== id && s.to !== id),
+    );
+    let px = 40;
+    const nodes = scene.nodes
+      .filter((n) => n.id !== id)
+      .map((n) => {
+        if (n.data?.kind !== 'sequence') return n;
+        const nn = { ...n, x: px };
+        px += n.w + 56;
+        return nn;
+      });
+    return {
+      scene: { ...scene, nodes, sequence: { ...scene.sequence, participants, statements } },
+      patch: { structural: true },
+    };
+  };
+}
+
+/** sequence:刪除某條陳述(訊息/note 等)。 */
+export function cmdDeleteSeqStatement(index: number): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const statements = scene.sequence.statements.filter((_, i) => i !== index);
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
+/** sequence:切換某條訊息的實線/虛線箭頭(->> ↔ -->>)。 */
+export function cmdToggleSeqArrow(index: number): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const statements = scene.sequence.statements.map((s, i) =>
+      i === index && s.kind === 'message'
+        ? { ...s, arrow: s.arrow.includes('--') ? '->>' : '-->>' }
+        : s,
+    );
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
 /** sequence:改某條訊息的文字(scene.sequence.statements[index])。 */
 export function cmdSetSeqMessageText(index: number, text: string): Command {
   return (scene) => {

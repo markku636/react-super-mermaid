@@ -19,6 +19,9 @@ import {
   cmdAddNode,
   cmdAddSeqMessage,
   cmdAddSeqParticipant,
+  cmdDeleteSeqParticipant,
+  cmdDeleteSeqStatement,
+  cmdToggleSeqArrow,
   cmdAlignNodes,
   cmdDeleteSelection,
   cmdDistributeNodes,
@@ -541,6 +544,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     const t = e.target as Element;
     const nodeEl = t.closest('[data-node-id]');
     const edgeEl = t.closest('[data-edge-hit]');
+    const seqMsgEl = t.closest('[data-seq-msg]');
     const menu = document.createElement('div');
     menu.className = 'rsm-ctx';
     const addItem = (label: string, fn: () => void): void => {
@@ -558,7 +562,23 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       s.className = 'rsm-ctx-sep';
       menu.appendChild(s);
     };
-    if (nodeEl) {
+    if (seqMsgEl) {
+      // sequence 訊息右鍵:編輯文字 / 切換箭頭 / 刪除。
+      const idx = Number(seqMsgEl.getAttribute('data-seq-msg'));
+      addItem('編輯文字', () => openSeqMessageEditor(idx));
+      addItem('切換實/虛箭頭', () => pointerHost.runCommand(cmdToggleSeqArrow(idx), 'seq-arrow'));
+      addSep();
+      addItem('刪除訊息', () => pointerHost.runCommand(cmdDeleteSeqStatement(idx), 'del-seq-msg'));
+    } else if (
+      nodeEl &&
+      scene.nodes.find((n) => n.id === nodeEl.getAttribute('data-node-id'))?.data?.kind === 'sequence'
+    ) {
+      // sequence 參與者右鍵:改名 / 刪除(同步移除 scene.sequence 條目,避免脫鉤)。
+      const id = nodeEl.getAttribute('data-node-id') as string;
+      addItem('改名', () => openEditor(id));
+      addSep();
+      addItem('刪除參與者', () => pointerHost.runCommand(cmdDeleteSeqParticipant(id), 'del-participant'));
+    } else if (nodeEl) {
       const id = nodeEl.getAttribute('data-node-id') as string;
       // 右鍵已選取的節點 → 保留多選(才能用對齊/群組);否則改選此節點。
       if (!pointer.getSelection().includes(id)) pointer.setSelection([id]);
