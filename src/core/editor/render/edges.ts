@@ -182,7 +182,8 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
   vis.style.pointerEvents = 'none';
   const widthByKind = edge.lineKind === 'thick' ? 3.4 : 1.8;
   vis.setAttribute('stroke-width', String(edge.style?.strokeWidth ?? widthByKind));
-  if (edge.lineKind === 'dotted') vis.setAttribute('stroke-dasharray', '3 5');
+  if (edge.style?.strokeDasharray) vis.setAttribute('stroke-dasharray', edge.style.strokeDasharray);
+  else if (edge.lineKind === 'dotted') vis.setAttribute('stroke-dasharray', '3 5');
   if (edge.lineKind === 'invisible') vis.setAttribute('stroke-opacity', '0');
   const startMk = markerIdFor(edge.arrowStart, dark);
   // 自訂色的箭頭:就地建一個同色 marker 讓箭頭與線同色(僅常見的實心箭頭)。

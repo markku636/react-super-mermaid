@@ -139,8 +139,10 @@ export class SceneRenderer {
       ...ROUGH_LOOKS[this.look],
       seed: seedFor(node.id, this.baseSeed),
       stroke: node.style?.stroke ?? pal.stroke,
+      strokeWidth: node.style?.strokeWidth ?? ROUGH_LOOKS[this.look].strokeWidth,
       fill: node.style?.fill ?? pal.fill,
     };
+    const dash = node.style?.strokeDasharray;
     // 形狀畫進子群組;clean 風的柔和陰影只套形狀(不套文字,文字才清晰銳利)。
     const shapesG = svgEl('g', { class: 'rsm-node-shapes' });
     if (this.look === 'clean') shapesG.style.filter = `url(#${NODE_SHADOW_ID})`;
@@ -158,6 +160,7 @@ export class SceneRenderer {
           path.setAttribute('stroke', pi.stroke);
           path.setAttribute('stroke-width', String(pi.strokeWidth));
           path.setAttribute('vector-effect', 'non-scaling-stroke');
+          if (dash) path.setAttribute('stroke-dasharray', dash);
         }
         path.style.pointerEvents = 'none';
         shapesG.appendChild(path);

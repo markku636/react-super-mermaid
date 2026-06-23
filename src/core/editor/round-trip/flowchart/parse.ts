@@ -67,7 +67,8 @@ function parseStyleProps(styles: string[] | undefined): ElementStyle | undefined
     else if (k === 'stroke-width') {
       const n = parseFloat(v);
       if (!Number.isNaN(n)) out.strokeWidth = n;
-    } else if (k === 'color' && v) out.color = v;
+    } else if (k === 'stroke-dasharray' && v && v !== 'none') out.strokeDasharray = v;
+    else if (k === 'color' && v) out.color = v;
   }
   return Object.keys(out).length ? out : undefined;
 }

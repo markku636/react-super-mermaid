@@ -68,6 +68,7 @@ export interface ElementStyle {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
+  strokeDasharray?: string;
   color?: string;
   /** round-trip mermaid 的 `:::className`。 */
   classRef?: string;
