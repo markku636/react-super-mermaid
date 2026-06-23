@@ -780,6 +780,13 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     deleteSelection: () => {
       const ids = new Set(pointer.getSelection());
       if (ids.size === 0) return;
+      // sequence:刪除參與者要同步清 scene.sequence(否則 node 沒了但 mermaid 還留著 → 脫鉤)。
+      if (scene.diagramType === 'sequence') {
+        const partIds = scene.nodes.filter((n) => ids.has(n.id) && n.data?.kind === 'sequence').map((n) => n.id);
+        for (const pid of partIds) pointerHost.runCommand(cmdDeleteSeqParticipant(pid), 'del-participant');
+        pointer.clearSelection();
+        return;
+      }
       const nodeIds = scene.nodes.filter((n) => ids.has(n.id)).map((n) => n.id);
       const edgeIds = scene.edges.filter((e) => ids.has(e.id)).map((e) => e.id);
       pointerHost.runCommand(cmdDeleteSelection(nodeIds, edgeIds), 'delete');
