@@ -111,7 +111,9 @@ function prescan(src: string): { frontmatter?: string; comments: string[]; style
         !/^state\b/i.test(line) &&
         !/^direction\b/i.test(line) &&
         line !== '}' &&
-        !/^\[\*\]/.test(line)
+        !/^\[\*\]/.test(line) &&
+        // `id : 描述` 已由節點 label 建模(序列化成 `state "描述" as id`)→ 不重複擷取,避免雙行。
+        !/^[A-Za-z_]\w*\s*:/.test(line)
       ) {
         // note / classDef / class / style / 其他未模型化 → 逐字保留。
         styleLines.push(line);
