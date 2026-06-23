@@ -14,6 +14,7 @@ import { getAdapter, detectDiagramType } from './adapters/registry';
 import { mermaidSvgLayout } from './layout/mermaid-svg-layout';
 import {
   History,
+  cmdAddConnectedNode,
   cmdAddElements,
   cmdAddNode,
   cmdAlignNodes,
@@ -31,7 +32,7 @@ import {
   type Command,
 } from './interaction/commands';
 import { NODE_PALETTE } from './render/palette';
-import { makeNode, nextEdgeId, nextNodeId } from './scene/scene-ops';
+import { makeEdge, makeNode, nextEdgeId, nextNodeId } from './scene/scene-ops';
 import { PointerController, type PointerHost, type Tool } from './interaction/pointer';
 import { openTextEditor } from './interaction/text-edit';
 import { Viewport } from './interaction/viewport';
@@ -386,6 +387,20 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
         const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
         pointerHost.runCommand(cmdMoveNodes(ids, dx, dy), 'nudge');
+      }
+    } else if (e.key === 'Tab') {
+      // Tab:選取單一節點 → 在其右側新增一個已連線的節點(draw.io 式快速建圖)。
+      const sel = pointer.getSelection();
+      const src = sel.length === 1 ? scene.nodes.find((n) => n.id === sel[0]) : undefined;
+      if (src) {
+        e.preventDefault();
+        const id = nextNodeId(scene);
+        const pos = { x: src.x + src.w + 80, y: src.y };
+        const node = { ...makeNode(id, pos, { shape: src.shape }), x: pos.x, y: pos.y, w: src.w, h: src.h };
+        const edge = makeEdge(nextEdgeId(scene), src.id, id);
+        pointerHost.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
+        pointer.setSelection([id]);
+        openEditor(id);
       }
     } else if (e.key === 'Escape') {
       pointer.clearSelection();

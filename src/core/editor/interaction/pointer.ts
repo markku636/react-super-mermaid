@@ -74,6 +74,7 @@ export class PointerController {
   private lastClickTime = 0;
   private lastClickEdgeId: string | null = null;
   private lastEdgeClickTime = 0;
+  private lastEmptyClickTime = 0;
 
   constructor(
     private svg: SVGSVGElement,
@@ -313,6 +314,21 @@ export class PointerController {
       this.mode = { kind: 'idle' };
       return;
     }
+
+    // 雙擊空白 → 在該處新增節點(Excalidraw/draw.io 式,直覺好發現)。
+    const emptyNow = performance.now();
+    if (!e.shiftKey && emptyNow - this.lastEmptyClickTime < 350) {
+      this.lastEmptyClickTime = 0;
+      this.mode = { kind: 'idle' };
+      const scene = this.host.getScene();
+      const id = nextNodeId(scene);
+      const node = makeNode(id, world, { shape: this.host.createShape() });
+      this.host.runCommand(cmdAddNode(node), 'add-node');
+      this.setSelection([id]);
+      this.host.requestTextEdit(id);
+      return;
+    }
+    this.lastEmptyClickTime = emptyNow;
 
     // 空白處:Shift+拖曳 → 框選(保留多選能力);一般拖曳 → 平移畫布(放開後仍是選取工具);
     // 純點擊未拖曳 → 取消選取。
