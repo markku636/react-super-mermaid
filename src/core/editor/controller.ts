@@ -534,9 +534,14 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
 
   // ── 右鍵選單(改外形 / 改名 / 複製 / 刪除;邊:改文字 / 刪除;空白:新增 / 貼上 / 整理 / 全選)──
   let ctxMenu: HTMLElement | null = null;
+  let ctxEsc: ((e: KeyboardEvent) => void) | null = null;
   const closeContextMenu = (): void => {
     ctxMenu?.remove();
     ctxMenu = null;
+    if (ctxEsc) {
+      document.removeEventListener('keydown', ctxEsc);
+      ctxEsc = null;
+    }
   };
   const onContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
@@ -681,11 +686,24 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       addItem('全選', () => pointer.selectAll());
     }
     const rect = host.getBoundingClientRect();
-    menu.style.left = `${e.clientX - rect.left}px`;
-    menu.style.top = `${e.clientY - rect.top}px`;
     host.appendChild(menu);
     ctxMenu = menu;
-    setTimeout(() => document.addEventListener('pointerdown', closeContextMenu, { once: true }), 0);
+    // 夾在 host 範圍內,避免靠近右/下緣時選單溢出看不到。
+    const mw = menu.offsetWidth || 160;
+    const mh = menu.offsetHeight || 200;
+    let lx = e.clientX - rect.left;
+    let ly = e.clientY - rect.top;
+    if (lx + mw > rect.width) lx = Math.max(4, rect.width - mw - 4);
+    if (ly + mh > rect.height) ly = Math.max(4, rect.height - mh - 4);
+    menu.style.left = `${lx}px`;
+    menu.style.top = `${ly}px`;
+    setTimeout(() => {
+      document.addEventListener('pointerdown', closeContextMenu, { once: true });
+      ctxEsc = (ev: KeyboardEvent) => {
+        if (ev.key === 'Escape') closeContextMenu();
+      };
+      document.addEventListener('keydown', ctxEsc);
+    }, 0);
   };
   host.addEventListener('contextmenu', onContextMenu);
 
