@@ -53,10 +53,17 @@ export class SceneRenderer {
   private scene: EditorScene | null = null;
   /** sequence:訊息陳述 index → 世界座標矩形(供雙擊編輯訊息文字定位)。 */
   private seqMsgRects = new Map<number, { x: number; y: number; w: number; h: number }>();
+  /** sequence:整張圖的世界座標範圍(供 fit;sequence 內容延伸到節點下方,不能只用節點 bbox)。 */
+  private seqBounds: { x: number; y: number; w: number; h: number } | null = null;
 
   /** 取得 sequence 訊息的世界座標矩形(host 開啟文字編輯器定位用)。 */
   getSeqMsgRect(index: number): { x: number; y: number; w: number; h: number } | undefined {
     return this.seqMsgRects.get(index);
+  }
+
+  /** sequence 模式下的整張圖範圍(供 fit 用);其他圖種回 null(改用節點 bbox)。 */
+  getContentBounds(): { x: number; y: number; w: number; h: number } | null {
+    return this.seqBounds;
   }
 
   constructor(opts: SceneRendererOptions = {}) {
@@ -475,6 +482,11 @@ export class SceneRenderer {
       g.appendChild(bb);
       g.appendChild(this.seqText(c.cx, bottomY + 4 + HEAD_H / 2 + 1, c.label, txt, 13, 700, 'middle'));
     }
+
+    // 整張 sequence 的世界範圍(含底部參與者框 + 片段框左緣),供 fit 用。
+    const minX = Math.min(10, cols[0]?.x ?? 40);
+    const maxX = rightEdge + 20;
+    this.seqBounds = { x: minX, y: 0, w: maxX - minX, h: bottomY + 8 + HEAD_H };
   }
 
   private static geomKey(n: SceneNode): string {
@@ -488,6 +500,7 @@ export class SceneRenderer {
       this.renderSequence(scene);
       return;
     }
+    this.seqBounds = null;
     const liveNodeIds = new Set(scene.nodes.map((n) => n.id));
 
     // 移除消失的節點群組。

@@ -803,7 +803,8 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       refreshOverlay();
     },
     fit: () => {
-      viewport.fit(boundingBox(scene.nodes.map(nodeRect)));
+      // sequence:內容延伸到節點下方,用渲染器回報的整張範圍;其他圖種用節點 bbox。
+      viewport.fit(renderer.getContentBounds() ?? boundingBox(scene.nodes.map(nodeRect)));
       refreshOverlay();
     },
     resetView: () => {
