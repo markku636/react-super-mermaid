@@ -417,6 +417,38 @@ export class SceneRenderer {
     // 生命線
     for (const c of cols) g.appendChild(line(c.cx, HEAD_Y + HEAD_H, c.cx, bottomY, { dash: true, w: 1 }));
 
+    // 啟用區(activation bars):依訊息 +/- 簡寫配對,在生命線上畫窄矩形。
+    const actStack = new Map<string, number[]>();
+    const actBars: Array<{ actor: string; y0: number; y1: number }> = [];
+    for (const d of drawn) {
+      if (d.kind === 'msg' && d.s.kind === 'message') {
+        const s = d.s;
+        if (s.activate === '+') {
+          const st = actStack.get(s.to) ?? [];
+          st.push(d.y);
+          actStack.set(s.to, st);
+        } else if (s.activate === '-') {
+          const st = actStack.get(s.from);
+          if (st && st.length) actBars.push({ actor: s.from, y0: st.pop() as number, y1: d.y });
+        }
+      }
+    }
+    for (const [actor, st] of actStack) for (const y0 of st) actBars.push({ actor, y0, y1: bottomY });
+    for (const ab of actBars) {
+      const cx = cxOf(ab.actor);
+      g.appendChild(
+        svgEl('rect', {
+          x: cx - 5,
+          y: ab.y0,
+          width: 10,
+          height: Math.max(8, ab.y1 - ab.y0),
+          fill: fillBox,
+          stroke: ink,
+          'stroke-width': 1,
+        }),
+      );
+    }
+
     // 訊息 + note
     let autoNum = 0;
     for (const d of drawn) {
