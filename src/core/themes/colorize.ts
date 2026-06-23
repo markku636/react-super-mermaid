@@ -437,6 +437,8 @@ function styleGantt(svg: Element, dark: boolean): void {
   if (tasks.length === 0) {
     return;
   }
+  // 亮色用實心淺色票(深字);暗色用半透明色票(深底)+ 亮字,維持與其他圖表暗色一致。
+  const taskPalette = dark ? CLUSTER_PALETTE : NODE_PALETTE;
   for (const task of tasks) {
     const cls = task.getAttribute('class') ?? '';
     if (/\b(done|active|crit|milestone)\d*\b/.test(cls)) {
@@ -446,7 +448,7 @@ function styleGantt(svg: Element, dark: boolean): void {
     if (!m) {
       continue;
     }
-    const entry = NODE_PALETTE[Number(m[1]) % NODE_PALETTE.length];
+    const entry = taskPalette[Number(m[1]) % taskPalette.length];
     task.style.fill = entry.fill;
     task.style.stroke = entry.stroke;
     task.setAttribute('rx', '4');
@@ -458,9 +460,12 @@ function styleGantt(svg: Element, dark: boolean): void {
       band.style.fill = CLUSTER_PALETTE[Number(m[1]) % CLUSTER_PALETTE.length].fill;
     }
   });
-  for (const inBar of Array.from(svg.querySelectorAll<SVGElement>('text.taskText'))) {
-    if (!/Outside/.test(inBar.getAttribute('class') ?? '')) {
-      inBar.style.fill = NODE_TEXT;
+  for (const t of Array.from(svg.querySelectorAll<SVGElement>('text.taskText'))) {
+    // 暗色:所有任務字(條內 + 條外)轉亮;亮色:只把條內字壓深(條外維持 mermaid 預設)。
+    if (dark) {
+      t.style.fill = '#E2E8F0';
+    } else if (!/Outside/.test(t.getAttribute('class') ?? '')) {
+      t.style.fill = NODE_TEXT;
     }
   }
   for (const tick of Array.from(svg.querySelectorAll<SVGElement>('g.grid g.tick line'))) {

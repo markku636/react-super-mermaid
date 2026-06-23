@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.84 — gantt dark-aware (completes chart dark-mode pass)
+
+- **Fix**: gantt task bars used solid light fills + dark text regardless of
+  theme — bright bars on a dark canvas. Now dark mode uses translucent tints +
+  light text. With this, **all** colourized chart types (pie, xychart, quadrant,
+  journey, timeline, mindmap, gantt) render consistently in both light & dark.
+
 ## 0.6.83 — timeline + mindmap dark-aware
 
 - **Fix**: in dark mode, timeline period/event cards and mindmap nodes used
