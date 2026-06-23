@@ -549,6 +549,28 @@ function styleJourney(svg: Element): void {
   });
 }
 
+function styleXychart(svg: Element): void {
+  // xychart-beta:每個 bar-plot-N 是一個資料系列;mermaid 預設長條填淺紫(#ECECFF)在白底幾乎
+  // 看不見 → 給每個系列一個鮮明色(系列內同色=標準長條圖),折線系列上鮮明描邊。
+  const barSeries = Array.from(svg.querySelectorAll<SVGElement>('g[class*="bar-plot-"]'));
+  barSeries.forEach((g, i) => {
+    const c = PIE_PALETTE[i % PIE_PALETTE.length];
+    Array.from(g.querySelectorAll<SVGElement>('rect')).forEach((rect) => {
+      rect.style.fill = c;
+      rect.setAttribute('rx', '2');
+      rect.setAttribute('ry', '2');
+    });
+  });
+  Array.from(svg.querySelectorAll<SVGElement>('g[class*="line-plot-"]')).forEach((g, i) => {
+    const c = PIE_PALETTE[(barSeries.length + i) % PIE_PALETTE.length];
+    Array.from(g.querySelectorAll<SVGElement>('path')).forEach((p) => {
+      p.style.stroke = c;
+      p.style.strokeWidth = '2.5px';
+      p.style.fill = 'none';
+    });
+  });
+}
+
 /**
  * 字體清晰度:對「任何主題」渲染出的圖加重文字字重,小字與縮圖也讀得清楚。
  * 只動 font-weight(不改色),故對原生 neutral/forest/dark 主題也安全,不會打架。
@@ -638,5 +660,7 @@ export function colorizeDiagram(root: ParentNode, opts: ColorizeOptions = {}): v
     styleMindmap(svg);
   } else if (kind === 'journey') {
     styleJourney(svg);
+  } else if (kind === 'xychart') {
+    styleXychart(svg);
   }
 }

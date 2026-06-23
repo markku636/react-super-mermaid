@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.79 — vibrant xychart bars
+
+- **Improvement** (chart viewer): xychart (bar/line) charts weren't colourized,
+  so bars kept mermaid's pale `#ECECFF` fill — nearly invisible on white. The
+  colourizer now styles xychart: each bar series gets a vibrant palette colour
+  (rounded corners), line series get a bold coloured stroke.
+
 ## 0.6.78 — pie legend colours match slices
 
 - **Fix** (chart viewer): in colourful/auto themes, a pie chart's legend
