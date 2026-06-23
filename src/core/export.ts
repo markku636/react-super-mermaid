@@ -131,13 +131,16 @@ export function flattenForeignObjects(svg: SVGSVGElement): void {
       continue;
     }
     const color = findFoColor(fo) ?? '#1f2937';
-    const fontSize = 13;
+    // 巢狀 div = 結構化(ER/class 隔間)→ 用較小字避免溢出;單純標籤 → 對齊編輯器 14px/600。
+    const structured = fo.querySelectorAll('div').length > 1;
+    const fontSize = structured ? 13 : 14;
     const lineH = fontSize * 1.35;
     const text = document.createElementNS(SVG_NS_EXPORT, 'text');
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('fill', color);
     text.setAttribute('font-family', 'system-ui,-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif');
     text.setAttribute('font-size', String(fontSize));
+    text.setAttribute('font-weight', structured ? '400' : '600');
     const cx = x + w / 2;
     const startY = y + h / 2 - ((lines.length - 1) * lineH) / 2 + fontSize / 3;
     lines.forEach((ln, i) => {
