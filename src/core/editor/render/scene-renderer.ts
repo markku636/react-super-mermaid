@@ -51,6 +51,13 @@ export class SceneRenderer {
   private nodeCache = new Map<string, NodeCache>();
   private edgeEls = new Map<string, SVGGElement>();
   private scene: EditorScene | null = null;
+  /** sequence:訊息陳述 index → 世界座標矩形(供雙擊編輯訊息文字定位)。 */
+  private seqMsgRects = new Map<number, { x: number; y: number; w: number; h: number }>();
+
+  /** 取得 sequence 訊息的世界座標矩形(host 開啟文字編輯器定位用)。 */
+  getSeqMsgRect(index: number): { x: number; y: number; w: number; h: number } | undefined {
+    return this.seqMsgRects.get(index);
+  }
 
   constructor(opts: SceneRendererOptions = {}) {
     this.gen = (rough as unknown as { generator(): RoughGeneratorLike }).generator();
@@ -62,13 +69,14 @@ export class SceneRenderer {
 
   /** clean 風的柔和陰影濾鏡(貼近 colorful 主題的卡片陰影)。 */
   private appendShadowFilter(): void {
-    const sh = svgEl('filter', { id: NODE_SHADOW_ID, x: '-30%', y: '-30%', width: '160%', height: '160%' });
+    const sh = svgEl('filter', { id: NODE_SHADOW_ID, x: '-40%', y: '-40%', width: '180%', height: '180%' });
+    // 柔和投影:暗色下原本純黑 0.55 + 模糊不足 → 像一塊醜黑塊。改用偏藍黑、低不透明、加大模糊。
     const fd = svgEl('feDropShadow', {
       dx: 0,
-      dy: 2,
-      stdDeviation: 3,
-      'flood-color': this.dark ? '#000000' : '#1e293b',
-      'flood-opacity': this.dark ? '0.55' : '0.16',
+      dy: 1.5,
+      stdDeviation: this.dark ? 6 : 4,
+      'flood-color': this.dark ? '#0b1220' : '#1e293b',
+      'flood-opacity': this.dark ? '0.28' : '0.14',
     });
     sh.appendChild(fd);
     this.defs.appendChild(sh);
@@ -287,6 +295,7 @@ export class SceneRenderer {
     if (!seq) return;
     this.nodeCache.clear();
     this.edgeEls.clear();
+    this.seqMsgRects.clear();
     for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer, this.overlayLayer]) {
       while (layer.firstChild) layer.removeChild(layer.firstChild);
     }
@@ -320,6 +329,7 @@ export class SceneRenderer {
       kind: 'msg' | 'note';
       y: number;
       s: import('../scene/types').SeqStatement;
+      idx: number;
     }
     interface Frag {
       kw: string;
@@ -331,12 +341,14 @@ export class SceneRenderer {
     const drawn: Drawn[] = [];
     const fragStack: Frag[] = [];
     const frags: Frag[] = [];
+    let sidx = -1;
     for (const s of seq.statements) {
+      sidx += 1;
       if (s.kind === 'message') {
-        drawn.push({ kind: 'msg', y: ROW0 + row * ROW_H, s });
+        drawn.push({ kind: 'msg', y: ROW0 + row * ROW_H, s, idx: sidx });
         row += 1;
       } else if (s.kind === 'note') {
-        drawn.push({ kind: 'note', y: ROW0 + row * ROW_H, s });
+        drawn.push({ kind: 'note', y: ROW0 + row * ROW_H, s, idx: sidx });
         row += 1;
       } else if (s.kind === 'fragment') {
         if (OPENERS.has(s.keyword)) {
@@ -405,16 +417,31 @@ export class SceneRenderer {
         const x1 = cxOf(s.from);
         const x2 = cxOf(s.to);
         const dashed = s.arrow.includes('--');
+        let rect: { x: number; y: number; w: number; h: number };
         if (s.from === s.to) {
           const r = 20;
           g.appendChild(svgEl('path', { d: `M${x1},${d.y} h${r} v18 h${-r}`, fill: 'none', stroke: ink, 'stroke-width': 1.6 }));
           const back = line(x1 + r, d.y + 18, x1, d.y + 18, { marker: true });
           g.appendChild(back);
           if (s.text) g.appendChild(this.seqText(x1 + r + 6, d.y + 4, s.text, ink, 12, 400, 'start'));
+          rect = { x: x1, y: d.y - 10, w: 140, h: 34 };
         } else {
           g.appendChild(line(x1, d.y, x2, d.y, { dash: dashed, marker: true }));
           if (s.text) g.appendChild(this.seqText((x1 + x2) / 2, d.y - 6, s.text, ink, 12, 400, 'middle'));
+          rect = { x: Math.min(x1, x2), y: d.y - 18, w: Math.abs(x2 - x1), h: 26 };
         }
+        // 雙擊可編輯訊息文字:透明命中區 + 記錄世界座標供 host 定位編輯器。
+        this.seqMsgRects.set(d.idx, rect);
+        const hit = svgEl('rect', {
+          x: rect.x,
+          y: rect.y,
+          width: rect.w,
+          height: rect.h,
+          fill: 'transparent',
+          'data-seq-msg': String(d.idx),
+        });
+        hit.style.cursor = 'text';
+        g.appendChild(hit);
       } else if (d.kind === 'note' && d.s.kind === 'note') {
         const s = d.s;
         const ids = s.actors.split(',').map((a) => a.trim()).filter(Boolean);

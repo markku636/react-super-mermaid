@@ -26,6 +26,7 @@ import {
   cmdSetDirection,
   cmdSetEdgeStyle,
   cmdRenameSeqParticipant,
+  cmdSetSeqMessageText,
   cmdSetLabel,
   cmdSetNodeData,
   cmdSetNodeStyle,
@@ -303,6 +304,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     refreshOverlay,
     requestTextEdit: (nodeId: string) => openEditor(nodeId),
     requestEdgeLabelEdit: (edgeId: string) => openEdgeEditor(edgeId),
+    requestSeqMessageEdit: (index: number) => openSeqMessageEditor(index),
     onSelectionChange: (ids) => emit('selectionchange', ids),
     onToolChange: (tool) => emit('toolchange', tool),
     createShape: () => createShape,
@@ -347,6 +349,36 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
           cancelTextEdit = null;
         },
         { multiline: structured },
+      );
+    }, 0);
+    cancelTextEdit = () => clearTimeout(timer);
+  }
+
+  function openSeqMessageEditor(index: number): void {
+    if (!scene.sequence) return;
+    const stmt = scene.sequence.statements[index];
+    if (!stmt || stmt.kind !== 'message') return;
+    const rect = renderer.getSeqMsgRect(index);
+    if (!rect) return;
+    const z = viewport.getZoom();
+    const s = viewport.worldToScreen({ x: rect.x, y: rect.y });
+    const initial = stmt.text ?? '';
+    cancelTextEdit?.();
+    const timer = setTimeout(() => {
+      cancelTextEdit = openTextEditor(
+        host,
+        { left: s.x, top: s.y, width: Math.max(120, rect.w * z), height: 26 },
+        initial,
+        (value) => {
+          cancelTextEdit = null;
+          const cur = scene.sequence?.statements[index];
+          if (cur && cur.kind === 'message' && value !== (cur.text ?? '')) {
+            pointerHost.runCommand(cmdSetSeqMessageText(index, value), 'seq-msg');
+          }
+        },
+        () => {
+          cancelTextEdit = null;
+        },
       );
     }, 0);
     cancelTextEdit = () => clearTimeout(timer);

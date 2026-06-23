@@ -39,6 +39,8 @@ export interface PointerHost {
   refreshOverlay(): void;
   requestTextEdit(nodeId: string): void;
   requestEdgeLabelEdit(edgeId: string): void;
+  /** sequence:雙擊訊息要求編輯其文字(statement index)。 */
+  requestSeqMessageEdit?(index: number): void;
   onSelectionChange(ids: string[]): void;
   onToolChange(tool: Tool): void;
   /** node-create 工具要放的外形。 */
@@ -194,6 +196,25 @@ export class PointerController {
     this.host.overlay.clearHover();
     this.hoverNodeId = null;
     const world = this.host.viewport.screenToWorld(e.clientX, e.clientY);
+
+    // sequence 訊息:雙擊命中區 → 編輯訊息文字(訊息非 node/edge,獨立處理)。
+    const seqMsgEl = target.closest('[data-seq-msg]');
+    if (seqMsgEl && this.host.requestSeqMessageEdit) {
+      const i = Number(seqMsgEl.getAttribute('data-seq-msg'));
+      const key = `seq:${i}`;
+      const tnow = performance.now();
+      if (this.lastClickEdgeId === key && tnow - this.lastEdgeClickTime < 350) {
+        this.lastEdgeClickTime = 0;
+        this.lastClickEdgeId = null;
+        this.mode = { kind: 'idle' };
+        this.host.requestSeqMessageEdit(i);
+        return;
+      }
+      this.lastEdgeClickTime = tnow;
+      this.lastClickEdgeId = key;
+      this.mode = { kind: 'idle' };
+      return;
+    }
 
     // node-create:放一個節點。
     if (this.tool === 'node-create') {

@@ -167,6 +167,17 @@ export function cmdGroup(container: SceneContainer): Command {
   });
 }
 
+/** sequence:改某條訊息的文字(scene.sequence.statements[index])。 */
+export function cmdSetSeqMessageText(index: number, text: string): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const statements = scene.sequence.statements.map((s, i) =>
+      i === index && s.kind === 'message' ? { ...s, text } : s,
+    );
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
 /** sequence:改參與者顯示名(同步更新鏡像 node.label 與 scene.sequence.participants)。 */
 export function cmdRenameSeqParticipant(id: string, label: string): Command {
   return (scene) => {
