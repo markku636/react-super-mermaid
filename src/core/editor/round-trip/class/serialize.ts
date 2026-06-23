@@ -42,6 +42,8 @@ export function sceneToClass(scene: EditorScene): SerializeResult {
     if (c.trim().startsWith('%%{')) lines.push(c.trim());
   }
   lines.push('classDiagram');
+  const dir = scene.meta.type === 'class' ? scene.meta.direction : undefined;
+  if (dir && dir !== 'TB' && dir !== 'TD') lines.push(`${INDENT}direction ${dir}`);
 
   // 1. 類別區塊(有成員 / 方法 / stereotype 才開 { };否則孤立類別輸出 `class X`)。
   const inEdge = new Set<string>();

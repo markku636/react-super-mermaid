@@ -26,6 +26,13 @@ interface ErEdgeLike {
 }
 interface ErDbLike {
   getData?: () => { nodes: ErNodeLike[]; edges: ErEdgeLike[] };
+  getDirection?: () => string;
+}
+
+function normalizeDir(dir: string | undefined): 'TB' | 'TD' | 'BT' | 'LR' | 'RL' {
+  const d = (dir ?? 'TB').toUpperCase();
+  if (d === 'TD' || d === 'BT' || d === 'RL' || d === 'LR' || d === 'TB') return d as 'TB';
+  return 'TB';
 }
 
 function cardFromArrow(t: string | undefined): ErCardinality {
@@ -100,6 +107,7 @@ export async function erDbToScene(text: string, mermaid: MermaidLike): Promise<P
   }
 
   const data = db.getData?.() ?? { nodes: [], edges: [] };
+  const direction = normalizeDir(db.getDirection?.());
   const idToName = new Map<string, string>();
   for (const dn of data.nodes) idToName.set(dn.id, dn.label ?? dn.id);
 
@@ -155,7 +163,7 @@ export async function erDbToScene(text: string, mermaid: MermaidLike): Promise<P
     scene: {
       version: 1,
       diagramType: 'er',
-      meta: { type: 'er' },
+      meta: { type: 'er', direction },
       nodes,
       edges,
       containers: [],

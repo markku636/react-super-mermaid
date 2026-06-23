@@ -39,6 +39,8 @@ export function sceneToEr(scene: EditorScene): SerializeResult {
     if (c.trim().startsWith('%%{')) lines.push(c.trim());
   }
   lines.push('erDiagram');
+  const dir = scene.meta.type === 'er' ? scene.meta.direction : undefined;
+  if (dir && dir !== 'TB' && dir !== 'TD') lines.push(`${INDENT}direction ${dir}`);
 
   // 1. 關係(穩定排序)。
   const ids = new Set(scene.nodes.map((n) => n.id));

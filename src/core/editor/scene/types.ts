@@ -176,8 +176,8 @@ export type SceneMeta =
   | { type: 'flowchart'; direction: FlowDirection }
   | { type: 'state'; direction?: FlowDirection }
   | { type: 'sequence'; autonumber: boolean }
-  | { type: 'class' }
-  | { type: 'er' };
+  | { type: 'class'; direction?: FlowDirection }
+  | { type: 'er'; direction?: FlowDirection };
 
 /** round-trip 時 DB 看不到 / 尚未模型化的內容,逐字保留。 */
 export interface SceneRaw {

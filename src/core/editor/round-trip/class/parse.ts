@@ -174,7 +174,7 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
     scene: {
       version: 1,
       diagramType: 'class',
-      meta: { type: 'class' },
+      meta: { type: 'class', direction },
       nodes,
       edges,
       containers: [],
