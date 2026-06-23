@@ -5,6 +5,7 @@ import { registerStateAdapter } from '../core/editor/adapters/state';
 import { registerErAdapter } from '../core/editor/adapters/er';
 import { registerClassAdapter } from '../core/editor/adapters/class';
 import { registerMindmapAdapter } from '../core/editor/adapters/mindmap';
+import { registerSequenceAdapter } from '../core/editor/adapters/sequence';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -15,6 +16,8 @@ registerFlowchartAdapter();
 registerStateAdapter();
 registerErAdapter();
 registerClassAdapter();
+registerMindmapAdapter();
+registerSequenceAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

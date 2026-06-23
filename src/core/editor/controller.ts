@@ -25,6 +25,7 @@ import {
   cmdUngroup,
   cmdSetDirection,
   cmdSetEdgeStyle,
+  cmdRenameSeqParticipant,
   cmdSetLabel,
   cmdSetNodeData,
   cmdSetNodeStyle,
@@ -334,6 +335,9 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
           if (structured) {
             const patch = parseEditText(cur, value);
             if (patch) pointerHost.runCommand(cmdSetNodeData(nodeId, patch), 'edit-node');
+          } else if (cur.data?.kind === 'sequence') {
+            // sequence 參與者:改名同步到 scene.sequence(序列化來源)。
+            if (value !== cur.label) pointerHost.runCommand(cmdRenameSeqParticipant(nodeId, value), 'rename');
           } else if (value !== cur.label) {
             // 只有 label 真的改變才入命令 —— 避免新增節點後 blur 自動 commit 空字串產生贅餘 undo。
             pointerHost.runCommand(cmdSetLabel(nodeId, value), 'label');

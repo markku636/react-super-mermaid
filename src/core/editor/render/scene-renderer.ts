@@ -8,7 +8,7 @@ import { boundingBox } from '../scene/geometry';
 import { moveNodes } from '../scene/scene-ops';
 import type { EditorScene, SceneNode } from '../scene/types';
 import { svgEl, XHTML_NS } from './dom';
-import { renderEdge, buildMarkers, updateEdgeGeometry } from './edges';
+import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
@@ -255,6 +255,197 @@ export class SceneRenderer {
     g.appendChild(fo);
   }
 
+  /** sequence 圖小工具:foreignObject 文字(CJK 友善)。 */
+  private seqText(
+    x: number,
+    y: number,
+    text: string,
+    color: string,
+    size: number,
+    weight: number,
+    anchor: 'start' | 'middle' | 'end' = 'start',
+  ): SVGGElement {
+    const W = 220;
+    const fx = anchor === 'middle' ? x - W / 2 : anchor === 'end' ? x - W : x;
+    const fo = svgEl('foreignObject', { x: fx, y: y - 9, width: W, height: 18 });
+    fo.style.pointerEvents = 'none';
+    fo.style.overflow = 'visible';
+    const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    div.textContent = text;
+    div.setAttribute(
+      'style',
+      `font:${weight} ${size}px/1.2 var(--rsm-editor-font);color:${color};` +
+        `text-align:${anchor === 'middle' ? 'center' : anchor === 'end' ? 'right' : 'left'};white-space:nowrap;`,
+    );
+    fo.appendChild(div as unknown as Node);
+    return fo as unknown as SVGGElement;
+  }
+
+  /** sequence 圖專屬渲染:參與者欄 + 生命線 + 依序堆疊的訊息 + note + 片段框。 */
+  private renderSequence(scene: EditorScene): void {
+    const seq = scene.sequence;
+    if (!seq) return;
+    this.nodeCache.clear();
+    this.edgeEls.clear();
+    for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer, this.overlayLayer]) {
+      while (layer.firstChild) layer.removeChild(layer.firstChild);
+    }
+    const g = this.nodesLayer;
+    const ink = this.dark ? '#c9d1d9' : '#334155';
+    const fillBox = this.dark ? '#26262b' : '#ffffff';
+    const ROW_H = 44;
+    // 欄位 = 參與者節點(座標與命中測試一致)。
+    const cols = scene.nodes
+      .filter((n) => n.data?.kind === 'sequence')
+      .map((n) => ({
+        id: n.id,
+        label: n.label,
+        actor: n.data?.kind === 'sequence' ? n.data.actor : false,
+        x: n.x,
+        w: n.w,
+        cx: n.x + n.w / 2,
+        y: n.y,
+        h: n.h,
+      }));
+    const HEAD_Y = cols[0]?.y ?? 12;
+    const HEAD_H = cols[0]?.h ?? 40;
+    const colById = new Map(cols.map((c) => [c.id, c] as const));
+    const cxOf = (id: string): number => colById.get(id)?.cx ?? 40;
+    const rightEdge = cols.length ? cols[cols.length - 1].x + cols[cols.length - 1].w : 200;
+
+    const ROW0 = HEAD_Y + HEAD_H + 36;
+    let row = 0;
+    const OPENERS = new Set(['loop', 'alt', 'opt', 'par', 'critical', 'break', 'rect', 'box']);
+    interface Drawn {
+      kind: 'msg' | 'note';
+      y: number;
+      s: import('../scene/types').SeqStatement;
+    }
+    interface Frag {
+      kw: string;
+      label: string;
+      y0: number;
+      y1?: number;
+      dividers: Array<{ y: number; kw: string; label: string }>;
+    }
+    const drawn: Drawn[] = [];
+    const fragStack: Frag[] = [];
+    const frags: Frag[] = [];
+    for (const s of seq.statements) {
+      if (s.kind === 'message') {
+        drawn.push({ kind: 'msg', y: ROW0 + row * ROW_H, s });
+        row += 1;
+      } else if (s.kind === 'note') {
+        drawn.push({ kind: 'note', y: ROW0 + row * ROW_H, s });
+        row += 1;
+      } else if (s.kind === 'fragment') {
+        if (OPENERS.has(s.keyword)) {
+          const f: Frag = { kw: s.keyword, label: s.label, y0: ROW0 + row * ROW_H, dividers: [] };
+          row += 1;
+          fragStack.push(f);
+          frags.push(f);
+        } else {
+          const top = fragStack[fragStack.length - 1];
+          if (top) top.dividers.push({ y: ROW0 + row * ROW_H, kw: s.keyword, label: s.label });
+          row += 1;
+        }
+      } else if (s.kind === 'end') {
+        const f = fragStack.pop();
+        if (f) {
+          f.y1 = ROW0 + row * ROW_H;
+          row += 1;
+        }
+      }
+    }
+    const bottomY = ROW0 + row * ROW_H + 6;
+
+    const line = (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      o: { dash?: boolean; w?: number; marker?: boolean } = {},
+    ): SVGPathElement => {
+      const p = svgEl('path', { d: `M${x1},${y1} L${x2},${y2}`, fill: 'none', stroke: ink, 'stroke-width': o.w ?? 1.6 });
+      p.setAttribute('vector-effect', 'non-scaling-stroke');
+      if (o.dash) p.setAttribute('stroke-dasharray', '5 4');
+      const mk = markerIdFor('arrow', this.dark);
+      if (o.marker && mk) p.setAttribute('marker-end', `url(#${mk})`);
+      p.style.pointerEvents = 'none';
+      return p;
+    };
+
+    // 片段框(墊底)
+    for (const f of frags) {
+      if (f.y1 == null) f.y1 = bottomY;
+      const fx = 20;
+      const fw = rightEdge + 20;
+      const box = svgEl('rect', { x: fx, y: f.y0 - 14, width: fw - fx, height: f.y1 - f.y0 + 24, rx: 4, fill: 'none', stroke: ink, 'stroke-width': 1, 'stroke-dasharray': '3 3' });
+      box.style.opacity = '0.6';
+      box.style.pointerEvents = 'none';
+      g.appendChild(box);
+      const tagW = Math.max(40, f.kw.length * 8 + 24);
+      const tag = svgEl('rect', { x: fx, y: f.y0 - 14, width: tagW, height: 18, fill: this.dark ? '#3a3a40' : '#e2e8f0', stroke: ink, 'stroke-width': 1 });
+      tag.style.pointerEvents = 'none';
+      g.appendChild(tag);
+      g.appendChild(this.seqText(fx + 5, f.y0 - 1, `${f.kw}${f.label ? ' ' + f.label : ''}`, ink, 11, 700, 'start'));
+      for (const d of f.dividers) {
+        g.appendChild(line(fx, d.y - 14, fw, d.y - 14, { dash: true, w: 1 }));
+        g.appendChild(this.seqText(fx + 5, d.y - 1, `[${d.label || d.kw}]`, ink, 11, 600, 'start'));
+      }
+    }
+
+    // 生命線
+    for (const c of cols) g.appendChild(line(c.cx, HEAD_Y + HEAD_H, c.cx, bottomY, { dash: true, w: 1 }));
+
+    // 訊息 + note
+    for (const d of drawn) {
+      if (d.kind === 'msg' && d.s.kind === 'message') {
+        const s = d.s;
+        const x1 = cxOf(s.from);
+        const x2 = cxOf(s.to);
+        const dashed = s.arrow.includes('--');
+        if (s.from === s.to) {
+          const r = 20;
+          g.appendChild(svgEl('path', { d: `M${x1},${d.y} h${r} v18 h${-r}`, fill: 'none', stroke: ink, 'stroke-width': 1.6 }));
+          const back = line(x1 + r, d.y + 18, x1, d.y + 18, { marker: true });
+          g.appendChild(back);
+          if (s.text) g.appendChild(this.seqText(x1 + r + 6, d.y + 4, s.text, ink, 12, 400, 'start'));
+        } else {
+          g.appendChild(line(x1, d.y, x2, d.y, { dash: dashed, marker: true }));
+          if (s.text) g.appendChild(this.seqText((x1 + x2) / 2, d.y - 6, s.text, ink, 12, 400, 'middle'));
+        }
+      } else if (d.kind === 'note' && d.s.kind === 'note') {
+        const s = d.s;
+        const ids = s.actors.split(',').map((a) => a.trim()).filter(Boolean);
+        const xs = ids.map(cxOf);
+        const minx = Math.min(...xs);
+        const maxx = Math.max(...xs);
+        const nw = s.placement === 'over' ? maxx - minx + 80 : 120;
+        const nx = s.placement === 'over' ? minx - 40 : s.placement === 'left of' ? minx - 130 : maxx + 10;
+        const w = Math.max(80, nw);
+        const nbox = svgEl('rect', { x: nx, y: d.y - 12, width: w, height: 26, rx: 2, fill: this.dark ? '#3d3a22' : '#fff7d6', stroke: ink, 'stroke-width': 1 });
+        nbox.style.pointerEvents = 'none';
+        g.appendChild(nbox);
+        g.appendChild(this.seqText(nx + w / 2, d.y + 1, s.text, ink, 11, 400, 'middle'));
+      }
+    }
+
+    // 參與者方框:頂端(帶 data-node-id 供選取 / 雙擊改名)+ 底端(裝飾)。
+    const txt = this.dark ? '#e9ecef' : '#1f2937';
+    for (const c of cols) {
+      const top = svgEl('g', { 'data-node-id': c.id, class: 'rsm-node' });
+      const tb = svgEl('rect', { x: c.x, y: c.y, width: c.w, height: c.h, rx: c.actor ? 16 : 6, fill: fillBox, stroke: ink, 'stroke-width': 1.5 });
+      top.appendChild(tb);
+      top.appendChild(this.seqText(c.cx, c.y + c.h / 2 + 1, c.label, txt, 13, 700, 'middle'));
+      g.appendChild(top);
+      const bb = svgEl('rect', { x: c.x, y: bottomY + 4, width: c.w, height: HEAD_H, rx: c.actor ? 16 : 6, fill: fillBox, stroke: ink, 'stroke-width': 1.5 });
+      bb.style.pointerEvents = 'none';
+      g.appendChild(bb);
+      g.appendChild(this.seqText(c.cx, bottomY + 4 + HEAD_H / 2 + 1, c.label, txt, 13, 700, 'middle'));
+    }
+  }
+
   private static geomKey(n: SceneNode): string {
     return `${n.shape}|${Math.round(n.w)}|${Math.round(n.h)}|${n.style?.fill ?? ''}|${n.style?.stroke ?? ''}`;
   }
@@ -262,6 +453,10 @@ export class SceneRenderer {
   /** 全量 diff 渲染(新增 / 移除 / 幾何變更重 rough,純位移只改 transform)。 */
   render(scene: EditorScene): void {
     this.scene = scene;
+    if (scene.diagramType === 'sequence' && scene.sequence) {
+      this.renderSequence(scene);
+      return;
+    }
     const liveNodeIds = new Set(scene.nodes.map((n) => n.id));
 
     // 移除消失的節點群組。

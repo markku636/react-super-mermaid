@@ -113,18 +113,26 @@ export async function sequenceToScene(text: string, _mermaid: MermaidLike): Prom
   }
 
   const participants = order.map((id) => partsById.get(id) as SeqParticipant);
-  // 參與者鏡像成 nodes(供選取 / rename;座標由渲染時自算)。
-  const nodes: SceneNode[] = participants.map((p, i) => ({
-    id: p.id,
-    shape: p.actor ? 'actor' : 'participant',
-    label: p.label,
-    x: i * 160 + 40,
-    y: 20,
-    w: Math.max(90, p.label.length * 9 + 28),
-    h: 44,
-    data: { kind: 'sequence', actor: p.actor },
-    sourceIndex: i,
-  }));
+  // 參與者鏡像成 nodes(供選取 / rename)。座標 = 渲染器的「頂端參與者框」欄位佈局,
+  // 兩者一致 → 命中測試 / 選取框與畫面對齊(GAP/HEAD_Y/HEAD_H 須與 scene-renderer 同步)。
+  const GAP = 56;
+  let px = 40;
+  const nodes: SceneNode[] = participants.map((p, i) => {
+    const w = Math.max(96, p.label.length * 9 + 28);
+    const node: SceneNode = {
+      id: p.id,
+      shape: p.actor ? 'actor' : 'participant',
+      label: p.label,
+      x: px,
+      y: 12,
+      w,
+      h: 40,
+      data: { kind: 'sequence', actor: p.actor },
+      sourceIndex: i,
+    };
+    px += w + GAP;
+    return node;
+  });
 
   return {
     scene: {

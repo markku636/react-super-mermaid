@@ -167,6 +167,24 @@ export function cmdGroup(container: SceneContainer): Command {
   });
 }
 
+/** sequence:改參與者顯示名(同步更新鏡像 node.label 與 scene.sequence.participants)。 */
+export function cmdRenameSeqParticipant(id: string, label: string): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    return {
+      scene: {
+        ...scene,
+        nodes: scene.nodes.map((n) => (n.id === id ? { ...n, label } : n)),
+        sequence: {
+          ...scene.sequence,
+          participants: scene.sequence.participants.map((p) => (p.id === id ? { ...p, label } : p)),
+        },
+      },
+      patch: { nodes: [id], structural: true },
+    };
+  };
+}
+
 /** 設定節點的 label + data(+ 重算尺寸)。供 ER 屬性 / class 成員結構化編輯。 */
 export function cmdSetNodeData(
   id: string,
