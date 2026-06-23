@@ -155,6 +155,10 @@ export class SceneRenderer {
       this.fillErEntity(g, node);
       return;
     }
+    if (node.data?.kind === 'class') {
+      this.fillClassBox(g, node);
+      return;
+    }
 
     // label foreignObject(置中):一律深色墨字(節點底色都是淺色)+ 跟隨 look 的字體 → 清晰。
     if (node.label) {
@@ -207,6 +211,46 @@ export class SceneRenderer {
       }
       root.appendChild(body as unknown as Node);
     }
+    fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
+  }
+
+  /** class 框:標題(+«stereotype»)/ 成員 / 方法 三隔間,以分隔線區隔。 */
+  private fillClassBox(g: SVGGElement, node: SceneNode): void {
+    const data = node.data?.kind === 'class' ? node.data : undefined;
+    const fo = svgEl('foreignObject', { x: 0, y: 0, width: node.w, height: node.h });
+    fo.style.pointerEvents = 'none';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;width:100%;height:100%;box-sizing:border-box;' +
+        `overflow:hidden;font:12px/1.45 var(--rsm-editor-font);color:${INK};`,
+    );
+    const mkSection = (style: string): HTMLDivElement => {
+      const d = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+      d.setAttribute('style', style);
+      return d;
+    };
+    const title = mkSection(
+      `font-weight:700;text-align:center;padding:4px 8px;border-bottom:1px solid ${INK};white-space:pre-wrap;`,
+    );
+    title.textContent = (data?.stereotype ? `«${data.stereotype}»\n` : '') + node.label;
+    root.appendChild(title as unknown as Node);
+    const addRows = (rows: string[], borderTop: boolean): void => {
+      if (!rows.length) return;
+      const sec = mkSection(
+        `flex:0 0 auto;padding:3px 8px;${borderTop ? `border-top:1px solid ${INK};` : ''}`,
+      );
+      for (const r of rows) {
+        const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+        row.textContent = r;
+        row.setAttribute('style', 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;');
+        sec.appendChild(row as unknown as Node);
+      }
+      root.appendChild(sec as unknown as Node);
+    };
+    addRows(data?.members ?? [], false);
+    addRows(data?.methods ?? [], (data?.members?.length ?? 0) > 0);
     fo.appendChild(root as unknown as Node);
     g.appendChild(fo);
   }

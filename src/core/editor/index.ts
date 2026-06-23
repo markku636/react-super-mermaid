@@ -19,6 +19,7 @@ export type {
 export { flowchartAdapter, registerFlowchartAdapter } from './adapters/flowchart';
 export { stateAdapter, registerStateAdapter } from './adapters/state';
 export { erAdapter, registerErAdapter } from './adapters/er';
+export { classAdapter, registerClassAdapter } from './adapters/class';
 
 export type { EditorLook } from './render/scene-renderer';
 export { mermaidSvgLayout } from './layout/mermaid-svg-layout';
