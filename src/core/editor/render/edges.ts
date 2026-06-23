@@ -203,16 +203,18 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
     const fo = svgEl('foreignObject', { x: mid.x - 60, y: mid.y - 14, width: 120, height: 28, class: 'rsm-edge-label' });
     fo.style.pointerEvents = 'none';
     fo.style.overflow = 'visible';
-    // 置中容器透明,白底膠囊由內層 span 包住文字(緊貼字寬,避免相鄰標籤白底連成一條寬帶)。
+    // 置中容器透明,膠囊底色由內層 span 包住文字(緊貼字寬,避免相鄰標籤底色連成一條寬帶)。
     const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     div.setAttribute('style', 'display:flex;align-items:center;justify-content:center;height:28px;');
     const span = document.createElementNS(XHTML_NS, 'span') as unknown as HTMLSpanElement;
     span.textContent = edge.label;
-    // 標籤底色一律淺(白底膠囊),故文字一律用深墨色(對齊 Edit Diagram,且修暗色模式下淺字白底看不清)。
+    // 膠囊底色隨主題(--rsm-edge-label-bg 淺/深),文字色也須隨主題,否則暗色=深字深底看不見。
+    const labelInk = dark ? INK_DARK : INK;
+    const labelBg = dark ? 'rgba(30,30,30,0.85)' : '#ffffffe6';
     span.setAttribute(
       'style',
-      `font:600 13px/1.2 var(--rsm-editor-font);color:${INK};` +
-        'background:var(--rsm-edge-label-bg,#ffffffe6);border-radius:4px;padding:1px 6px;white-space:nowrap;',
+      `font:600 13px/1.2 var(--rsm-editor-font);color:${labelInk};` +
+        `background:var(--rsm-edge-label-bg,${labelBg});border-radius:4px;padding:1px 6px;white-space:nowrap;`,
     );
     div.appendChild(span as unknown as Node);
     fo.appendChild(div as unknown as Node);
