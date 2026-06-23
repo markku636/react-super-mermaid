@@ -144,15 +144,19 @@ export interface DiagramEditorHandle {
   destroy(): void;
 }
 
-// 右鍵選單可快速切換的常用外形。
-const CTX_SHAPES: Array<[NodeShape, string]> = [
-  ['rectangle', '▭'],
-  ['rounded', '⬭'],
-  ['stadium', '⬮'],
-  ['diamond', '◇'],
-  ['circle', '◯'],
-  ['hexagon', '⬡'],
-  ['cylinder', '⛁'],
+// 右鍵選單可快速切換的外形(涵蓋 renderer 支援的全部 flowchart 外形)。
+const CTX_SHAPES: Array<[NodeShape, string, string]> = [
+  ['rectangle', '▭', '矩形'],
+  ['rounded', '⬭', '圓角矩形'],
+  ['stadium', '⬮', '體育場形'],
+  ['subroutine', '◫', '子流程'],
+  ['diamond', '◇', '菱形(判斷)'],
+  ['circle', '◯', '圓形'],
+  ['doubleCircle', '◎', '雙圈'],
+  ['hexagon', '⬡', '六邊形'],
+  ['cylinder', '⛁', '圓柱(資料庫)'],
+  ['parallelogram', '▱', '平行四邊形'],
+  ['trapezoid', '⏢', '梯形'],
 ];
 
 /** ER 實體 / class 節點 → 可編輯多行文字(第一行=名稱,其餘=屬性 / 成員)。 */
@@ -591,11 +595,11 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       if (!pointer.getSelection().includes(id)) pointer.setSelection([id]);
       const strip = document.createElement('div');
       strip.className = 'rsm-ctx-shapes';
-      for (const [shape, glyph] of CTX_SHAPES) {
+      for (const [shape, glyph, name] of CTX_SHAPES) {
         const sb = document.createElement('button');
         sb.type = 'button';
         sb.textContent = glyph;
-        sb.title = shape;
+        sb.title = name;
         sb.addEventListener('click', () => {
           closeContextMenu();
           handle.setNodeShape(id, shape);
