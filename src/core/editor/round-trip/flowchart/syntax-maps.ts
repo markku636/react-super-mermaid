@@ -77,6 +77,12 @@ const HEAD_SYMBOL: Partial<Record<ArrowHead, string>> = {
   dot: 'o',
   cross: 'x',
 };
+// 起點端頭:箭頭朝左用 `<`(`>` 只對終點);圓圈 / 交叉左右對稱。
+const START_HEAD_SYMBOL: Partial<Record<ArrowHead, string>> = {
+  arrow: '<',
+  dot: 'o',
+  cross: 'x',
+};
 
 /**
  * 組出 source→target 的連線運算子(不含 label)。
@@ -90,7 +96,7 @@ export function buildLinkOperator(edge: {
   minLen?: number;
 }): string {
   const body = LINE_BODY[edge.lineKind];
-  const startSym = HEAD_SYMBOL[edge.arrowStart] ?? '';
+  const startSym = START_HEAD_SYMBOL[edge.arrowStart] ?? '';
   const endSym = HEAD_SYMBOL[edge.arrowEnd] ?? '';
   const hasHead = Boolean(startSym || endSym);
   // 額外秩距:minLen=2 → 多一節線體(mermaid 用線長控制 rank 距離)。
