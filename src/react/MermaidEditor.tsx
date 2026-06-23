@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { DiagramEditorHandle } from '../core/editor/controller';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -54,6 +54,22 @@ export const MermaidEditor = forwardRef<MermaidEditorHandle, MermaidEditorProps>
     const [showSource, setShowSource] = useState(props.defaultSource ?? false);
     const [copied, setCopied] = useState(false);
     const dark = props.dark ?? false;
+    // 可編輯的原始碼草稿:畫布變更時若使用者沒在編輯 textarea 才同步,避免打字被覆寫。
+    const [draft, setDraft] = useState('');
+    const [srcErr, setSrcErr] = useState(false);
+    const taRef = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+      if (document.activeElement !== taRef.current) {
+        setDraft(ed.code);
+        setSrcErr(false);
+      }
+    }, [ed.code]);
+    const applySource = (): void => {
+      void ed.handle
+        ?.loadSource(draft)
+        .then(() => setSrcErr(false))
+        .catch(() => setSrcErr(true));
+    };
     const copySource = (): void => {
       navigator.clipboard
         ?.writeText(ed.code)
@@ -107,25 +123,46 @@ export const MermaidEditor = forwardRef<MermaidEditorHandle, MermaidEditorProps>
                   borderBottom: `1px solid ${dark ? '#21262d' : '#e5e7eb'}`,
                 }}
               >
-                <span>Mermaid 原始碼</span>
-                <button type="button" className="rsm-btn" onClick={copySource}>
-                  {copied ? '✓ 已複製' : '複製'}
-                </button>
+                <span>Mermaid 原始碼{srcErr ? ' — 語法錯誤' : ''}</span>
+                <span style={{ display: 'flex', gap: 4 }}>
+                  <button type="button" className="rsm-btn" onClick={applySource} title="套用原始碼變更到圖">
+                    套用
+                  </button>
+                  <button type="button" className="rsm-btn" onClick={copySource}>
+                    {copied ? '✓ 已複製' : '複製'}
+                  </button>
+                </span>
               </div>
-              <pre
+              <textarea
+                ref={taRef}
+                value={draft}
+                aria-label="Mermaid 原始碼"
+                title="編輯 Mermaid 原始碼,按「套用」或 Ctrl+Enter 套用到圖"
+                spellCheck={false}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  // Ctrl/Cmd+Enter 套用;Tab 插入縮排不跳出。
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    applySource();
+                  }
+                }}
                 style={{
                   flex: 1,
                   margin: 0,
                   padding: 12,
-                  overflow: 'auto',
+                  border: 'none',
+                  outline: srcErr ? '2px solid #ef4444' : 'none',
+                  outlineOffset: '-2px',
+                  resize: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                   fontSize: 13,
                   lineHeight: 1.5,
                   whiteSpace: 'pre',
                 }}
-              >
-                <code>{ed.code}</code>
-              </pre>
+              />
             </div>
           ) : null}
         </div>
