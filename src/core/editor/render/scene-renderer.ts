@@ -6,7 +6,7 @@ import rough from 'roughjs';
 import { ensureSketchFont } from '../../themes/sketch';
 import { boundingBox } from '../scene/geometry';
 import { moveNodes } from '../scene/scene-ops';
-import type { EditorScene, SceneNode } from '../scene/types';
+import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, clusterByIndex, paletteByIndex, seedFor } from './palette';
@@ -625,20 +625,28 @@ export class SceneRenderer {
     const byId = new Map(scene.nodes.map((n) => [n.id, n] as const));
     const PAD = 18;
     const LABEL_H = 22;
-    let ci = 0;
-    for (const c of scene.containers) {
-      // 對齊 Edit Diagram:每個 subgraph 取叢集底色 + 同色標題(色相循序)。
-      const cp = clusterByIndex(ci++);
+    // 容器外框需「遞迴」涵蓋子節點 + 子容器(巢狀 subgraph 才會外層包住內層,而非並排)。
+    const childContainers = (cid: string) => scene.containers.filter((k) => k.parentId === cid);
+    const effRect = (c: SceneContainer): { x: number; y: number; w: number; h: number } | null => {
       const rects = c.childNodeIds
         .map((id) => byId.get(id))
         .filter((n): n is SceneNode => Boolean(n))
         .map((n) => ({ x: n.x, y: n.y, w: n.w, h: n.h }));
+      for (const sub of childContainers(c.id)) {
+        const sr = effRect(sub);
+        if (sr) rects.push(sr);
+      }
       const bb = boundingBox(rects);
-      if (!bb) continue;
-      const x = bb.x - PAD;
-      const y = bb.y - PAD - LABEL_H;
-      const w = bb.w + PAD * 2;
-      const h = bb.h + PAD * 2 + LABEL_H;
+      if (!bb) return null;
+      return { x: bb.x - PAD, y: bb.y - PAD - LABEL_H, w: bb.w + PAD * 2, h: bb.h + PAD * 2 + LABEL_H };
+    };
+    let ci = 0;
+    for (const c of scene.containers) {
+      // 對齊 Edit Diagram:每個 subgraph 取叢集底色 + 同色標題(色相循序)。
+      const cp = clusterByIndex(ci++);
+      const box0 = effRect(c);
+      if (!box0) continue;
+      const { x, y, w, h } = box0;
       const box = svgEl('rect', {
         x,
         y,

@@ -47,7 +47,7 @@ export function getNode(scene: EditorScene, id: string): SceneNode | undefined {
 const C_PAD = 18;
 const C_LABEL_H = 22;
 
-/** 容器(複合狀態 / subgraph)依其子節點 bbox + 內距推得的外框矩形。 */
+/** 容器(複合狀態 / subgraph)外框矩形:遞迴涵蓋子節點 + 子容器(巢狀 subgraph)+ 內距。 */
 export function containerRect(scene: EditorScene, id: string): Rect | null {
   const c = scene.containers.find((k) => k.id === id);
   if (!c) return null;
@@ -55,6 +55,12 @@ export function containerRect(scene: EditorScene, id: string): Rect | null {
     .map((cid) => getNode(scene, cid))
     .filter((n): n is SceneNode => Boolean(n))
     .map(nodeRect);
+  for (const sub of scene.containers) {
+    if (sub.parentId === id) {
+      const sr = containerRect(scene, sub.id);
+      if (sr) rects.push(sr);
+    }
+  }
   const bb = boundingBox(rects);
   if (!bb) return null;
   return { x: bb.x - C_PAD, y: bb.y - C_PAD - C_LABEL_H, w: bb.w + C_PAD * 2, h: bb.h + C_PAD * 2 + C_LABEL_H };
