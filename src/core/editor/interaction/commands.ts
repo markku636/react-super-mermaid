@@ -5,6 +5,7 @@ import type {
   EditorScene,
   ElementStyle,
   LineKind,
+  NodeData,
   NodeShape,
   Point,
   SceneContainer,
@@ -163,6 +164,30 @@ export function cmdGroup(container: SceneContainer): Command {
   return (scene) => ({
     scene: groupIntoContainer(scene, container),
     patch: { containers: [container.id], nodes: container.childNodeIds, structural: true },
+  });
+}
+
+/** 設定節點的 label + data(+ 重算尺寸)。供 ER 屬性 / class 成員結構化編輯。 */
+export function cmdSetNodeData(
+  id: string,
+  patch: { label?: string; data?: NodeData; w?: number; h?: number },
+): Command {
+  return (scene) => ({
+    scene: {
+      ...scene,
+      nodes: scene.nodes.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              label: patch.label ?? n.label,
+              data: patch.data ?? n.data,
+              w: patch.w ?? n.w,
+              h: patch.h ?? n.h,
+            }
+          : n,
+      ),
+    },
+    patch: { nodes: [id] },
   });
 }
 

@@ -26,6 +26,7 @@ import {
   cmdSetDirection,
   cmdSetEdgeStyle,
   cmdSetLabel,
+  cmdSetNodeData,
   cmdSetNodeStyle,
   cmdSetShape,
   type AlignAxis,
@@ -44,7 +45,7 @@ import { svgEl } from './render/dom';
 import { boundingBox, nodeRect } from './scene/geometry';
 import { edgePoints } from './render/edges';
 import { emptyScene } from './scene/types';
-import type { ArrowHead, DiagramType, EditorScene, FlowDirection, LineKind, NodeShape, Point } from './scene/types';
+import type { ArrowHead, DiagramType, EditorScene, FlowDirection, LineKind, NodeShape, Point, SceneNode } from './scene/types';
 import { renderDiagram } from '../render-pipeline';
 
 export type EditorEvent =
@@ -145,6 +146,73 @@ const CTX_SHAPES: Array<[NodeShape, string]> = [
   ['hexagon', '⬡'],
   ['cylinder', '⛁'],
 ];
+
+/** ER 實體 / class 節點 → 可編輯多行文字(第一行=名稱,其餘=屬性 / 成員)。 */
+function nodeToEditText(node: SceneNode): string {
+  if (node.data?.kind === 'er') {
+    const rows = node.data.attributes.map((a) =>
+      `${a.type ?? ''} ${a.name}${a.keys && a.keys.length ? ' ' + a.keys.join(',') : ''}${a.comment ? ' "' + a.comment + '"' : ''}`.trim(),
+    );
+    return [node.label, ...rows].join('\n');
+  }
+  if (node.data?.kind === 'class') {
+    const rows = [
+      ...(node.data.stereotype ? [`<<${node.data.stereotype}>>`] : []),
+      ...node.data.members,
+      ...node.data.methods,
+    ];
+    return [node.label, ...rows].join('\n');
+  }
+  return node.label;
+}
+
+/** 多行編輯文字 → 節點 patch(label + data + 重算尺寸)。 */
+function parseEditText(
+  node: SceneNode,
+  value: string,
+): { label: string; data: SceneNode['data']; w: number; h: number } | null {
+  const lines = value.split('\n');
+  const label = (lines[0] ?? '').trim() || node.id;
+  const rest = lines.slice(1).map((l) => l.trim()).filter(Boolean);
+  const widest = Math.max(label.length, ...lines.map((l) => l.trim().length), 8);
+  const w = Math.max(120, widest * 7.5 + 24);
+  if (node.data?.kind === 'er') {
+    const attributes = rest.map((line) => {
+      let comment: string | undefined;
+      let body = line.replace(/"([^"]*)"\s*$/, (_m, c) => {
+        comment = c;
+        return '';
+      });
+      const tok = body.trim().split(/\s+/);
+      const type = tok[0] ?? 'string';
+      const name = tok[1] ?? tok[0] ?? '';
+      const keys = tok
+        .slice(2)
+        .flatMap((k) => k.split(','))
+        .filter((k) => /^(PK|FK|UK)$/i.test(k))
+        .map((k) => k.toUpperCase());
+      return { name, type, keys: keys.length ? keys : undefined, comment };
+    });
+    return { label, data: { kind: 'er', attributes }, w, h: 30 + Math.max(1, attributes.length) * 20 + 8 };
+  }
+  if (node.data?.kind === 'class') {
+    let stereotype: string | undefined;
+    const members: string[] = [];
+    const methods: string[] = [];
+    for (const l of rest) {
+      const st = l.match(/^«?<<?\s*(.+?)\s*>>?»?$/);
+      if (st && /<</.test(l)) {
+        stereotype = st[1];
+        continue;
+      }
+      if (l.includes('(')) methods.push(l);
+      else members.push(l);
+    }
+    const rows = (stereotype ? 1 : 0) + members.length + methods.length;
+    return { label, data: { kind: 'class', members, methods, stereotype }, w, h: 30 + Math.max(1, rows) * 19 + 12 };
+  }
+  return null;
+}
 
 export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOptions = {}): DiagramEditorHandle {
   assertBrowser('createDiagramEditor');
@@ -247,27 +315,34 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     cancelTextEdit?.();
     const tl = viewport.worldToScreen({ x: node.x, y: node.y });
     const z = viewport.getZoom();
-    const nodeW = node.w;
-    const nodeH = node.h;
-    const initial = node.label;
+    // ER 實體 / class 用「多行結構編輯」(第一行=名稱,其餘=屬性 / 成員)。
+    const structured = node.data?.kind === 'er' || node.data?.kind === 'class';
+    const initial = structured ? nodeToEditText(node) : node.label;
+    const editW = Math.max(node.w, structured ? 200 : 0);
+    const editH = Math.max(node.h, structured ? 120 : 0);
     // 延後到目前 click/pointer 事件完全結束才建立並聚焦 textarea。否則原生點擊收尾會把焦點
     // 搶回畫布,textarea 一聚焦就立刻 blur 關閉 → 看起來「雙擊無法編輯」。
     const timer = setTimeout(() => {
       cancelTextEdit = openTextEditor(
         host,
-        { left: tl.x, top: tl.y, width: nodeW * z, height: nodeH * z },
+        { left: tl.x, top: tl.y, width: editW * z, height: editH * z },
         initial,
         (value) => {
           cancelTextEdit = null;
-          // 只有 label 真的改變才入命令 —— 避免新增節點後 blur 自動 commit 空字串產生贅餘 undo。
           const cur = scene.nodes.find((n) => n.id === nodeId);
-          if (cur && value !== cur.label) {
+          if (!cur) return;
+          if (structured) {
+            const patch = parseEditText(cur, value);
+            if (patch) pointerHost.runCommand(cmdSetNodeData(nodeId, patch), 'edit-node');
+          } else if (value !== cur.label) {
+            // 只有 label 真的改變才入命令 —— 避免新增節點後 blur 自動 commit 空字串產生贅餘 undo。
             pointerHost.runCommand(cmdSetLabel(nodeId, value), 'label');
           }
         },
         () => {
           cancelTextEdit = null;
         },
+        { multiline: structured },
       );
     }, 0);
     cancelTextEdit = () => clearTimeout(timer);
