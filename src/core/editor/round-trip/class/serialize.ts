@@ -39,6 +39,10 @@ function relationLine(e: SceneEdge): string {
 }
 
 export function sceneToClass(scene: EditorScene): SerializeResult {
+  // 解析失敗的降級場景(空節點但保有原文)→ 原樣回吐,絕不覆寫成空。
+  if (scene.nodes.length === 0 && scene.raw?.fullSource) {
+    return { text: scene.raw.fullSource, warnings: [] };
+  }
   const warnings: DataLossWarning[] = [];
   const lines: string[] = [];
 
