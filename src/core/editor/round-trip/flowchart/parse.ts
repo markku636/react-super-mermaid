@@ -5,6 +5,7 @@
 import type { ParseResult, ParseWarning } from '../../adapters/types';
 import type {
   EditorScene,
+  ElementStyle,
   FlowDirection,
   SceneContainer,
   SceneEdge,
@@ -49,6 +50,26 @@ interface FlowEdgeLike {
   length?: number;
   text?: string;
   labelType?: string;
+  style?: string[];
+}
+
+/** linkStyle 解析後的 per-edge style 陣列(如 ["stroke:#e11","stroke-width:3px"])→ ElementStyle。 */
+function edgeStyleFromArray(styles: string[] | undefined): ElementStyle | undefined {
+  if (!styles || !styles.length) return undefined;
+  let stroke: string | undefined;
+  let strokeWidth: number | undefined;
+  for (const s of styles) {
+    const idx = s.indexOf(':');
+    if (idx < 0) continue;
+    const k = s.slice(0, idx).trim();
+    const v = s.slice(idx + 1).trim();
+    if (k === 'stroke' && v && v !== 'none') stroke = v;
+    else if (k === 'stroke-width') {
+      const n = parseFloat(v);
+      if (!Number.isNaN(n)) strokeWidth = n;
+    }
+  }
+  return stroke || strokeWidth ? { stroke, strokeWidth } : undefined;
 }
 
 interface FlowSubGraphLike {
@@ -237,6 +258,7 @@ export async function flowDbToScene(text: string, mermaid: MermaidLike): Promise
       arrowStart: arrow.arrowStart,
       arrowEnd: arrow.arrowEnd,
       minLen: arrow.minLen,
+      style: edgeStyleFromArray(fe.style),
       data: { kind: 'flowchart' },
       sourceIndex: eIdx++,
     });

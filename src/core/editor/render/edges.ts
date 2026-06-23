@@ -172,19 +172,38 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
   hit.style.cursor = 'pointer';
   g.appendChild(hit);
 
-  // 可見路徑。
-  const vis = svgEl('path', { d, fill: 'none', stroke: ink });
+  // 可見路徑。linkStyle 自訂色/寬(edge.style)優先於主題墨色與 lineKind 寬度。
+  const customStroke = edge.style?.stroke;
+  const strokeColor = customStroke || ink;
+  const vis = svgEl('path', { d, fill: 'none', stroke: strokeColor });
   vis.setAttribute('stroke-linecap', 'round');
   vis.setAttribute('stroke-linejoin', 'round');
   vis.setAttribute('vector-effect', 'non-scaling-stroke');
   vis.style.pointerEvents = 'none';
   const widthByKind = edge.lineKind === 'thick' ? 3.4 : 1.8;
-  vis.setAttribute('stroke-width', String(widthByKind));
+  vis.setAttribute('stroke-width', String(edge.style?.strokeWidth ?? widthByKind));
   if (edge.lineKind === 'dotted') vis.setAttribute('stroke-dasharray', '3 5');
   if (edge.lineKind === 'invisible') vis.setAttribute('stroke-opacity', '0');
-  const endMk = markerIdFor(edge.arrowEnd, dark);
   const startMk = markerIdFor(edge.arrowStart, dark);
-  if (endMk) vis.setAttribute('marker-end', `url(#${endMk})`);
+  // 自訂色的箭頭:就地建一個同色 marker 讓箭頭與線同色(僅常見的實心箭頭)。
+  if (customStroke && edge.arrowEnd === 'arrow') {
+    const mid = `rsm-mk-arrow-${edge.id}`;
+    const mk = svgEl('marker', {
+      id: mid,
+      viewBox: '0 0 12 12',
+      refX: 10,
+      refY: 6,
+      markerWidth: 9,
+      markerHeight: 9,
+      orient: 'auto-start-reverse',
+    });
+    mk.appendChild(svgEl('path', { d: 'M1,1 L11,6 L1,11 z', fill: customStroke, stroke: customStroke }));
+    g.appendChild(mk);
+    vis.setAttribute('marker-end', `url(#${mid})`);
+  } else {
+    const endMk = markerIdFor(edge.arrowEnd, dark);
+    if (endMk) vis.setAttribute('marker-end', `url(#${endMk})`);
+  }
   if (startMk) vis.setAttribute('marker-start', `url(#${startMk})`);
   g.appendChild(vis);
 
