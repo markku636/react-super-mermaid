@@ -37,6 +37,11 @@ export function sceneToState(scene: EditorScene): SerializeResult {
   lines.push('stateDiagram-v2');
   const dir = scene.meta.type === 'state' ? scene.meta.direction : undefined;
   if (dir && dir !== 'TB' && dir !== 'TD') lines.push(`${INDENT}direction ${dir}`);
+  // 一般 %% 註解(非 init)→ 標頭後逐字保留。
+  for (const c of scene.raw?.comments ?? []) {
+    const t = c.trim();
+    if (t.startsWith('%%') && !t.startsWith('%%{')) lines.push(INDENT + t);
+  }
 
   const nodeById = new Map(scene.nodes.map((n) => [n.id, n] as const));
   const containerById = new Map(scene.containers.map((c) => [c.id, c] as const));

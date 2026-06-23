@@ -69,7 +69,7 @@ export function sceneToFlowchart(scene: EditorScene): SerializeResult {
   if (scene.frontmatter) {
     lines.push(scene.frontmatter.replace(/\n+$/, ''));
   }
-  // 2. init / 設定指令(逐字,來自 raw.comments 中的 %%{...}%%)。
+  // 2. init / 設定指令(逐字,來自 raw.comments 中的 %%{...}%%)。必須在標頭前。
   for (const c of scene.raw?.comments ?? []) {
     if (c.trim().startsWith('%%{')) lines.push(c.trim());
   }
@@ -77,6 +77,12 @@ export function sceneToFlowchart(scene: EditorScene): SerializeResult {
   // 3. 標頭。
   const direction = scene.meta.type === 'flowchart' ? scene.meta.direction : 'TB';
   lines.push(`flowchart ${direction}`);
+
+  // 3b. 一般 %% 註解(非 init)→ 標頭後逐字保留(原位置未存,內容不丟即可)。
+  for (const c of scene.raw?.comments ?? []) {
+    const t = c.trim();
+    if (t.startsWith('%%') && !t.startsWith('%%{')) lines.push(INDENT + t);
+  }
 
   // 4. 節點:先頂層,容器內的留到 subgraph 裡宣告。
   const containerOf = new Map<string, string>();

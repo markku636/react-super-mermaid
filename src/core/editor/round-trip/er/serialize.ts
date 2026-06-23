@@ -45,6 +45,11 @@ export function sceneToEr(scene: EditorScene): SerializeResult {
   lines.push('erDiagram');
   const dir = scene.meta.type === 'er' ? scene.meta.direction : undefined;
   if (dir && dir !== 'TB' && dir !== 'TD') lines.push(`${INDENT}direction ${dir}`);
+  // 一般 %% 註解(非 init)→ 標頭後逐字保留。
+  for (const c of scene.raw?.comments ?? []) {
+    const t = c.trim();
+    if (t.startsWith('%%') && !t.startsWith('%%{')) lines.push(INDENT + t);
+  }
 
   // 1. 關係(穩定排序)。
   const ids = new Set(scene.nodes.map((n) => n.id));
