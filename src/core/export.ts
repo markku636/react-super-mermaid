@@ -67,6 +67,90 @@ export function serializeLiveSvg(svg: SVGSVGElement): PreparedSvg {
   return finalizePrepared(clone);
 }
 
+const SVG_NS_EXPORT = 'http://www.w3.org/2000/svg';
+
+/** 取 foreignObject 內的文字行(依 <br> 與區塊 <div> / 文字內 \n 斷行)。 */
+function extractFoLines(el: Element): string[] {
+  const lines: string[] = [];
+  let cur = '';
+  const flush = (): void => {
+    if (cur.trim()) lines.push(cur.trim());
+    cur = '';
+  };
+  const walk = (node: Node): void => {
+    node.childNodes.forEach((child) => {
+      if (child.nodeType === 3) {
+        const parts = (child.textContent ?? '').split('\n');
+        cur += parts[0];
+        for (let i = 1; i < parts.length; i++) {
+          flush();
+          cur = parts[i];
+        }
+      } else if (child.nodeName === 'BR') {
+        flush();
+      } else if (child.nodeName === 'DIV') {
+        flush();
+        walk(child);
+        flush();
+      } else {
+        walk(child); // span / strong / em / code → 視為行內
+      }
+    });
+  };
+  walk(el);
+  flush();
+  return lines.map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+
+/** 在 foreignObject 子樹找第一個 color: 樣式值(供文字色)。 */
+function findFoColor(el: Element): string | null {
+  const stack: Element[] = [el];
+  while (stack.length) {
+    const e = stack.shift() as Element;
+    const m = (e.getAttribute('style') ?? '').match(/(?:^|;)\s*color\s*:\s*([^;]+)/);
+    if (m) return m[1].trim();
+    stack.push(...Array.from(e.children));
+  }
+  return null;
+}
+
+/**
+ * 把 <foreignObject>(HTML 標籤)就地換成 SVG <text>,讓 canvas 點陣化不被污染
+ * (Chromium 對含 foreignObject 的 SVG img 會 taint canvas → toBlob 失敗)。
+ * 失真:粗體 / 斜體 / 隔間分隔線簡化為純文字置中;僅供 PNG 匯出(SVG 匯出保留 foreignObject)。
+ */
+export function flattenForeignObjects(svg: SVGSVGElement): void {
+  for (const fo of Array.from(svg.querySelectorAll('foreignObject'))) {
+    const x = parseFloat(fo.getAttribute('x') ?? '0');
+    const y = parseFloat(fo.getAttribute('y') ?? '0');
+    const w = parseFloat(fo.getAttribute('width') ?? '0');
+    const h = parseFloat(fo.getAttribute('height') ?? '0');
+    const lines = extractFoLines(fo);
+    if (!lines.length) {
+      fo.remove();
+      continue;
+    }
+    const color = findFoColor(fo) ?? '#1f2937';
+    const fontSize = 13;
+    const lineH = fontSize * 1.35;
+    const text = document.createElementNS(SVG_NS_EXPORT, 'text');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('fill', color);
+    text.setAttribute('font-family', 'system-ui,-apple-system,"Segoe UI","Microsoft JhengHei",sans-serif');
+    text.setAttribute('font-size', String(fontSize));
+    const cx = x + w / 2;
+    const startY = y + h / 2 - ((lines.length - 1) * lineH) / 2 + fontSize / 3;
+    lines.forEach((ln, i) => {
+      const tspan = document.createElementNS(SVG_NS_EXPORT, 'tspan');
+      tspan.setAttribute('x', String(cx));
+      tspan.setAttribute('y', String(startY + i * lineH));
+      tspan.textContent = ln;
+      text.appendChild(tspan);
+    });
+    fo.parentNode?.replaceChild(text, fo);
+  }
+}
+
 export function svgBlob(serialized: string): Blob {
   const xml = serialized.startsWith('<?xml')
     ? serialized

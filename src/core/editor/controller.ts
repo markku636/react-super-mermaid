@@ -8,6 +8,7 @@ import {
   rasterizeToBlob,
   svgBlob,
   downloadBlob,
+  flattenForeignObjects,
 } from '../export';
 import type { ExportRasterOptions, MermaidSource, MermaidTheme } from '../../types';
 import { getAdapter, detectDiagramType } from './adapters/registry';
@@ -928,7 +929,10 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     getSvg: () => svg,
     exportSvg: () => prepareSvgElement(exportClone()).serialized,
     exportPng: async (rasterOpts) => {
-      const prepared = prepareSvgElement(exportClone());
+      // foreignObject(HTML 標籤)會污染 canvas → 點陣化前先攤平成 SVG <text>。
+      const clone = exportClone();
+      flattenForeignObjects(clone);
+      const prepared = prepareSvgElement(clone);
       return rasterizeToBlob(prepared, { ...rasterOpts, dark });
     },
     downloadSvg: (filename = 'diagram.svg') => {
