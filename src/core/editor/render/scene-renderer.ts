@@ -212,18 +212,27 @@ export class SceneRenderer {
     );
     root.appendChild(title as unknown as Node);
     if (attrs.length) {
+      // 屬性以「表格列」呈現:平均分配高度填滿框體(對齊 mermaid 把框撐高的尺寸),列間細分隔線。
       const body = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
-      body.setAttribute('style', 'flex:1;padding:3px 8px;overflow:hidden;');
-      for (const a of attrs) {
+      body.setAttribute('style', 'flex:1;display:flex;flex-direction:column;overflow:hidden;');
+      attrs.forEach((a, i) => {
         const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
         const keys = a.keys && a.keys.length ? ` ${a.keys.join(',')}` : '';
         row.textContent = `${a.type ?? ''} ${a.name}${keys}`.trim();
         row.setAttribute(
           'style',
-          'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;',
+          'flex:1;display:flex;align-items:center;padding:0 8px;min-height:20px;font-size:12px;' +
+            `white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${i > 0 ? `border-top:1px solid ${INK}22;` : ''}`,
         );
+        // 屬性備註(description)以淡色斜體附在後面,對齊 mermaid ER 的備註欄。
+        if (a.comment) {
+          const c = document.createElementNS(XHTML_NS, 'span') as unknown as HTMLSpanElement;
+          c.textContent = `  ${a.comment}`;
+          c.setAttribute('style', 'opacity:0.55;font-style:italic;');
+          row.appendChild(c as unknown as Node);
+        }
         body.appendChild(row as unknown as Node);
-      }
+      });
       root.appendChild(body as unknown as Node);
     }
     fo.appendChild(root as unknown as Node);
