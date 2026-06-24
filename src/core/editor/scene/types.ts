@@ -6,7 +6,7 @@
 //   但以 `layoutOwner:'engine'` 標記其座標為衍生值。
 // - 型別差異收進判別式 data / meta;新增圖種只加 variant,不動共用形狀。
 
-export type DiagramType = 'flowchart' | 'sequence' | 'class' | 'er' | 'state' | 'mindmap';
+export type DiagramType = 'flowchart' | 'sequence' | 'class' | 'er' | 'state' | 'mindmap' | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
 export type NodeShape =
@@ -61,6 +61,16 @@ export type ArrowHead =
 export interface Point {
   x: number;
   y: number;
+}
+
+/**
+ * 連線端的「固定錨點」(draw.io 式)。以相對節點 bbox 的分數座標表示(fx/fy ∈ 0..1),
+ * 對標 draw.io 的 exitX/exitY / entryX/entryY。未設(undefined)= 浮動錨:動態朝對端中心,
+ * 維持原本行為。此為編輯器專屬視覺資訊,mermaid 文字無對應語法(serialize 時略去,如同 waypoints)。
+ */
+export interface EdgeAnchor {
+  fx: number;
+  fy: number;
 }
 
 /** 內聯樣式 — 對映 mermaid 的 style / classDef。 */
@@ -149,6 +159,10 @@ export interface SceneEdge {
   minLen?: number;
   /** 使用者拗折的路徑點(Excalidraw 式)。 */
   waypoints?: Point[];
+  /** 來源端固定錨點(draw.io 式)。未設 = 浮動(動態朝目標)。 */
+  sourceAnchor?: EdgeAnchor;
+  /** 目標端固定錨點(draw.io 式)。未設 = 浮動(動態朝來源)。 */
+  targetAnchor?: EdgeAnchor;
   data?: EdgeData;
   style?: ElementStyle;
   sourceIndex?: number;
@@ -180,7 +194,9 @@ export type SceneMeta =
   | { type: 'sequence'; autonumber: boolean }
   | { type: 'class'; direction?: FlowDirection }
   | { type: 'er'; direction?: FlowDirection }
-  | { type: 'mindmap' };
+  | { type: 'mindmap' }
+  // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
+  | { type: 'timeline' };
 
 /** round-trip 時 DB 看不到 / 尚未模型化的內容,逐字保留。 */
 export interface SceneRaw {
@@ -242,7 +258,9 @@ export function emptyScene(diagramType: DiagramType = 'flowchart'): EditorScene 
             ? { type: 'class' }
             : diagramType === 'mindmap'
               ? { type: 'mindmap' }
-              : { type: 'er' };
+              : diagramType === 'timeline'
+                ? { type: 'timeline' }
+                : { type: 'er' };
   return {
     version: 1,
     diagramType,

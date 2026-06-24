@@ -2,8 +2,9 @@
 // 控制點尺寸除以 zoom → 螢幕上恆定大小。
 
 import type { Rect } from '../scene/geometry';
+import { PERIMETER_ANCHORS, sameAnchor } from '../scene/geometry';
 import { svgEl, clearChildren } from '../render/dom';
-import type { Point } from '../scene/types';
+import type { EdgeAnchor, Point } from '../scene/types';
 import type { Guide } from './snap';
 
 const ACCENT = '#2563eb';
@@ -21,6 +22,8 @@ const RESIZE_DIRS: Array<{ dir: ResizeDir; fx: number; fy: number }> = [
   { dir: 'sw', fx: 0, fy: 1 },
 ];
 
+// 選取時:4 角已被縮放控制點占用,故連線點只放 4 邊中點(避免重疊衝突)。
+// 滑過(未選取)時則用 geometry 的完整 8 點(PERIMETER_ANCHORS),含 4 角。
 const CONN_SIDES: Array<{ side: ConnSide; fx: number; fy: number }> = [
   { side: 'top', fx: 0.5, fy: 0 },
   { side: 'right', fx: 1, fy: 0.5 },
@@ -33,6 +36,7 @@ export class Overlay {
   private selEdgeLayer: SVGGElement;
   private hoverLayer: SVGGElement;
   private dropLayer: SVGGElement;
+  private anchorLayer: SVGGElement;
   private guideLayer: SVGGElement;
   private transientLayer: SVGGElement;
 
@@ -40,6 +44,7 @@ export class Overlay {
     this.selEdgeLayer = svgEl('g', { class: 'rsm-ov-sel-edge' });
     this.hoverLayer = svgEl('g', { class: 'rsm-ov-hover' });
     this.dropLayer = svgEl('g', { class: 'rsm-ov-drop' });
+    this.anchorLayer = svgEl('g', { class: 'rsm-ov-anchors' });
     this.selLayer = svgEl('g', { class: 'rsm-ov-sel' });
     this.guideLayer = svgEl('g', { class: 'rsm-ov-guides' });
     this.transientLayer = svgEl('g', { class: 'rsm-ov-transient' });
@@ -48,6 +53,8 @@ export class Overlay {
     layer.appendChild(this.selEdgeLayer);
     layer.appendChild(this.hoverLayer);
     layer.appendChild(this.selLayer);
+    // anchorLayer 疊在最上層(transient 之下),拉線時的候選點要蓋過 drop 高亮框。
+    layer.appendChild(this.anchorLayer);
     layer.appendChild(this.transientLayer);
   }
 
@@ -70,20 +77,25 @@ export class Overlay {
     this.dropLayer.appendChild(box);
   }
 
-  /** 滑過節點時顯示 4 個連線控制點(藍點)→ 從點拖出即可拉線(免先選取,直覺好發現)。 */
+  /**
+   * 滑過節點時顯示 8 個固定連線錨點(藍點:4 邊中點 + 4 角)→ 從某點拖出即可從該位置拉線
+   * (draw.io 式,免先選取,直覺好發現)。每點帶 fx/fy 供拉線時記成 edge.sourceAnchor。
+   */
   showHoverHandles(nodeId: string, r: Rect, zoom: number): void {
     clearChildren(this.hoverLayer);
     const hs = HANDLE_PX / zoom;
-    for (const c of CONN_SIDES) {
+    for (const a of PERIMETER_ANCHORS) {
       const dot = svgEl('circle', {
-        cx: r.x + r.w * c.fx,
-        cy: r.y + r.h * c.fy,
-        r: hs * 0.62,
+        cx: r.x + r.w * a.fx,
+        cy: r.y + r.h * a.fy,
+        r: hs * 0.55,
         fill: '#fff',
         stroke: ACCENT,
         'stroke-width': 1.5 / zoom,
-        'data-conn-handle': c.side,
+        'data-conn-handle': '1',
         'data-conn-node': nodeId,
+        'data-conn-fx': String(a.fx),
+        'data-conn-fy': String(a.fy),
       });
       dot.style.cursor = 'crosshair';
       this.hoverLayer.appendChild(dot);
@@ -92,6 +104,33 @@ export class Overlay {
 
   clearHover(): void {
     clearChildren(this.hoverLayer);
+  }
+
+  /**
+   * 拉線 / 重接時,在目標節點上畫出 8 個候選錨點;`highlight` 為目前吸附中的點(放大實心)。
+   * 讓使用者明確看到「會接到哪個位置」(draw.io 式)。r=null → 清除。
+   */
+  showAnchorPoints(r: Rect | null, zoom: number, highlight: EdgeAnchor | null): void {
+    clearChildren(this.anchorLayer);
+    if (!r) return;
+    const hs = HANDLE_PX / zoom;
+    for (const a of PERIMETER_ANCHORS) {
+      const hi = highlight ? sameAnchor(a, highlight) : false;
+      const dot = svgEl('circle', {
+        cx: r.x + r.w * a.fx,
+        cy: r.y + r.h * a.fy,
+        r: (hi ? 0.95 : 0.5) * hs,
+        fill: hi ? ACCENT : '#fff',
+        stroke: ACCENT,
+        'stroke-width': 1.5 / zoom,
+      });
+      dot.style.pointerEvents = 'none';
+      this.anchorLayer.appendChild(dot);
+    }
+  }
+
+  clearAnchorPoints(): void {
+    clearChildren(this.anchorLayer);
   }
 
   /** 選取的連線:沿路徑畫半透明粗描邊(accent)當高亮 + 兩端可拖曳端點(重新接線)。 */
@@ -149,7 +188,7 @@ export class Overlay {
     if (!opts.handles || rects.length !== 1) return;
     const r = rects[0].rect;
     const nodeId = rects[0].id;
-    // 連線控制點(圓)。
+    // 連線控制點(圓)。4 角被縮放控制點占用 → 選取時只放 4 邊中點;各帶 fx/fy 供設 sourceAnchor。
     for (const c of CONN_SIDES) {
       const cx = r.x + r.w * c.fx;
       const cy = r.y + r.h * c.fy;
@@ -162,6 +201,8 @@ export class Overlay {
         'stroke-width': 1.5 / zoom,
         'data-conn-handle': c.side,
         'data-conn-node': nodeId,
+        'data-conn-fx': String(c.fx),
+        'data-conn-fy': String(c.fy),
       });
       dot.style.cursor = 'crosshair';
       this.selLayer.appendChild(dot);

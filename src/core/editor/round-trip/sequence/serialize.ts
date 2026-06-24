@@ -23,12 +23,42 @@ export function sceneToSequence(scene: EditorScene): SerializeResult {
 
   if (seq.autonumber) lines.push(`${INDENT}autonumber`);
 
-  // 參與者:有別名 / 是 actor 才顯式宣告(其餘由訊息推斷,保持順序與冪等)。
-  // 但若參與者順序與「首次出現於訊息」不同,仍須顯式宣告以保序。
+  // 參與者:有別名 / 是 actor 一律顯式宣告(別名 + actor 外形都要)。其餘(id===label 的純參與者)
+  // 預設由訊息推斷以保持輸出精簡;但若「拖曳換序」後的順序無法靠訊息首次出現推斷出來,
+  // 就把純參與者也顯式宣告以鎖序(否則 mermaid 會依首次出現重排,換序不持久)。
+  const declaredIds = new Set(seq.participants.filter((p) => p.label !== p.id || p.actor).map((p) => p.id));
+  // mermaid 有效順序 = 已宣告者(依此陣列序) ++ 未宣告者(依訊息首次出現) ++ 從未被引用者(陣列序)。
+  const appearance: string[] = [];
+  const seen = new Set<string>();
+  const mark = (pid?: string): void => {
+    const k = pid?.trim();
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      appearance.push(k);
+    }
+  };
+  for (const s of seq.statements) {
+    if (s.kind === 'message') {
+      mark(s.from);
+      mark(s.to);
+    } else if (s.kind === 'note') {
+      for (const a of s.actors.split(',')) mark(a.trim());
+    } else if (s.kind === 'activate' || s.kind === 'deactivate') {
+      mark(s.actor);
+    }
+  }
+  const effective: string[] = [];
+  const placed = new Set<string>();
+  for (const p of seq.participants) if (declaredIds.has(p.id)) (placed.add(p.id), effective.push(p.id));
+  for (const id of appearance) if (!placed.has(id)) (placed.add(id), effective.push(id));
+  for (const p of seq.participants) if (!placed.has(p.id)) (placed.add(p.id), effective.push(p.id));
+  const wantOrder = seq.participants.map((p) => p.id);
+  const lockOrder = effective.length !== wantOrder.length || effective.some((id, i) => id !== wantOrder[i]);
   for (const p of seq.participants) {
     const kw = p.actor ? 'actor' : 'participant';
     if (p.label !== p.id) lines.push(`${INDENT}${kw} ${p.id} as ${p.label}`);
     else if (p.actor) lines.push(`${INDENT}actor ${p.id}`);
+    else if (lockOrder) lines.push(`${INDENT}participant ${p.id}`);
   }
 
   let depth = 1;

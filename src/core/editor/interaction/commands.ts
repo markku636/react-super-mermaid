@@ -2,6 +2,7 @@
 // 歷史保存 before/after 兩個不可變場景(diagram 不大,快照成本低)+ patch(增量重繪提示)。
 
 import type {
+  EdgeAnchor,
   EditorScene,
   ElementStyle,
   LineKind,
@@ -137,9 +138,14 @@ export function cmdAlignNodes(ids: string[], axis: AlignAxis): Command {
   };
 }
 
-export function cmdReconnectEdge(edgeId: string, endpoint: 'source' | 'target', nodeId: string): Command {
+export function cmdReconnectEdge(
+  edgeId: string,
+  endpoint: 'source' | 'target',
+  nodeId: string,
+  anchor?: EdgeAnchor | null,
+): Command {
   return (scene) => ({
-    scene: reconnectEdge(scene, edgeId, endpoint, nodeId),
+    scene: reconnectEdge(scene, edgeId, endpoint, nodeId, anchor),
     patch: { edges: [edgeId], structural: true },
   });
 }
@@ -301,6 +307,44 @@ export function cmdRenameSeqParticipant(id: string, label: string): Command {
         },
       },
       patch: { nodes: [id], structural: true },
+    };
+  };
+}
+
+/**
+ * sequence:把參與者移到新的欄位索引(左右換序)。targetIndex 為「移除被拖者後」的插入位置。
+ * 同步重排 scene.sequence.participants、鏡像 nodes 的陣列順序與欄位 x(沿用 GAP=56 佈局),
+ * 讓渲染 / 命中測試 / serialize 三者一致。serialize 會在順序無法由訊息推斷時補顯式宣告以鎖序。
+ */
+export function cmdReorderSeqParticipant(id: string, targetIndex: number): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const parts = scene.sequence.participants;
+    const from = parts.findIndex((p) => p.id === id);
+    if (from < 0) return { scene, patch: {} };
+    const clamped = Math.max(0, Math.min(parts.length - 1, targetIndex));
+    if (clamped === from) return { scene, patch: {} };
+    const nextParts = [...parts];
+    const [moved] = nextParts.splice(from, 1);
+    nextParts.splice(clamped, 0, moved);
+    // 依新序取回鏡像 node 並重算欄位 x(x0=40, GAP=56,與 parse / cmdAdd 一致)。
+    const byId = new Map(scene.nodes.map((n) => [n.id, n] as const));
+    let px = 40;
+    const relaid: SceneNode[] = [];
+    for (const p of nextParts) {
+      const n = byId.get(p.id);
+      if (!n) continue;
+      relaid.push({ ...n, x: px });
+      px += n.w + 56;
+    }
+    const nonSeq = scene.nodes.filter((n) => n.data?.kind !== 'sequence');
+    return {
+      scene: {
+        ...scene,
+        nodes: [...relaid, ...nonSeq],
+        sequence: { ...scene.sequence, participants: nextParts },
+      },
+      patch: { nodes: relaid.map((n) => n.id), structural: true },
     };
   };
 }

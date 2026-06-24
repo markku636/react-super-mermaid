@@ -51,6 +51,9 @@ export class SceneRenderer {
   private nodeCache = new Map<string, NodeCache>();
   private edgeEls = new Map<string, SVGGElement>();
   private scene: EditorScene | null = null;
+  /** 上一次渲染走的是 sequence 路徑(直接寫入 layers、不經 nodeCache)。切換到非 sequence 圖種時,
+   *  diff 渲染靠 nodeCache 找不到這些殘留元素,需先強制清空 layers,否則上一張圖會疊著留下來。 */
+  private renderedSequence = false;
   /** sequence:訊息陳述 index → 世界座標矩形(供雙擊編輯訊息文字定位)。 */
   private seqMsgRects = new Map<number, { x: number; y: number; w: number; h: number }>();
   /** sequence:整張圖的世界座標範圍(供 fit;sequence 內容延伸到節點下方,不能只用節點 bbox)。 */
@@ -347,6 +350,7 @@ export class SceneRenderer {
   private renderSequence(scene: EditorScene): void {
     const seq = scene.sequence;
     if (!seq) return;
+    this.renderedSequence = true;
     this.nodeCache.clear();
     this.edgeEls.clear();
     this.seqMsgRects.clear();
@@ -594,6 +598,17 @@ export class SceneRenderer {
       return;
     }
     this.seqBounds = null;
+    // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
+    // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
+    if (this.renderedSequence) {
+      this.renderedSequence = false;
+      this.nodeCache.clear();
+      this.edgeEls.clear();
+      this.seqMsgRects.clear();
+      for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer, this.overlayLayer]) {
+        while (layer.firstChild) layer.removeChild(layer.firstChild);
+      }
+    }
     const liveNodeIds = new Set(scene.nodes.map((n) => n.id));
 
     // 移除消失的節點群組。

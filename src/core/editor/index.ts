@@ -30,6 +30,16 @@ export type { LayoutEngine, LayoutContext } from './layout/types';
 export { sceneToFlowchart } from './round-trip/flowchart/serialize';
 export { flowDbToScene } from './round-trip/flowchart/parse';
 
+// timeline 等資料圖表的 form 子編輯器(由 controller 在偵測到 timeline 時惰性接管)。
+export { createTimelineForm } from './form/timeline-editor';
+export type { TimelineFormHandle, TimelineFormOptions } from './form/timeline-editor';
+export {
+  parseTimeline,
+  serializeTimeline,
+  emptyTimelineModel,
+} from './form/timeline-model';
+export type { TimelineModel, TimelineSection, TimelinePeriod } from './form/timeline-model';
+
 export type { Tool } from './interaction/pointer';
 export { History } from './interaction/commands';
 export type { Command, ScenePatch } from './interaction/commands';

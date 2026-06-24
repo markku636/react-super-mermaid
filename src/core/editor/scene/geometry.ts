@@ -1,6 +1,6 @@
 // 純幾何工具(零 DOM):bbox、命中測試、節點周界錨點。場景座標系。
 
-import type { Point, SceneEdge, SceneNode } from './types';
+import type { EdgeAnchor, Point, SceneEdge, SceneNode } from './types';
 
 export interface Rect {
   x: number;
@@ -11,6 +11,56 @@ export interface Rect {
 
 export function nodeRect(n: SceneNode): Rect {
   return { x: n.x, y: n.y, w: n.w, h: n.h };
+}
+
+/**
+ * draw.io 式的 8 個固定連線錨點(相對 bbox 的分數位置:4 邊中點 + 4 角)。
+ * 拉線時可從來源錨點起、貼到目標錨點上,讓使用者「選擇連結位置」。
+ */
+export const PERIMETER_ANCHORS: ReadonlyArray<EdgeAnchor> = [
+  { fx: 0.5, fy: 0 }, // 上
+  { fx: 1, fy: 0 }, // 右上
+  { fx: 1, fy: 0.5 }, // 右
+  { fx: 1, fy: 1 }, // 右下
+  { fx: 0.5, fy: 1 }, // 下
+  { fx: 0, fy: 1 }, // 左下
+  { fx: 0, fy: 0.5 }, // 左
+  { fx: 0, fy: 0 }, // 左上
+];
+
+/** 固定錨點(分數)→ 場景座標。 */
+export function anchorPoint(r: Rect, a: EdgeAnchor): Point {
+  return { x: r.x + r.w * a.fx, y: r.y + r.h * a.fy };
+}
+
+/** 兩錨點是否為同一格(用於高亮已吸附的候選點)。 */
+export function sameAnchor(a: EdgeAnchor, b: EdgeAnchor): boolean {
+  return Math.abs(a.fx - b.fx) < 1e-6 && Math.abs(a.fy - b.fy) < 1e-6;
+}
+
+/** 僅 4 邊中點(不含角)。供「已選取節點」用:4 角已是縮放控制點,連線只取邊中點。 */
+export const SIDE_ANCHORS: ReadonlyArray<EdgeAnchor> = PERIMETER_ANCHORS.filter(
+  (a) => a.fx === 0.5 || a.fy === 0.5,
+);
+
+/** 找出 world 點在容差(世界座標)內最靠近 rect 的哪個候選錨點;皆超出則回 null(=浮動)。 */
+export function nearestAnchor(
+  r: Rect,
+  world: Point,
+  tolWorld: number,
+  candidates: ReadonlyArray<EdgeAnchor> = PERIMETER_ANCHORS,
+): EdgeAnchor | null {
+  let best: EdgeAnchor | null = null;
+  let bestD = tolWorld;
+  for (const a of candidates) {
+    const p = anchorPoint(r, a);
+    const d = Math.hypot(world.x - p.x, world.y - p.y);
+    if (d <= bestD) {
+      bestD = d;
+      best = a;
+    }
+  }
+  return best;
 }
 
 export function rectCenter(r: Rect): Point {

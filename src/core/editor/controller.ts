@@ -11,7 +11,8 @@ import {
   flattenForeignObjects,
 } from '../export';
 import type { ExportRasterOptions, MermaidSource, MermaidTheme } from '../../types';
-import { getAdapter, detectDiagramType } from './adapters/registry';
+import { getAdapter, detectDiagramType, firstKeyword } from './adapters/registry';
+import { createTimelineForm, type TimelineFormHandle } from './form/timeline-editor';
 import { mermaidSvgLayout } from './layout/mermaid-svg-layout';
 import {
   History,
@@ -152,6 +153,9 @@ export interface DiagramEditorHandle {
   destroy(): void;
 }
 
+// 走 form 子編輯器(而非畫布)的圖種關鍵字。timeline 是資料圖表,內容為 section/period/event。
+const FORM_KEYWORDS = new Set(['timeline']);
+
 // 右鍵選單可快速切換的外形(涵蓋 renderer 支援的全部 flowchart 外形)。
 const CTX_SHAPES: Array<[NodeShape, string, string]> = [
   ['rectangle', '▭', '矩形'],
@@ -282,6 +286,10 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     ['心智圖', 'mindmap\n  root((主題))\n    分支A\n    分支B\n      子項'],
   ];
   function updateEmptyHint(): void {
+    if (formActive) {
+      emptyHint.classList.remove('rsm-empty-show');
+      return; // form 模式有自己的 UI,畫布引導提示永遠不顯示
+    }
     const seqHasParts = scene.diagramType === 'sequence' && (scene.sequence?.participants.length ?? 0) > 0;
     const empty = scene.nodes.length === 0 && scene.containers.length === 0 && !seqHasParts;
     if (emptyHintGrace || !empty) {
@@ -321,6 +329,9 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   let createShape: NodeShape = 'rectangle';
   let cancelTextEdit: (() => void) | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // timeline 等「資料圖表」不吃畫布拖拉,改走結構化 form 子編輯器(惰性建立、接管 handle 子集)。
+  let form: TimelineFormHandle | null = null;
+  let formActive = false;
 
   const adapterFor = (type: DiagramType) => getAdapter(type) ?? getAdapter('flowchart');
 
@@ -343,7 +354,8 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       .map((id) => scene.nodes.find((n) => n.id === id))
       .filter((n): n is NonNullable<typeof n> => Boolean(n))
       .map((n) => ({ id: n.id, rect: nodeRect(n) }));
-    overlay.showSelection(nodeRects, zoom, { handles: nodeRects.length === 1 });
+    // sequence 參與者不可自由縮放(寬度由標籤決定、放手不寫回 code)→ 不顯示縮放控制點。
+    overlay.showSelection(nodeRects, zoom, { handles: nodeRects.length === 1 && scene.diagramType !== 'sequence' });
     // 選取的連線高亮(點到線即可選取並看到回饋)。
     const edgePathsList = scene.edges
       .filter((e) => idSet.has(e.id))
@@ -867,6 +879,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   const handle: DiagramEditorHandle = {
     getScene: () => scene,
     toMermaid: () => {
+      if (formActive && form) return form.toMermaid();
       const adapter = adapterFor(diagramType);
       if (!adapter) return '';
       return adapter.serialize(scene).text;
@@ -877,6 +890,33 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
     loadSource: async (text: string) => {
       try {
+        // timeline 等資料圖表 → form 子編輯器(惰性建立、隱藏畫布)。
+        if (FORM_KEYWORDS.has(firstKeyword(text))) {
+          if (!form) {
+            form = createTimelineForm(host, {
+              mermaid: opts.mermaid,
+              dark,
+              fontUrl: opts.fontUrl,
+              // change 事件補帶 timeline 場景(host 期望 payload 為 scene);其餘原樣轉發。
+              emit: (e, p) => emit(e as EditorEvent, e === 'change' ? scene : p),
+            });
+          }
+          formActive = true;
+          scene = emptyScene('timeline');
+          diagramType = 'timeline';
+          svg.style.display = 'none';
+          emptyHint.style.display = 'none';
+          form.show();
+          form.loadSource(text);
+          return;
+        }
+        // 畫布圖種:若先前在 form 模式,收起 form、還原畫布。
+        if (formActive) {
+          formActive = false;
+          form?.hide();
+          svg.style.display = '';
+          emptyHint.style.display = '';
+        }
         const type = detectDiagramType(text) ?? 'flowchart';
         const adapter = adapterFor(type);
         if (!adapter) throw new Error(`找不到圖種 adapter:${type}`);
@@ -924,15 +964,17 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
 
     undo: () => {
+      if (formActive && form) return form.undo();
       const res = history.undo();
       if (res) setScene(res.scene);
     },
     redo: () => {
+      if (formActive && form) return form.redo();
       const res = history.redo();
       if (res) setScene(res.scene);
     },
-    canUndo: () => history.canUndo(),
-    canRedo: () => history.canRedo(),
+    canUndo: () => (formActive && form ? form.canUndo() : history.canUndo()),
+    canRedo: () => (formActive && form ? form.canRedo() : history.canRedo()),
 
     selectAll: () => pointer.selectAll(),
     clearSelection: () => pointer.clearSelection(),
@@ -962,6 +1004,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       refreshOverlay();
     },
     fit: () => {
+      if (formActive) return; // form 模式無畫布視窗
       // sequence:內容延伸到節點下方,用渲染器回報的整張範圍;其他圖種用節點 bbox。
       viewport.fit(renderer.getContentBounds() ?? boundingBox(scene.nodes.map(nodeRect)));
       refreshOverlay();
@@ -1020,12 +1063,14 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       dark = d;
       host.classList.toggle('rsm-dark', d);
       renderer.setDark(d);
+      form?.setDark(d);
       refreshOverlay();
     },
 
     getSvg: () => svg,
-    exportSvg: () => prepareSvgElement(exportClone()).serialized,
+    exportSvg: () => (formActive && form ? form.exportSvg() : prepareSvgElement(exportClone()).serialized),
     exportPng: async (rasterOpts) => {
+      if (formActive && form) return form.exportPng(rasterOpts);
       // foreignObject(HTML 標籤)會污染 canvas → 點陣化前先攤平成 SVG <text>。
       const clone = exportClone();
       flattenForeignObjects(clone);
@@ -1072,6 +1117,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       if (debounceTimer) clearTimeout(debounceTimer);
       clearTimeout(graceTimer);
       cancelTextEdit?.();
+      form?.destroy();
       pointer.destroy();
       host.removeEventListener('keydown', onKeyDown);
       host.removeEventListener('contextmenu', onContextMenu);

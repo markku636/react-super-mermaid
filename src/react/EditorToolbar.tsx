@@ -63,7 +63,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   );
 
   // sequence 不吃自由拖曳建點/連線(改右鍵新增參與者/訊息);mindmap/sequence 無流程方向。
+  // timeline 走結構化表單(非畫布),所有畫布工具(選取/連線/縮放/整理)都隱藏。
   const isSeq = props.diagramType === 'sequence';
+  const isTimeline = props.diagramType === 'timeline';
   const hasDirection =
     props.diagramType === 'flowchart' ||
     props.diagramType === 'state' ||
@@ -73,14 +75,17 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
 
   return (
     <div className="rsm-toolbar rsm-editor-toolbar">
-      {toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
-      {!isSeq && toolBtn('edge-create', '↘ 連線', '從節點拉出連線（E）')}
-      {toolBtn('pan', '✋ 平移', '平移畫布')}
+      {!isTimeline && toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
+      {!isSeq && !isTimeline && toolBtn('edge-create', '↘ 連線', '從節點拉出連線（E）')}
+      {!isTimeline && toolBtn('pan', '✋ 平移', '平移畫布')}
 
-      {!isSeq && <span className="rsm-tb-sep" aria-hidden="true" />}
+      {isTimeline && <span className="rsm-tb-hint">時間軸：在左側表單編輯區段 / 時間點 / 事件</span>}
 
-      {/* 一鍵新增節點(常用外形直接攤開);sequence 不適用(用右鍵新增參與者/訊息) */}
+      {!isSeq && !isTimeline && <span className="rsm-tb-sep" aria-hidden="true" />}
+
+      {/* 一鍵新增節點(常用外形直接攤開);sequence/timeline 不適用 */}
       {!isSeq &&
+        !isTimeline &&
         SHAPES.map((s) => (
           <button
             key={s.shape}
@@ -118,25 +123,30 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       <button type="button" className="rsm-btn" disabled={!props.canRedo} onClick={() => h?.redo()} title="重做（Ctrl+Y）">
         ↷
       </button>
-      <button type="button" className="rsm-btn" onClick={() => h?.deleteSelection()} title="刪除選取（Del）">
-        🗑
-      </button>
+      {!isTimeline && (
+        <button type="button" className="rsm-btn" onClick={() => h?.deleteSelection()} title="刪除選取（Del）">
+          🗑
+        </button>
+      )}
 
-      <span className="rsm-tb-sep" aria-hidden="true" />
-
-      <button type="button" className="rsm-btn" onClick={() => h?.zoomOut()} title="縮小">
-        −
-      </button>
-      <span className="rsm-count">{props.zoomPercent}%</span>
-      <button type="button" className="rsm-btn" onClick={() => h?.zoomIn()} title="放大">
-        ＋
-      </button>
-      <button type="button" className="rsm-btn" onClick={() => h?.fit()} title="符合視窗">
-        ⤢
-      </button>
-      <button type="button" className="rsm-btn" onClick={() => void h?.tidy()} title="自動整理排版">
-        ⌗ 整理
-      </button>
+      {!isTimeline && (
+        <>
+          <span className="rsm-tb-sep" aria-hidden="true" />
+          <button type="button" className="rsm-btn" onClick={() => h?.zoomOut()} title="縮小">
+            −
+          </button>
+          <span className="rsm-count">{props.zoomPercent}%</span>
+          <button type="button" className="rsm-btn" onClick={() => h?.zoomIn()} title="放大">
+            ＋
+          </button>
+          <button type="button" className="rsm-btn" onClick={() => h?.fit()} title="符合視窗">
+            ⤢
+          </button>
+          <button type="button" className="rsm-btn" onClick={() => void h?.tidy()} title="自動整理排版">
+            ⌗ 整理
+          </button>
+        </>
+      )}
 
       {props.onToggleSource ? (
         <button
@@ -163,17 +173,21 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       >
         {copied ? '✓ 已複製' : '⧉ 複製'}
       </button>
-      <button
-        type="button"
-        className={`rsm-btn${look === 'sketch' ? ' rsm-btn-active' : ''}`}
-        onClick={toggleLook}
-        title="手繪外觀（Excalidraw 風）↔ 簡潔"
-      >
-        ✏ 手繪
-      </button>
-      <button type="button" className="rsm-btn" onClick={() => h?.toggleHelp()} title="鍵盤快捷鍵說明（?）">
-        ?
-      </button>
+      {!isTimeline && (
+        <button
+          type="button"
+          className={`rsm-btn${look === 'sketch' ? ' rsm-btn-active' : ''}`}
+          onClick={toggleLook}
+          title="手繪外觀（Excalidraw 風）↔ 簡潔"
+        >
+          ✏ 手繪
+        </button>
+      )}
+      {!isTimeline && (
+        <button type="button" className="rsm-btn" onClick={() => h?.toggleHelp()} title="鍵盤快捷鍵說明（?）">
+          ?
+        </button>
+      )}
     </div>
   );
 }

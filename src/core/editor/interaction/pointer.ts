@@ -3,11 +3,14 @@
 // 平滑要點:transform-only 拖曳(放手才重 rough)、rAF 批次、pointer capture、吸附。
 
 import {
+  anchorPoint,
   boundingBox,
+  nearestAnchor,
   nodeRect,
   perimeterAnchor,
   rectCenter,
   rectsIntersect,
+  SIDE_ANCHORS,
   type Rect,
 } from '../scene/geometry';
 import {
@@ -18,13 +21,14 @@ import {
   nextNodeId,
   resolveEdgeAnchors,
 } from '../scene/scene-ops';
-import type { EditorScene, NodeShape, Point, SceneNode } from '../scene/types';
+import type { EdgeAnchor, EditorScene, NodeShape, Point, SceneNode } from '../scene/types';
 import {
   cmdAddConnectedNode,
   cmdAddEdge,
   cmdAddNode,
   cmdMoveNodes,
   cmdReconnectEdge,
+  cmdReorderSeqParticipant,
   cmdResizeNode,
   type Command,
 } from './commands';
@@ -57,13 +61,18 @@ const DRAG_THRESHOLD = 4; // 螢幕 px
 const MIN_W = 40;
 const MIN_H = 28;
 const SNAP_TOL_SCREEN = 6;
+// 連線錨點命中 / 吸附半徑(螢幕 px;除以 zoom 換算世界座標)。
+const ANCHOR_HIT_SCREEN = 16;
 
 type Mode =
   | { kind: 'idle' }
   | { kind: 'maybe-drag'; startWorld: Point; ids: string[]; bases: Map<string, Rect> }
   | { kind: 'move'; startWorld: Point; ids: string[]; bases: Map<string, Rect>; dx: number; dy: number }
+  // sequence 專屬:參與者只能左右拖換序(非自由位移)。targetIndex = 移除被拖者後的插入位置。
+  | { kind: 'seq-reorder'; id: string; startWorld: Point; base: Rect; targetIndex: number }
   | { kind: 'resize'; nodeId: string; dir: ResizeDir; startRect: Rect; startWorld: Point; cur: Rect }
-  | { kind: 'rubber-edge'; sourceId: string; from: Point }
+  // fromAnchor:從來源節點哪個固定錨點起拉(null = 從節點本體拉 → 浮動來源錨)。
+  | { kind: 'rubber-edge'; sourceId: string; from: Point; fromAnchor: EdgeAnchor | null }
   | { kind: 'reconnect-edge'; edgeId: string; endpoint: 'source' | 'target'; anchorFixed: Point }
   | { kind: 'marquee'; startWorld: Point; additive: boolean }
   | { kind: 'pan'; lastClient: Point; deselectAt?: Point };
@@ -140,9 +149,15 @@ export class PointerController {
     if (!el) return null;
     return { node: el.getAttribute('data-resize-node') ?? '', dir: el.getAttribute('data-resize') as ResizeDir };
   }
-  private hitConn(t: Element): string | null {
+  private hitConn(t: Element): { nodeId: string; anchor: EdgeAnchor | null } | null {
     const el = t.closest('[data-conn-handle]');
-    return el ? el.getAttribute('data-conn-node') : null;
+    if (!el) return null;
+    const nodeId = el.getAttribute('data-conn-node');
+    if (!nodeId) return null;
+    const fx = el.getAttribute('data-conn-fx');
+    const fy = el.getAttribute('data-conn-fy');
+    const anchor = fx != null && fy != null ? { fx: Number(fx), fy: Number(fy) } : null;
+    return { nodeId, anchor };
   }
   private hitNode(t: Element): string | null {
     const el = t.closest('[data-node-id]');
@@ -165,28 +180,40 @@ export class PointerController {
     return null;
   }
 
-  /** 回傳「按壓點靠近其某個邊中點(連線白點)」的節點 id;優先檢查 hover 的節點。 */
-  private connectAnchorNode(world: Point, preferId: string | null): string | null {
-    const R = 16 / this.host.viewport.getZoom();
+  /**
+   * 回傳「按壓點靠近其某個固定錨點(8 點:4 邊中點 + 4 角)」的節點與該錨點;優先檢查 hover 的節點。
+   * 純幾何判定 → 即使白點凸出到節點外、DOM 命中抓不到,也能起連線。
+   */
+  private connectAnchorNode(
+    world: Point,
+    preferId: string | null,
+  ): { nodeId: string; anchor: EdgeAnchor } | null {
+    const tolWorld = ANCHOR_HIT_SCREEN / this.host.viewport.getZoom();
     const scene = this.host.getScene();
-    const near = (n: SceneNode): boolean => {
-      const r = nodeRect(n);
-      const a: Point[] = [
-        { x: r.x + r.w / 2, y: r.y },
-        { x: r.x + r.w, y: r.y + r.h / 2 },
-        { x: r.x + r.w / 2, y: r.y + r.h },
-        { x: r.x, y: r.y + r.h / 2 },
-      ];
-      return a.some((p) => Math.hypot(world.x - p.x, world.y - p.y) <= R);
+    const check = (n: SceneNode): { nodeId: string; anchor: EdgeAnchor } | null => {
+      // 已選取節點:4 角是縮放控制點 → 連線只取 4 邊中點(與畫面上顯示的控制點一致)。
+      const cands = this.selection.has(n.id) ? SIDE_ANCHORS : undefined;
+      const a = nearestAnchor(nodeRect(n), world, tolWorld, cands);
+      return a ? { nodeId: n.id, anchor: a } : null;
     };
     if (preferId) {
       const pn = getNode(scene, preferId);
-      if (pn && near(pn)) return preferId;
+      if (pn) {
+        const hit = check(pn);
+        if (hit) return hit;
+      }
     }
     for (let i = scene.nodes.length - 1; i >= 0; i--) {
-      if (near(scene.nodes[i])) return scene.nodes[i].id;
+      const hit = check(scene.nodes[i]);
+      if (hit) return hit;
     }
     return null;
+  }
+
+  /** 拖線端落在 node 上時,吸附到最近的固定錨點(8 點);皆超出容差 → null(浮動,接整個節點)。 */
+  private snapAnchor(node: SceneNode, world: Point): EdgeAnchor | null {
+    const tolWorld = ANCHOR_HIT_SCREEN / this.host.viewport.getZoom();
+    return nearestAnchor(nodeRect(node), world, tolWorld);
   }
 
   private onPointerDown = (e: PointerEvent): void => {
@@ -241,6 +268,32 @@ export class PointerController {
       return;
     }
 
+    // sequence:參與者只接「左右拖換序」+ 雙擊改名。自由位移 / 縮放 / 連線對序列圖無意義
+    // (拖了不寫回 code、又會弄亂版面),故在此攔截並提早返回,不落入下方 resize / 連線分支。
+    {
+      const seqScene = this.host.getScene();
+      if (seqScene.diagramType === 'sequence') {
+        const sid = this.hitNode(target);
+        const snode = sid ? getNode(seqScene, sid) : null;
+        if (snode && snode.data?.kind === 'sequence') {
+          const now = performance.now();
+          if (this.lastClickNodeId === sid && now - this.lastClickTime < 350) {
+            this.lastClickTime = 0;
+            this.lastClickNodeId = null;
+            this.mode = { kind: 'idle' };
+            this.setSelection([sid as string]);
+            this.host.requestTextEdit(sid as string);
+            return;
+          }
+          this.lastClickTime = now;
+          this.lastClickNodeId = sid;
+          this.setSelection([sid as string]);
+          this.mode = { kind: 'seq-reorder', id: sid as string, startWorld: world, base: nodeRect(snode), targetIndex: -1 };
+          return;
+        }
+      }
+    }
+
     // resize 控制點。
     const rz = this.hitResize(target);
     if (rz && rz.node) {
@@ -251,14 +304,19 @@ export class PointerController {
       }
     }
 
-    // 連線控制點 / edge-create 工具在節點上 → 橡皮筋。
-    const connNode = this.hitConn(target);
+    // 連線控制點 / edge-create 工具在節點上 → 橡皮筋。從錨點起拉時記下該錨點(→ sourceAnchor)。
+    const connHit = this.hitConn(target);
     const nodeId = this.hitNode(target);
-    if (connNode || (this.tool === 'edge-create' && nodeId)) {
-      const srcId = connNode ?? (nodeId as string);
+    if (connHit || (this.tool === 'edge-create' && nodeId)) {
+      const srcId = connHit?.nodeId ?? (nodeId as string);
       const src = getNode(this.host.getScene(), srcId);
       if (src) {
-        this.mode = { kind: 'rubber-edge', sourceId: srcId, from: rectCenter(nodeRect(src)) };
+        this.mode = {
+          kind: 'rubber-edge',
+          sourceId: srcId,
+          from: rectCenter(nodeRect(src)),
+          fromAnchor: connHit?.anchor ?? null,
+        };
         return;
       }
     }
@@ -281,13 +339,17 @@ export class PointerController {
       }
     }
 
-    // 按在「連線白點」附近(節點 4 邊中點)→ 拉線(像 draw.io)。優先用 hover 中的節點;
-    // 純幾何判定,故即使白點凸出到節點邊緣外、DOM 命中抓不到節點,也一定能起連線。
+    // 按在「連線白點」附近(節點 8 個固定錨點)→ 從該位置拉線(像 draw.io)。優先用 hover 中的節點。
     const connectSrc = this.connectAnchorNode(world, hovered);
     if (connectSrc) {
-      const src = getNode(this.host.getScene(), connectSrc);
+      const src = getNode(this.host.getScene(), connectSrc.nodeId);
       if (src) {
-        this.mode = { kind: 'rubber-edge', sourceId: connectSrc, from: rectCenter(nodeRect(src)) };
+        this.mode = {
+          kind: 'rubber-edge',
+          sourceId: connectSrc.nodeId,
+          from: rectCenter(nodeRect(src)),
+          fromAnchor: connectSrc.anchor,
+        };
         return;
       }
     }
@@ -343,7 +405,18 @@ export class PointerController {
     }
 
     // 雙擊空白 → 在該處新增節點(Excalidraw/draw.io 式,直覺好發現)。
+    // sequence 例外:自由節點對它無意義(會變孤兒節點),改由右鍵選單新增參與者 / 訊息 / 筆記。
     const emptyNow = performance.now();
+    if (this.host.getScene().diagramType === 'sequence') {
+      this.lastEmptyClickTime = emptyNow;
+      if (e.shiftKey) {
+        this.mode = { kind: 'marquee', startWorld: world, additive: true };
+      } else {
+        this.mode = { kind: 'pan', lastClient: { x: e.clientX, y: e.clientY }, deselectAt: { x: e.clientX, y: e.clientY } };
+        this.svg.style.cursor = 'grabbing';
+      }
+      return;
+    }
     if (!e.shiftKey && emptyNow - this.lastEmptyClickTime < 350) {
       this.lastEmptyClickTime = 0;
       this.mode = { kind: 'idle' };
@@ -369,6 +442,8 @@ export class PointerController {
 
   /** 閒置時:滑過節點顯示連線控制點(讓「點到節點就能拉線」直覺可發現)。 */
   private updateHover(clientX: number, clientY: number): void {
+    // sequence 不支援自由拉線(訊息由右鍵選單新增),不顯示連線控制點以免誤導。
+    if (this.host.getScene().diagramType === 'sequence') return;
     const n = this.nodeUnder(clientX, clientY);
     const id = n?.id ?? null;
     if (id === this.hoverNodeId) return;
@@ -441,6 +516,27 @@ export class PointerController {
       return;
     }
 
+    if (m.kind === 'seq-reorder') {
+      const dx = world.x - m.startWorld.x;
+      // 參與者欄不進 nodeCache(renderSequence 直接畫),previewMove 對它無效 → 拖曳回饋
+      // 只移動「選取框」+ 一條插入指示線,實際欄位放手後才重排,絕不出現重疊亂掉的暫態。
+      this.host.overlay.showSelection([{ id: m.id, rect: { ...m.base, x: m.base.x + dx } }], zoom, { handles: false });
+      const seqNodes = this.host.getScene().nodes.filter((n) => n.data?.kind === 'sequence');
+      const draggedCx = m.base.x + m.base.w / 2 + dx;
+      const others = seqNodes.filter((n) => n.id !== m.id);
+      let target = 0;
+      for (const n of others) if (n.x + n.w / 2 < draggedCx) target += 1;
+      m.targetIndex = target;
+      const top = seqNodes[0]?.y ?? 12;
+      let gx: number;
+      if (others.length === 0) gx = draggedCx;
+      else if (target <= 0) gx = others[0].x - 14;
+      else if (target >= others.length) gx = others[others.length - 1].x + others[others.length - 1].w + 14;
+      else gx = (others[target - 1].x + others[target - 1].w + others[target].x) / 2;
+      this.host.overlay.showGuides([{ x1: gx, y1: top - 10, x2: gx, y2: top + 64 }], zoom);
+      return;
+    }
+
     if (m.kind === 'resize') {
       m.cur = resizeRect(m.startRect, m.dir, world, m.startWorld);
       this.host.renderer.previewResize(m.nodeId, m.cur);
@@ -449,20 +545,28 @@ export class PointerController {
     }
 
     if (m.kind === 'rubber-edge') {
+      const tgt = this.nodeUnder(c.x, c.y, m.sourceId);
+      const snap = tgt ? this.snapAnchor(tgt, world) : null;
+      // 端點:吸附到目標錨點時貼齊該點,否則跟著游標。
+      const to = snap && tgt ? anchorPoint(nodeRect(tgt), snap) : world;
       const src = getNode(this.host.getScene(), m.sourceId);
       if (src) {
-        const from = perimeterAnchor(nodeRect(src), world);
-        this.host.overlay.showRubberBand(from, world, zoom);
+        // 起點:從固定錨點起 → 用該錨點;否則用朝向終點的浮動周界錨。
+        const from = m.fromAnchor ? anchorPoint(nodeRect(src), m.fromAnchor) : perimeterAnchor(nodeRect(src), to);
+        this.host.overlay.showRubberBand(from, to, zoom);
       }
-      const tgt = this.nodeUnder(c.x, c.y, m.sourceId);
       this.host.overlay.showDropTarget(tgt ? nodeRect(tgt) : null, zoom);
+      this.host.overlay.showAnchorPoints(tgt ? nodeRect(tgt) : null, zoom, snap);
       return;
     }
 
     if (m.kind === 'reconnect-edge') {
-      this.host.overlay.showRubberBand(m.anchorFixed, world, zoom);
       const tgt = this.nodeUnder(c.x, c.y);
+      const snap = tgt ? this.snapAnchor(tgt, world) : null;
+      const to = snap && tgt ? anchorPoint(nodeRect(tgt), snap) : world;
+      this.host.overlay.showRubberBand(m.anchorFixed, to, zoom);
       this.host.overlay.showDropTarget(tgt ? nodeRect(tgt) : null, zoom);
+      this.host.overlay.showAnchorPoints(tgt ? nodeRect(tgt) : null, zoom, snap);
       return;
     }
 
@@ -489,6 +593,16 @@ export class PointerController {
       this.host.refreshOverlay();
       return;
     }
+    if (m.kind === 'seq-reorder') {
+      this.host.overlay.clearGuides();
+      const fromIdx = this.host.getScene().sequence?.participants.findIndex((p) => p.id === m.id) ?? -1;
+      if (m.targetIndex >= 0 && m.targetIndex !== fromIdx) {
+        this.host.runCommand(cmdReorderSeqParticipant(m.id, m.targetIndex), 'reorder-participant');
+      } else {
+        this.host.refreshOverlay(); // 沒換序(或只是點一下)→ 選取框彈回原位。
+      }
+      return;
+    }
     if (m.kind === 'resize') {
       this.host.runCommand(cmdResizeNode(m.nodeId, m.cur), 'resize');
       this.host.refreshOverlay();
@@ -498,16 +612,19 @@ export class PointerController {
       const target = this.nodeUnder(e.clientX, e.clientY, m.sourceId);
       this.host.overlay.clearTransient();
       this.host.overlay.showDropTarget(null, 1);
+      this.host.overlay.clearAnchorPoints();
       const scene = this.host.getScene();
+      const sourceAnchor = m.fromAnchor ?? undefined;
       if (target && target.id !== m.sourceId) {
-        // 放在另一個節點上 → 連到它(白點拉線的主要用途)。
-        const edge = makeEdge(nextEdgeId(scene), m.sourceId, target.id);
+        // 放在另一個節點上 → 連到它;吸附到目標錨點則一併設 targetAnchor(白點拉線的主要用途)。
+        const targetAnchor = this.snapAnchor(target, world) ?? undefined;
+        const edge = makeEdge(nextEdgeId(scene), m.sourceId, target.id, { sourceAnchor, targetAnchor });
         this.host.runCommand(cmdAddEdge(edge), 'add-edge');
       } else if (!target && this.tool === 'edge-create') {
         // 只有「明確使用連線工具」拖到空白,才一步建立新節點並連上(draw.io 招牌)。
         const id = nextNodeId(scene);
         const node = makeNode(id, world, {});
-        const edge = makeEdge(nextEdgeId(scene), m.sourceId, id);
+        const edge = makeEdge(nextEdgeId(scene), m.sourceId, id, { sourceAnchor });
         this.host.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
         this.setSelection([id]);
         this.host.requestTextEdit(id);
@@ -522,8 +639,11 @@ export class PointerController {
       const target = this.nodeUnder(e.clientX, e.clientY);
       this.host.overlay.clearTransient();
       this.host.overlay.showDropTarget(null, 1);
+      this.host.overlay.clearAnchorPoints();
       if (target) {
-        this.host.runCommand(cmdReconnectEdge(m.edgeId, m.endpoint, target.id), 'reconnect');
+        // 重接同時更新該端錨點:吸附到候選點 → 設錨;放在節點本體 → 清成浮動。
+        const anchor = this.snapAnchor(target, world);
+        this.host.runCommand(cmdReconnectEdge(m.edgeId, m.endpoint, target.id, anchor), 'reconnect');
       }
       this.host.refreshOverlay();
       return;
@@ -561,6 +681,7 @@ export class PointerController {
     this.host.overlay.clearGuides();
     this.host.overlay.clearTransient();
     this.host.overlay.showDropTarget(null, 1);
+    this.host.overlay.clearAnchorPoints();
     this.host.refreshOverlay();
     this.mode = { kind: 'idle' };
   };

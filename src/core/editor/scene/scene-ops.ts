@@ -2,6 +2,7 @@
 // 命令層(commands.ts)在此之上包 inverse 與 undo/redo。
 
 import type {
+  EdgeAnchor,
   EditorScene,
   LineKind,
   NodeShape,
@@ -11,7 +12,7 @@ import type {
   SceneNode,
 } from './types';
 import type { Rect } from './geometry';
-import { boundingBox, nodeRect, perimeterAnchor, rectCenter, shapeAnchor } from './geometry';
+import { anchorPoint, boundingBox, nodeRect, perimeterAnchor, rectCenter, shapeAnchor } from './geometry';
 
 let nodeCounter = 0;
 let edgeCounter = 0;
@@ -66,7 +67,11 @@ export function containerRect(scene: EditorScene, id: string): Rect | null {
   return { x: bb.x - C_PAD, y: bb.y - C_PAD - C_LABEL_H, w: bb.w + C_PAD * 2, h: bb.h + C_PAD * 2 + C_LABEL_H };
 }
 
-/** 邊的兩端錨點,支援節點 *與容器*(複合狀態)端點。容器端用矩形周界錨點。 */
+/**
+ * 邊的兩端錨點,支援節點 *與容器*(複合狀態)端點。容器端用矩形周界錨點。
+ * 端點若設了固定錨點(edge.sourceAnchor / targetAnchor,draw.io 式)則用該點;
+ * 否則維持「動態朝對端」的浮動錨。一端固定、另一端浮動時,浮動端朝固定點(而非對端中心)。
+ */
 export function resolveEdgeAnchors(
   scene: EditorScene,
   edge: SceneEdge,
@@ -76,11 +81,13 @@ export function resolveEdgeAnchors(
   const sRect = sNode ? nodeRect(sNode) : containerRect(scene, edge.source);
   const tRect = tNode ? nodeRect(tNode) : containerRect(scene, edge.target);
   if (!sRect || !tRect) return null;
-  const sc = rectCenter(sRect);
-  const tc = rectCenter(tRect);
+  const sFixed = edge.sourceAnchor ? anchorPoint(sRect, edge.sourceAnchor) : null;
+  const tFixed = edge.targetAnchor ? anchorPoint(tRect, edge.targetAnchor) : null;
+  const sRef = sFixed ?? rectCenter(sRect);
+  const tRef = tFixed ?? rectCenter(tRect);
   return {
-    start: sNode ? shapeAnchor(sNode, tc) : perimeterAnchor(sRect, tc),
-    end: tNode ? shapeAnchor(tNode, sc) : perimeterAnchor(tRect, sc),
+    start: sFixed ?? (sNode ? shapeAnchor(sNode, tRef) : perimeterAnchor(sRect, tRef)),
+    end: tFixed ?? (tNode ? shapeAnchor(tNode, sRef) : perimeterAnchor(tRect, sRef)),
   };
 }
 
@@ -120,7 +127,7 @@ export function makeEdge(
   id: string,
   source: string,
   target: string,
-  opts: { label?: string; lineKind?: LineKind } = {},
+  opts: { label?: string; lineKind?: LineKind; sourceAnchor?: EdgeAnchor; targetAnchor?: EdgeAnchor } = {},
 ): SceneEdge {
   return {
     id,
@@ -130,6 +137,8 @@ export function makeEdge(
     lineKind: opts.lineKind ?? 'solid',
     arrowStart: 'none',
     arrowEnd: 'arrow',
+    sourceAnchor: opts.sourceAnchor,
+    targetAnchor: opts.targetAnchor,
     data: { kind: 'flowchart' },
   };
 }
@@ -168,10 +177,15 @@ export function reconnectEdge(
   edgeId: string,
   endpoint: 'source' | 'target',
   nodeId: string,
+  anchor?: EdgeAnchor | null,
 ): EditorScene {
+  // 重接時一併更新該端的固定錨點:吸附到候選點 → 設錨;放在節點本體 → 清成浮動。
+  const anchorKey = endpoint === 'source' ? 'sourceAnchor' : 'targetAnchor';
   return {
     ...scene,
-    edges: scene.edges.map((e) => (e.id === edgeId ? { ...e, [endpoint]: nodeId } : e)),
+    edges: scene.edges.map((e) =>
+      e.id === edgeId ? { ...e, [endpoint]: nodeId, [anchorKey]: anchor ?? undefined } : e,
+    ),
   };
 }
 
