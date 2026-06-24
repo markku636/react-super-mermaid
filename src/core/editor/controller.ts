@@ -12,6 +12,7 @@ import {
 } from '../export';
 import type { ExportRasterOptions, MermaidSource, MermaidTheme } from '../../types';
 import { getAdapter, detectDiagramType, firstKeyword } from './adapters/registry';
+import type { DiagramCapabilities } from './adapters/types';
 import { createTimelineForm, type TimelineFormHandle } from './form/timeline-editor';
 import { mermaidSvgLayout } from './layout/mermaid-svg-layout';
 import {
@@ -33,6 +34,7 @@ import {
   cmdUngroup,
   cmdSetDirection,
   cmdSetEdgeStyle,
+  cmdSetEdgesStyle,
   cmdRenameSeqParticipant,
   cmdSetSeqMessageText,
   cmdSetLabel,
@@ -100,6 +102,15 @@ export interface DiagramEditorHandle {
   setDirection(dir: FlowDirection): void;
   /** 變更連線樣式(線型 / 箭頭)。 */
   setEdgeStyle(edgeId: string, patch: Partial<{ lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead }>): void;
+  /** 目前圖種的能力(支援的外形 / 線型 / 箭頭),供工具列建構控制項。null = 找不到 adapter。 */
+  getCapabilities(): DiagramCapabilities | null;
+  /** 「新連線」目前的預設樣式(線型 / 箭頭)。 */
+  getEdgeStyleDefault(): { lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead };
+  /**
+   * 套用連線樣式:更新「新連線」預設,並一併套到目前選取的連線(若有,單一 undo)。
+   * 會過濾掉目前圖種不支援的線型 / 箭頭,確保永遠序列化成合法 mermaid。
+   */
+  applyEdgeStyle(patch: Partial<{ lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead }>): void;
 
   undo(): void;
   redo(): void;
@@ -327,6 +338,12 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   let scene: EditorScene = opts.scene ?? emptyScene('flowchart');
   let diagramType: DiagramType = scene.diagramType;
   let createShape: NodeShape = 'rectangle';
+  // 「新連線」的預設樣式(線型 / 箭頭);工具列可改,拉新線時套用。隨圖種重設(見 resetEdgeDefault)。
+  let createEdge: { lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead } = {
+    lineKind: 'solid',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+  };
   let cancelTextEdit: (() => void) | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   // timeline 等「資料圖表」不吃畫布拖拉,改走結構化 form 子編輯器(惰性建立、接管 handle 子集)。
@@ -334,6 +351,12 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   let formActive = false;
 
   const adapterFor = (type: DiagramType) => getAdapter(type) ?? getAdapter('flowchart');
+
+  // 載入新圖時把「新連線」預設重設成該圖種的合宜值(避免上一張圖選的箭頭帶到不支援的圖種)。
+  const resetEdgeDefault = (): void => {
+    const caps = adapterFor(diagramType)?.capabilities;
+    createEdge = { lineKind: 'solid', arrowStart: 'none', arrowEnd: caps?.defaults.arrowEnd ?? 'arrow' };
+  };
 
   const emitMermaidDebounced = (): void => {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -391,6 +414,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     onSelectionChange: (ids) => emit('selectionchange', ids),
     onToolChange: (tool) => emit('toolchange', tool),
     createShape: () => createShape,
+    createEdgeStyle: () => createEdge,
   };
 
   const pointer = new PointerController(svg, pointerHost);
@@ -654,7 +678,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         const id = nextNodeId(scene);
         const pos = { x: src.x + src.w + 80, y: src.y };
         const node = { ...makeNode(id, pos, { shape: src.shape }), x: pos.x, y: pos.y, w: src.w, h: src.h };
-        const edge = makeEdge(nextEdgeId(scene), src.id, id);
+        const edge = makeEdge(nextEdgeId(scene), src.id, id, createEdge);
         pointerHost.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
         pointer.setSelection([id]);
         openEditor(id);
@@ -886,6 +910,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
     loadScene: (next) => {
       setScene(next);
+      resetEdgeDefault();
       handle.fit();
     },
     loadSource: async (text: string) => {
@@ -928,6 +953,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
             : parsed;
         history.clear();
         setScene(laid);
+        resetEdgeDefault();
         handle.fit();
       } catch (err) {
         emit('error', err);
@@ -948,6 +974,22 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
     setEdgeStyle: (edgeId, patch) => {
       pointerHost.runCommand(cmdSetEdgeStyle(edgeId, patch), 'edge-style');
+    },
+    getCapabilities: () => adapterFor(diagramType)?.capabilities ?? null,
+    getEdgeStyleDefault: () => ({ ...createEdge }),
+    applyEdgeStyle: (patch) => {
+      const caps = adapterFor(diagramType)?.capabilities;
+      // 只接受目前圖種支援的值('none' 永遠合法,代表「無箭頭」)。
+      const clean: Partial<{ lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead }> = {};
+      if (patch.lineKind && (!caps || caps.lineKinds.includes(patch.lineKind))) clean.lineKind = patch.lineKind;
+      const headOk = (h: ArrowHead): boolean => h === 'none' || !caps || caps.arrowHeads.includes(h);
+      if (patch.arrowStart !== undefined && headOk(patch.arrowStart)) clean.arrowStart = patch.arrowStart;
+      if (patch.arrowEnd !== undefined && headOk(patch.arrowEnd)) clean.arrowEnd = patch.arrowEnd;
+      if (Object.keys(clean).length === 0) return;
+      createEdge = { ...createEdge, ...clean };
+      // 套到目前選取的連線(若有);沒有選取時僅更新「新連線」預設。
+      const ids = pointer.getSelection().filter((id) => scene.edges.some((e) => e.id === id));
+      if (ids.length) pointerHost.runCommand(cmdSetEdgesStyle(ids, clean), 'edge-style');
     },
     addNode: (shape) => {
       const rect = svg.getBoundingClientRect();

@@ -23,6 +23,10 @@ const CSS = `
 .rsm-editor-toolbar .rsm-tb-spacer{flex:1 1 auto;}
 .rsm-shape-btn{display:inline-flex;align-items:center;gap:4px;}
 .rsm-shape-btn .rsm-shape-glyph{font-size:15px;line-height:1;}
+/* 連線樣式:線型按鈕(迷你預覽)+ 分組 */
+.rsm-line-group{display:inline-flex;align-items:center;gap:2px;}
+.rsm-line-btn{display:inline-flex;align-items:center;justify-content:center;padding:4px 6px;}
+.rsm-line-btn svg{display:block;}
 /* 下拉選單:選項一律深字淺底(原生 option 在暗色下常白底白字,看不清)。 */
 .rsm-editor-toolbar select{color:inherit;}
 .rsm-editor-toolbar select option{background:#ffffff;color:#1f2937;}

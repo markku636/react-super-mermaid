@@ -2,6 +2,7 @@
 // 命令層(commands.ts)在此之上包 inverse 與 undo/redo。
 
 import type {
+  ArrowHead,
   EdgeAnchor,
   EditorScene,
   LineKind,
@@ -127,7 +128,14 @@ export function makeEdge(
   id: string,
   source: string,
   target: string,
-  opts: { label?: string; lineKind?: LineKind; sourceAnchor?: EdgeAnchor; targetAnchor?: EdgeAnchor } = {},
+  opts: {
+    label?: string;
+    lineKind?: LineKind;
+    arrowStart?: ArrowHead;
+    arrowEnd?: ArrowHead;
+    sourceAnchor?: EdgeAnchor;
+    targetAnchor?: EdgeAnchor;
+  } = {},
 ): SceneEdge {
   return {
     id,
@@ -135,8 +143,8 @@ export function makeEdge(
     target,
     label: opts.label,
     lineKind: opts.lineKind ?? 'solid',
-    arrowStart: 'none',
-    arrowEnd: 'arrow',
+    arrowStart: opts.arrowStart ?? 'none',
+    arrowEnd: opts.arrowEnd ?? 'arrow',
     sourceAnchor: opts.sourceAnchor,
     targetAnchor: opts.targetAnchor,
     data: { kind: 'flowchart' },

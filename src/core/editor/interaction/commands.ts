@@ -438,6 +438,18 @@ export function cmdSetEdgeStyle(
   });
 }
 
+/** 批次設定多條連線的樣式(線型 / 箭頭),只算一次 undo。供工具列「套用到選取連線」。 */
+export function cmdSetEdgesStyle(
+  edgeIds: string[],
+  patch: Partial<Pick<SceneEdge, 'lineKind' | 'arrowStart' | 'arrowEnd'>>,
+): Command {
+  const set = new Set(edgeIds);
+  return (scene) => ({
+    scene: { ...scene, edges: scene.edges.map((e) => (set.has(e.id) ? { ...e, ...patch } : e)) },
+    patch: { edges: edgeIds },
+  });
+}
+
 // ── 歷史 ──
 
 interface HistoryEntry {

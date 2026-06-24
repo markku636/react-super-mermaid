@@ -21,7 +21,7 @@ import {
   nextNodeId,
   resolveEdgeAnchors,
 } from '../scene/scene-ops';
-import type { EdgeAnchor, EditorScene, NodeShape, Point, SceneNode } from '../scene/types';
+import type { ArrowHead, EdgeAnchor, EditorScene, LineKind, NodeShape, Point, SceneNode } from '../scene/types';
 import {
   cmdAddConnectedNode,
   cmdAddEdge,
@@ -55,6 +55,8 @@ export interface PointerHost {
   onToolChange(tool: Tool): void;
   /** node-create 工具要放的外形。 */
   createShape(): NodeShape;
+  /** 新連線的預設樣式(線型 / 箭頭),由工具列設定。 */
+  createEdgeStyle(): { lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead };
 }
 
 const DRAG_THRESHOLD = 4; // 螢幕 px
@@ -618,13 +620,17 @@ export class PointerController {
       if (target && target.id !== m.sourceId) {
         // 放在另一個節點上 → 連到它;吸附到目標錨點則一併設 targetAnchor(白點拉線的主要用途)。
         const targetAnchor = this.snapAnchor(target, world) ?? undefined;
-        const edge = makeEdge(nextEdgeId(scene), m.sourceId, target.id, { sourceAnchor, targetAnchor });
+        const edge = makeEdge(nextEdgeId(scene), m.sourceId, target.id, {
+          ...this.host.createEdgeStyle(),
+          sourceAnchor,
+          targetAnchor,
+        });
         this.host.runCommand(cmdAddEdge(edge), 'add-edge');
       } else if (!target && this.tool === 'edge-create') {
         // 只有「明確使用連線工具」拖到空白,才一步建立新節點並連上(draw.io 招牌)。
         const id = nextNodeId(scene);
         const node = makeNode(id, world, {});
-        const edge = makeEdge(nextEdgeId(scene), m.sourceId, id, { sourceAnchor });
+        const edge = makeEdge(nextEdgeId(scene), m.sourceId, id, { ...this.host.createEdgeStyle(), sourceAnchor });
         this.host.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
         this.setSelection([id]);
         this.host.requestTextEdit(id);
