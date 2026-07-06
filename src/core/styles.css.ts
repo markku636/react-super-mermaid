@@ -406,4 +406,14 @@ svg[id^="rsm-"] text.actor { font-weight: 600 !important; }
 svg[id^="rsm-"] .cluster-label text,
 svg[id^="rsm-"] .cluster-label .nodeLabel,
 svg[id^="rsm-"] text.pieTitleText { font-weight: 700 !important; }
+
+/* ── HTML 標籤不裁字(量測階段就生效)──
+ * mermaid 對 htmlLabels 的量測 div 會硬上 inline 的 max-width:200px(flowchart.wrappingWidth)+
+ * white-space:nowrap,量到頂時本該以 bbox.width === width 的「嚴格相等」切成自動換行——但在
+ * 非整數 DPI(如 Windows 125%/150% 縮放)下 getBoundingClientRect 回傳 200.00003…,相等判斷
+ * 永遠不成立 → 標籤停在 nowrap 又被 200px 上限卡住,節點框只開 200px,尾字整段被裁掉。
+ * 解法:用 !important 蓋掉 inline max-width,讓量測直接得到整行真實寬度,節點框剛好容納 →
+ * 文字完整呈現。代價是放棄 200px 自動換行(行寬交給圖源的 <br> 控制),對檢視器是正確取捨。
+ * 與上方字重規則同理 scope 在 svg[id^="rsm-"],量測時暫掛 <body> 下也吃得到,且不污染 host。 */
+svg[id^="rsm-"] foreignObject > div { max-width: none !important; }
 `;
