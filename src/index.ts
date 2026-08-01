@@ -71,6 +71,16 @@ export {
   type PreparedSvg,
 } from './core/export';
 
+// ── 懸停提示(tips)的框架無關工具 ──
+export { parseTips, stripTipDirectives, mergeTips, normalizeTips } from './core/tips/parse';
+export { attachHoverTips } from './core/tips/hover';
+export type {
+  AttachHoverTipsOptions,
+  GetNodeTip,
+  HoverTipContext,
+  HoverTipsController,
+} from './core/tips/hover';
+
 // ── 檢查提示(checks)的框架無關工具 ──
 export { parseChecks, stripCheckDirectives, mergeChecks } from './core/checks/parse';
 export { annotateChecks } from './core/checks/annotate';
@@ -101,6 +111,7 @@ export type {
   RsmPattern,
   RsmBackgroundPreset,
   DiagramCheck,
+  DiagramTip,
   CheckSeverity,
   CheckSnippet,
   CheckLink,

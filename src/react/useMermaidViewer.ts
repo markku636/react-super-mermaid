@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type {
   DiagramCheck,
+  DiagramTip,
   ExportRasterOptions,
   MermaidSource,
   MermaidTheme,
@@ -18,6 +19,8 @@ import { resolveTheme } from '../core/resolve-theme';
 import { attachPanZoom, type PanZoomController } from '../core/pan-zoom';
 import { createSearch, type SearchController } from '../core/search';
 import { mergeChecks, parseChecks } from '../core/checks/parse';
+import { mergeTips, normalizeTips, parseTips } from '../core/tips/parse';
+import { attachHoverTips, type GetNodeTip, type HoverTipsController } from '../core/tips/hover';
 import {
   annotateChecks,
   type ChecksController,
@@ -53,6 +56,16 @@ export interface UseMermaidViewerOptions {
   checksVisible?: boolean;
   /** 點擊角標時觸發(host 用來開跳窗)。 */
   onCheckActivate?: (group: ResolvedCheckGroup) => void;
+  /** 是否啟用節點懸停提示,預設 true。 */
+  nodeTips?: boolean;
+  /** host 傳入的懸停提示(與原始碼解析結果合併,同 target 覆寫)。可用 Record 簡寫。 */
+  tips?: DiagramTip[] | Record<string, string>;
+  /** 是否解析原始碼中的 `%% @tip` 指令,預設 true。 */
+  tipsFromSource?: boolean;
+  /** 動態決定節點提示;回傳 null = 不顯示,undefined = 交回內建查找。 */
+  getNodeTip?: GetNodeTip;
+  /** 無授權提示時退回顯示節點完整文字 + id,預設 false。 */
+  tipFallbackLabel?: boolean;
   onRender?: (svg: SVGSVGElement) => void;
   onError?: (err: Error) => void;
 }
@@ -104,6 +117,11 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     checksFromSource = true,
     checksVisible = true,
     onCheckActivate,
+    nodeTips = true,
+    tips: tipsProp,
+    tipsFromSource = true,
+    getNodeTip,
+    tipFallbackLabel = false,
     onRender,
     onError,
   } = opts;
@@ -118,6 +136,7 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
   const pzRef = useRef<PanZoomController | null>(null);
   const prevCodeRef = useRef<string | null>(null);
   const checksRef = useRef<ChecksController | null>(null);
+  const tipsCtlRef = useRef<HoverTipsController | null>(null);
 
   // 提示解析只跟原始碼有關,memo 起來避免每次 render 重跑正則。
   const sourceChecks = useMemo(
@@ -129,11 +148,23 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     [sourceChecks, checksProp],
   );
 
-  // 這兩個值在 async 渲染流程中被讀取,放 ref 避免列進 effect 依賴而造成整張圖重繪。
+  // 懸停提示解析也只跟原始碼 / prop 有關,memo 避免每次 render 重跑正則。
+  const sourceTips = useMemo(
+    () => (tipsFromSource ? parseTips(code) : []),
+    [code, tipsFromSource],
+  );
+  const tips = useMemo(
+    () => mergeTips(sourceTips, normalizeTips(tipsProp)),
+    [sourceTips, tipsProp],
+  );
+
+  // 這些值在 async 渲染流程中被讀取,放 ref 避免列進 effect 依賴而造成整張圖重繪。
   const checksVisibleRef = useRef(checksVisible);
   checksVisibleRef.current = checksVisible;
   const onCheckActivateRef = useRef(onCheckActivate);
   onCheckActivateRef.current = onCheckActivate;
+  const getNodeTipRef = useRef(getNodeTip);
+  getNodeTipRef.current = getNodeTip;
 
   // 把易變的設定放進 ref,讓 async loader / 匯出讀到最新值而不必列為 effect 依賴。
   const mermaidSourceRef = useRef<MermaidSource | undefined>(mermaid);
@@ -205,6 +236,8 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
         pzRef.current = null;
         checksRef.current?.destroy();
         checksRef.current = null;
+        tipsCtlRef.current?.destroy();
+        tipsCtlRef.current = null;
 
         const svg = mountSvg(host, svgString, postProcess, { dark, seed });
         if (!svg) {
@@ -223,6 +256,17 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
           setCheckGroups(checksRef.current.groups);
         } else {
           setCheckGroups([]);
+        }
+
+        // 懸停提示:掛在角標之後(有檢查的節點要借角標 <title> 當摘要、懸停角標時要讓路)。
+        // tooltip div 放進 .rsm-canvas(stage 的 positioned 父層);headless 情境退回 stage 自身。
+        if (nodeTips) {
+          tipsCtlRef.current = attachHoverTips(svg, host.parentElement ?? host, {
+            renderId,
+            tips,
+            getTip: (ctx) => getNodeTipRef.current?.(ctx),
+            fallbackLabel: tipFallbackLabel,
+          });
         }
 
         if (panZoom) {
@@ -274,6 +318,9 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     touchGestures,
     injectStyles,
     checks,
+    tips,
+    nodeTips,
+    tipFallbackLabel,
   ]);
 
   // 角標顯示 / 隱藏不需要重繪整張圖,直接操作既有 controller。
@@ -281,13 +328,15 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     checksRef.current?.setVisible(checksVisible);
   }, [checksVisible, checkGroups]);
 
-  // 卸載時清掉 pan-zoom 與角標監聽。
+  // 卸載時清掉 pan-zoom、角標與懸停提示監聽。
   useEffect(() => {
     return () => {
       pzRef.current?.destroy();
       pzRef.current = null;
       checksRef.current?.destroy();
       checksRef.current = null;
+      tipsCtlRef.current?.destroy();
+      tipsCtlRef.current = null;
     };
   }, []);
 

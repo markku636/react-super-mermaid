@@ -162,6 +162,33 @@ export const RSM_CSS = `
 .rsm-root .rsm-dim { opacity: 0.22; transition: opacity 0.15s ease; }
 .rsm-root .rsm-hit { filter: drop-shadow(0 0 5px #f59e0b) drop-shadow(0 0 1.5px #f59e0b); }
 
+/* ── 節點懸停提示(tips)──
+ * 一顆跟著游標走的 HTML tooltip,絕對定位在 .rsm-canvas 內。
+ * pointer-events:none:它永遠不擋 svg-pan-zoom 的拖曳,也不會自己觸發 hover 抖動。 */
+.rsm-tip {
+  position: absolute;
+  z-index: 30;
+  max-width: min(340px, calc(100% - 16px));
+  padding: 8px 11px;
+  border: 1px solid var(--rsm-border);
+  border-radius: 8px;
+  background: var(--rsm-surface);
+  color: var(--rsm-fg);
+  font-size: 12.5px;
+  line-height: 1.55;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.16);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  overflow-wrap: break-word;
+}
+.rsm-tip.rsm-tip-visible { opacity: 1; transform: none; }
+.rsm-tip-title { font-weight: 600; font-size: 12px; }
+.rsm-tip-title + .rsm-tip-body { margin-top: 3px; }
+.rsm-tip-body { color: var(--rsm-muted); white-space: pre-line; }
+.rsm-root.rsm-dark .rsm-tip { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); }
+
 /* ── 檢查提示(checks)──
  * 角標是 SVG 元素、掛在節點的 <g> 內(繼承 transform,跟著 pan/zoom 走,也會進匯出);
  * 卡片 / 跳窗 / 清單是 HTML,絕對定位在 .rsm-canvas 內。

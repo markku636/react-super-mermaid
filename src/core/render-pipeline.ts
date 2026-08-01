@@ -4,6 +4,7 @@
 import { assertBrowser } from '../env';
 import type { MermaidLike, MermaidTheme, RenderDiagramOptions, RenderResult } from '../types';
 import { stripCheckDirectives } from './checks/parse';
+import { stripTipDirectives } from './tips/parse';
 import { boostLegibility, colorizeDiagram } from './themes/colorize';
 import { ensureSketchFont, SKETCH_FONT, sketchifyDiagram } from './themes/sketch';
 import { ensureStyles } from './ensure-styles';
@@ -68,9 +69,9 @@ export async function renderToSvg(args: RenderToSvgArgs): Promise<RenderedSvg> {
   args.mermaid.initialize(buildConfig(args));
   renderSeq += 1;
   const id = `rsm-${renderSeq}`;
-  // 檢查提示指令在這個唯一咽喉點剝除,viewer / renderDiagram / 編輯器排版三條路徑同時受惠。
+  // 檢查 / 懸停提示指令在這個唯一咽喉點剝除,viewer / renderDiagram / 編輯器排版三條路徑同時受惠。
   // (原始碼本身不動 —— 編輯器 round-trip 讀的是原始碼,提示不會在來回轉換中遺失。)
-  const { svg } = await args.mermaid.render(id, stripCheckDirectives(args.code));
+  const { svg } = await args.mermaid.render(id, stripTipDirectives(stripCheckDirectives(args.code)));
   return { svgString: svg, id, postProcess: args.pristine ? 'none' : resolved.postProcess };
 }
 

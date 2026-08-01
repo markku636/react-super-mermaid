@@ -28,6 +28,14 @@ Attach "how do I diagnose this step?" notes to diagram nodes — severity badge 
 - ELK links: declarative `elk={{ kibanaHost, dataViewId, timeFrom, timeTo }}` uses the built-in builder (no backend); `onResolveElkLink` overrides it for hosts that must resolve a data view server-side. Neither configured → the button degrades to "copy KQL" instead of a dead link.
 - Toolbar gets a badge toggle + check-list drawer; `h` / `c` shortcuts. With zero checks the whole feature stays hidden.
 
+## Hover tips (`%% @tip`)
+
+A themed tooltip when the mouse rests on a node — the one-liner counterpart to check hints ("what does this step do?").
+
+- Syntax: `%% @tip <target> <text>`; indented `%%` comment lines continue the same tip (joined with newlines). Quote the target (`%% @tip "Node label" …`) to match label text instead of the author id. Directives are stripped before mermaid parses the source, same as `%% @check`.
+- Viewer props: `nodeTips` (default true, master switch), `tips` (`DiagramTip[]` or `Record<target, text>` shorthand; same target overrides `%% @tip`), `tipsFromSource` (default true), `getNodeTip({ id, label, node })` (string = show, `null` = silence the node, `undefined` = fall through), `tipFallbackLabel` (default false; nodes without a tip show full label + id — useful when fitted diagrams squeeze long labels).
+- A node carrying check hints (and no tip) shows the check summary on hover; the badge itself keeps its native tooltip. The tooltip follows the cursor, flips at canvas edges, hides during drag-pan, and is `pointer-events: none`.
+
 ## Framework-agnostic core API
 
 - `renderDiagram({ code, container, theme, dark, seed, fontUrl, mermaidConfig, mermaid, injectStyles })` — one-shot render + post-process into a container, returns `{ svg, svgString, id }`.
@@ -36,6 +44,8 @@ Attach "how do I diagnose this step?" notes to diagram nodes — severity badge 
 - `boostLegibility(svgOrRoot)` — bump label font-weight for crisp text in every theme (weight-only, never changes colours). Applied automatically by the viewer.
 - `sketchifyDiagram(svgOrRoot, { dark, seed })` — apply the Excalidraw hand-drawn post-process (sequence diagrams especially).
 - `parseChecks(code)` / `stripCheckDirectives(code)` / `mergeChecks(base, overrides)` — the `%% @check` directive parser.
+- `parseTips(code)` / `stripTipDirectives(code)` / `mergeTips(base, overrides)` / `normalizeTips(recordOrArray)` — the `%% @tip` directive parser.
+- `attachHoverTips(svg, host, { renderId, tips, getTip, fallbackLabel, checksSummary, delay })` — bind hover tooltips to a rendered SVG for non-React hosts; `host` is the positioned container the tip div lives in; returns `{ destroy }`.
 - `annotateChecks(svg, checks, { renderId, onActivate, visible })` — inject severity badges into a rendered SVG; returns a controller (`groups`, `unresolved`, `setVisible`, `focus`, `destroy`).
 - `buildKibanaDiscoverUrl({ kibanaHost, dataViewId, kql, timeFrom, timeTo, columns })` — pure rison → Discover URL builder (no network). `elkLinkFromConfig(query, config)` applies a viewer's `elk` config to one check.
 - `findDiagramNode(svg, target, { renderId, match })` / `authorIdFromDomId(domId, renderId)` / `nodeLabelText(el)` — map an author-written node id back to its rendered SVG element.

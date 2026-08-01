@@ -182,6 +182,19 @@ export interface DiagramCheck {
   elk?: CheckElkQuery;
 }
 
+// ── 懸停提示(tips)──
+// 滑鼠懸停在節點上時顯示的說明文字。來源有二:mermaid 原始碼裡的 `%% @tip` 指令,
+// 以及 host 傳入的 `tips` prop(同 target 由 prop 覆寫)。
+
+/** 掛在某個圖形節點上的一則懸停提示。 */
+export interface DiagramTip {
+  /** 對應的節點:預設比對作者 id,`match: 'label'` 時比對節點標籤文字。 */
+  target: string;
+  match?: 'id' | 'label';
+  /** 懸停時顯示的文字(可多行,`\n` 分行)。 */
+  text: string;
+}
+
 /** 內建 Kibana Discover 連結設定;host 已知 data view UUID 時可免後端直接產連結。 */
 export interface ElkLinkConfig {
   /** Kibana 站台網址,例 `https://kibana.example.com`。 */

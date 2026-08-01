@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type {
   DiagramCheck,
+  DiagramTip,
   ElkLinkConfig,
   ExportRasterOptions,
   MermaidSource,
@@ -10,6 +11,7 @@ import type {
   SvgPanZoomSource,
 } from '../types';
 import type { ResolvedCheckGroup } from '../core/checks/annotate';
+import type { GetNodeTip } from '../core/tips/hover';
 import { useMermaidViewer } from './useMermaidViewer';
 import { DEFAULT_THEME_OPTIONS, Toolbar, type ThemeOption } from './Toolbar';
 import { CheckList, CheckPopover, type CheckResolveElkLink } from './CheckPanel';
@@ -78,6 +80,22 @@ export interface MermaidViewerProps {
   elk?: ElkLinkConfig;
   /** 覆寫 ELK 連結產生方式;需要打後端解析 data view 的 host 走這條。 */
   onResolveElkLink?: CheckResolveElkLink;
+  /**
+   * 節點懸停提示(tooltip):滑鼠停在節點上顯示說明。內容來源 = 原始碼 `%% @tip` 指令
+   * + `tips` prop + 檢查提示摘要。預設 true;false = 完全關閉。
+   */
+  nodeTips?: boolean;
+  /**
+   * 懸停提示(與原始碼裡的 `%% @tip` 指令合併,同一個 target 以此處為準)。
+   * 可用 `{ 節點id: 文字 }` 簡寫。
+   */
+  tips?: DiagramTip[] | Record<string, string>;
+  /** 是否解析原始碼中的 `%% @tip` 指令,預設 true。 */
+  tipsFromSource?: boolean;
+  /** 動態決定節點提示;回傳 null = 該節點不顯示,undefined = 交回內建查找。 */
+  getNodeTip?: GetNodeTip;
+  /** 無授權提示時退回顯示「節點完整文字 + id」,預設 false。 */
+  tipFallbackLabel?: boolean;
   className?: string;
   style?: React.CSSProperties;
   onRender?: (svg: SVGSVGElement) => void;
@@ -189,6 +207,11 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       onCheckSelect,
       elk,
       onResolveElkLink,
+      nodeTips = true,
+      tips,
+      tipsFromSource = true,
+      getNodeTip,
+      tipFallbackLabel = false,
       className,
       style,
       onRender,
@@ -275,6 +298,11 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       checksFromSource,
       checksVisible,
       onCheckActivate: openCheck,
+      nodeTips,
+      tips,
+      tipsFromSource,
+      getNodeTip,
+      tipFallbackLabel,
       onRender,
       onError,
     });

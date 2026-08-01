@@ -184,6 +184,7 @@ gitGraph
 - 🧰 **Toolbox or diagram-only** — show the built-in toolbar, or just the chart with `toolbar={false}`.
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).
 - 🩺 **Inline check hints** — attach "how do I diagnose this step?" notes to nodes: severity badges, click-to-open cards with ordered steps, copyable SQL/KQL snippets, links, and a generated Kibana Discover URL. Authored **inside the mermaid source** with `%% @check`, so an AI-generated diagram carries its own runbook.
+- 💬 **Hover tips** — a themed tooltip when the mouse rests on a node: authored with `%% @tip` in the source (or the `tips` prop / a `getNodeTip` callback), with an optional fallback that shows the node's full label + id — handy when fitted diagrams squeeze long labels.
 - 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w`, mouse wheel, and **touch gestures** (pinch-to-zoom + drag-to-pan) via `svg-pan-zoom`.
 - ⛶ **Fullscreen modal** — open the diagram in a viewport-filling, RWD-friendly popup (`f` / `Esc`); body scroll locked, auto re-fit.
 - ▦ **Background picker** — a swatch popover to set the canvas **surface** (preset colors + a custom color well) and an independent **pattern** (none / dots / grid lines, cycle with `b`). Surface + pattern combine freely and carry through to exports.
@@ -285,6 +286,11 @@ Resolution order is **injected → peer import → CDN**, memoized so mermaid lo
 | `checksFromSource` | `boolean` | `true` | parse `%% @check` directives out of `code` |
 | `defaultChecksVisible` | `boolean` | `true` | show badges initially (toolbar / `h` toggles) |
 | `onCheckSelect` | `(check) => void` | — | fired when a hint card is opened |
+| `nodeTips` | `boolean` | `true` | hover tooltips on nodes (`%% @tip` / `tips` / check summaries) |
+| `tips` | `DiagramTip[] \| Record<string, string>` | — | programmatic hover tips; merged with `%% @tip` (same `target` → this wins) |
+| `tipsFromSource` | `boolean` | `true` | parse `%% @tip` directives out of `code` |
+| `getNodeTip` | `(ctx: { id?, label, node }) => string \| null \| undefined` | — | dynamic tip: string shows it, `null` silences the node, `undefined` falls through |
+| `tipFallbackLabel` | `boolean` | `false` | nodes without an authored tip fall back to full label + id |
 | `elk` | `{ kibanaHost, dataViewId, timeFrom?, timeTo?, columns? }` | — | built-in Kibana Discover link builder |
 | `onResolveElkLink` | `(check) => string \| Promise<string \| null>` | — | override link generation (e.g. resolve the data view server-side) |
 | `className` / `style` | — | — | on the root element |
@@ -424,6 +430,53 @@ builder is also exported on its own: `buildKibanaDiscoverUrl({ kibanaHost, dataV
 - Hovering a badge shows the check's title and description as a native tooltip (an SVG `<title>`, which
   doubles as the badge's accessible name). Click to open the full card.
 - With zero checks the entire feature — badges, toolbar buttons, shortcuts — stays out of the way.
+
+## Hover tips — `%% @tip`
+
+Rest the mouse on a node and a themed tooltip appears — no click needed. Where check hints are the
+full runbook card, hover tips are the one-liner: *what does this step do?*
+
+````markdown
+```mermaid
+flowchart LR
+  IN[Ingest] --> VAL{Validate}
+  VAL -- ok --> Q[(Queue)]
+
+%% @tip IN Upstream pushes a batch every 5s, 500 rows max
+%%   During peak hours expect 20–30k rows/min
+%% @tip "Validate" Signature + amount range + duplicate order id
+```
+````
+
+**Syntax**
+
+- `%% @tip <target> <text…>` — one directive per tip. Indented `%%` comment lines continue the same tip
+  (joined with newlines).
+- `target` matches the author-written node id; quote it (`%% @tip "Node label" …`) to match the label text.
+- Directives are stripped before mermaid parses the source (same as `%% @check`), and survive the drawing
+  editor's round-trip untouched.
+
+**Programmatic + dynamic**
+
+```tsx
+// Record shorthand (or DiagramTip[] for match-by-label); same target → prop wins over %% @tip.
+<MermaidViewer code={code} tips={{ DONE: 'Reconciled within 5 minutes of settling' }} />
+
+// Full dynamic control: string = show, null = never show for this node, undefined = fall through.
+<MermaidViewer code={code} getNodeTip={({ id, label }) => (id ? metrics.tooltipFor(id) : undefined)} />
+
+// Long labels get squeezed in fitted diagrams — this makes hover reveal the full text + id.
+<MermaidViewer code={code} tipFallbackLabel />
+```
+
+**Notes**
+
+- Hovering a node that carries check hints (and no `@tip`) shows the check summary, so badges are
+  discoverable without clicking. Hovering the badge itself still uses its native tooltip.
+- The tooltip follows the cursor, flips near the canvas edges, hides while you drag-pan, and is
+  `pointer-events: none` — it can never steal a click or a drag from the diagram.
+- Framework-agnostic exports: `parseTips` / `stripTipDirectives` / `mergeTips` / `attachHoverTips(svg, host, opts)`
+  for non-React hosts.
 
 ## Keyboard shortcuts
 

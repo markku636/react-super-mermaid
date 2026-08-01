@@ -77,6 +77,24 @@ const UNSETTLED_TREE = `flowchart TD
 %%   FROM TpUnsettle WHERE TransId = '{TransId}';`;
 
 /**
+ * 懸停提示示範:`%% @tip` 讓 AI 產圖時把「每一步在做什麼」一起帶出來,
+ * 滑鼠停上去就看得到,不用點。縮排的 %% 行是續行。
+ */
+const PIPELINE_WITH_TIPS = `flowchart LR
+  IN[收單] --> VAL{驗證}
+  VAL -- 過 --> Q[(佇列)]
+  VAL -- 不過 --> REJ[退件]
+  Q --> W[結算 worker]
+  W --> DONE([完成])
+
+%% @tip IN 上游每 5 秒推一批,一批最多 500 筆
+%%   高峰期常見 2~3 萬筆/分,壅塞先看這裡
+%% @tip VAL 驗簽 + 金額範圍 + 重複單號
+%% @tip Q Redis Stream,積壓門檻 10k
+%% @tip "結算 worker" 消費者群組 settle-cg,失敗會重排(最多 3 次)
+%% @tip REJ 退件會回 webhook 給上游,帶 reject_reason`;
+
+/**
  * 程式化提示:與原始碼裡的 `%% @check` 合併,同 target 以這裡為準。
  * 這則示範「host 想補一個原始碼沒寫的節點」。
  */
@@ -173,6 +191,27 @@ export function App(): React.JSX.Element {
               timeTo: 'now',
             }}
             onCheckSelect={(check) => console.log('[example] 開啟檢查提示', check.target)}
+          />
+        </div>
+      </section>
+
+      <section>
+        <h2>4) 懸停提示（滑鼠停在節點上看說明）</h2>
+        <p style={{ color: '#6b7280', fontSize: 13, margin: '0 0 8px' }}>
+          <code>%% @tip 節點id 說明文字</code> 寫在 mermaid 原始碼裡即可；也可用{' '}
+          <code>tips</code> prop 程式化補充（同 target 以 prop 為準）。
+          <br />
+          這張圖另開了 <code>tipFallbackLabel</code>：沒寫 @tip 的節點（如「退件」以外的節點）
+          懸停會退回顯示完整節點文字 + id，長標籤被縮圖擠到難讀時特別有用。
+        </p>
+        <div style={{ height: 380 }}>
+          <MermaidViewer
+            code={PIPELINE_WITH_TIPS}
+            theme={theme}
+            pattern="none"
+            tipFallbackLabel
+            // 程式化補充/覆寫:DONE 在原始碼裡沒寫 @tip,由 host 補上。
+            tips={{ DONE: '結算完成後 5 分鐘內對帳,對不平會進人工覆核' }}
           />
         </div>
       </section>

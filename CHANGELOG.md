@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.8.0 — node hover tips (`%% @tip`)
+
+- **Feature**: rest the mouse on a node and a themed HTML tooltip appears — the one-liner
+  counterpart to check hints ("what does this step do?"). Authored inside the source with
+  `%% @tip <target> <text>` (indented `%%` lines continue the tip; quoted target matches the
+  label instead of the id), or programmatically via the `tips` prop (`DiagramTip[]` or a
+  `Record<target, text>` shorthand; same target → prop wins) and a `getNodeTip` callback
+  (string = show, `null` = silence, `undefined` = fall through). New viewer props:
+  `nodeTips` (default true), `tips`, `tipsFromSource` (default true), `getNodeTip`,
+  `tipFallbackLabel` (default false — nodes without a tip show their full label + id, which
+  rescues long labels squeezed by fitted diagrams).
+- **Feature**: nodes carrying check hints (and no `@tip`) show the check summary on hover, so
+  badges are discoverable without clicking; hovering the badge itself keeps its native tooltip
+  (no double tip).
+- **Behavior**: the tooltip follows the cursor with a 120ms show delay, flips near canvas
+  edges, hides while drag-panning, and is `pointer-events: none` — it can never steal a click
+  or a drag. Native SVG `<title>` was rejected for node tips: ~1s delay, single-line, and
+  blind to dark mode.
+- **Internal**: `%% @tip` directives are stripped at the same render-pipeline choke point as
+  `%% @check`, so the viewer, `renderDiagram()`, and the drawing editor's layout all benefit,
+  and the editor round-trip preserves them. Framework-agnostic exports: `parseTips` /
+  `stripTipDirectives` / `mergeTips` / `normalizeTips` / `attachHoverTips`.
+
 ## 0.7.1 — check hints: hover tooltips + six fixes from review
 
 - **Feature**: badges now carry an SVG `<title>`, so hovering one shows the check's title and

@@ -54,8 +54,11 @@ interface ScanResult {
   directiveLines: Set<number>;
 }
 
-/** 取註解行的內容(去掉開頭 `%%`,保留其後縮排供多行值判斷);非註解行回 undefined。 */
-function commentBody(line: string): string | undefined {
+/**
+ * 取註解行的內容(去掉開頭 `%%`,保留其後縮排供多行值判斷);非註解行回 undefined。
+ * 匯出供 tips/parse 重用 —— 兩種指令共用同一套「什麼是註解 / 什麼是 init 指令」判斷。
+ */
+export function commentBody(line: string): string | undefined {
   const trimmed = line.trimStart();
   if (!trimmed.startsWith('%%')) {
     return undefined;
@@ -73,7 +76,8 @@ function commentBody(line: string): string | undefined {
   return body.startsWith(' ') ? body.slice(1) : body;
 }
 
-function isIndented(body: string): boolean {
+/** 註解內容是否有縮排(= 多行值的續行)。匯出供 tips/parse 重用。 */
+export function isIndented(body: string): boolean {
   return /^\s/.test(body);
 }
 
