@@ -209,6 +209,14 @@ export interface ToolbarProps {
   fullscreenEnabled: boolean;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** 圖上的檢查提示數量;0 時整組檢查 UI 不顯示。 */
+  checkCount: number;
+  /** 角標目前是否顯示。 */
+  checksVisible: boolean;
+  onToggleChecks: () => void;
+  /** 側邊檢查清單是否展開。 */
+  checklistOpen: boolean;
+  onToggleChecklist: () => void;
 }
 
 export function Toolbar(props: ToolbarProps): React.JSX.Element {
@@ -236,6 +244,29 @@ export function Toolbar(props: ToolbarProps): React.JSX.Element {
           pattern={props.pattern}
           onPatternChange={props.onPatternChange}
         />
+      ) : null}
+
+      {props.checkCount > 0 ? (
+        <div className="rsm-toolbar-group">
+          <button
+            type="button"
+            className="rsm-btn"
+            aria-pressed={props.checksVisible}
+            onClick={props.onToggleChecks}
+            title="顯示 / 隱藏節點上的檢查提示（H）"
+          >
+            🔍 檢查 {props.checkCount}
+          </button>
+          <button
+            type="button"
+            className="rsm-btn"
+            aria-pressed={props.checklistOpen}
+            onClick={props.onToggleChecklist}
+            title="展開檢查清單（C）"
+          >
+            ☰ 清單
+          </button>
+        </div>
       ) : null}
 
       <div className="rsm-toolbar-spacer" />

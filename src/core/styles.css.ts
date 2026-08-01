@@ -162,6 +162,162 @@ export const RSM_CSS = `
 .rsm-root .rsm-dim { opacity: 0.22; transition: opacity 0.15s ease; }
 .rsm-root .rsm-hit { filter: drop-shadow(0 0 5px #f59e0b) drop-shadow(0 0 1.5px #f59e0b); }
 
+/* ── 檢查提示(checks)──
+ * 角標是 SVG 元素、掛在節點的 <g> 內(繼承 transform,跟著 pan/zoom 走,也會進匯出);
+ * 卡片 / 跳窗 / 清單是 HTML,絕對定位在 .rsm-canvas 內。
+ * 對焦用獨立的 rsm-check-focus,不與搜尋的 rsm-hit / rsm-dim 共用,否則兩套高亮會互相蓋掉。 */
+.rsm-root {
+  --rsm-check-info: #2563eb;
+  --rsm-check-warn: #d97706;
+  --rsm-check-error: #dc2626;
+}
+.rsm-root.rsm-dark {
+  --rsm-check-info: #60a5fa;
+  --rsm-check-warn: #fbbf24;
+  --rsm-check-error: #f87171;
+}
+
+/* 角標的「上色」規則不在這裡 —— 它們由 annotateChecks 注入到 SVG 內部,才能跟著匯出走
+ * (見 core/checks/annotate.ts 的 BADGE_CSS)。這裡只留純互動、不需要跟著匯出的部分。 */
+.rsm-root .rsm-check-badge { cursor: pointer; }
+/* 拿掉預設 outline(SVG 上的方框很醜),但 :focus-visible 必須換一個看得見的替代品 ——
+ * 只靠透明度變化,鍵盤使用者根本認不出焦點在哪一顆。 */
+.rsm-root .rsm-check-badge:focus { outline: none; }
+.rsm-root .rsm-check-badge:focus-visible .rsm-check-badge-hit {
+  fill: none !important;
+  stroke: var(--rsm-accent) !important;
+  stroke-width: 2px !important;
+}
+.rsm-root .rsm-check-badge .rsm-check-badge-bg { transition: opacity 0.12s ease; }
+.rsm-root .rsm-check-badge .rsm-check-badge-text { pointer-events: none; }
+.rsm-root .rsm-check-badge:hover .rsm-check-badge-bg,
+.rsm-root .rsm-check-badge:focus-visible .rsm-check-badge-bg { opacity: 0.75; }
+
+/* 有提示的節點:淡淡的光暈,讓人知道這裡可以點。對焦時加強。 */
+.rsm-root .rsm-has-check-info { filter: drop-shadow(0 0 2px var(--rsm-check-info)); }
+.rsm-root .rsm-has-check-warn { filter: drop-shadow(0 0 2px var(--rsm-check-warn)); }
+.rsm-root .rsm-has-check-error { filter: drop-shadow(0 0 2px var(--rsm-check-error)); }
+.rsm-root .rsm-check-hidden { filter: none; }
+.rsm-root .rsm-check-focus {
+  filter: drop-shadow(0 0 6px var(--rsm-accent)) drop-shadow(0 0 2px var(--rsm-accent));
+}
+
+/* 跳窗:貼在角標旁,內容過長時自身捲動(不撐破畫布)。 */
+.rsm-check-pop {
+  position: absolute;
+  z-index: 20;
+  width: min(420px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--rsm-border);
+  border-radius: var(--rsm-radius);
+  background: var(--rsm-surface);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18);
+}
+.rsm-check-pop-head,
+.rsm-check-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rsm-border);
+}
+.rsm-check-pop-count,
+.rsm-check-list-title { font-size: 12px; font-weight: 600; color: var(--rsm-muted); }
+.rsm-check-pop-head > .rsm-btn,
+.rsm-check-list-head > .rsm-btn { margin-left: auto; }
+.rsm-check-pop:focus { outline: none; }
+.rsm-check-pop-body,
+.rsm-check-list-body { overflow: auto; padding: 10px; display: grid; gap: 12px; }
+/* 複製失敗要看得出來 —— 靜默無反應會讓人以為工具壞了。 */
+.rsm-check-copy-failed { color: var(--rsm-check-error); border-color: var(--rsm-check-error); }
+
+/* 側邊清單:停在畫布右緣,窄螢幕時佔滿寬度。 */
+.rsm-check-list {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 15;
+  width: min(360px, 100%);
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--rsm-border);
+  background: var(--rsm-surface);
+  box-shadow: -6px 0 18px rgba(15, 23, 42, 0.12);
+}
+.rsm-check-list-item {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--rsm-border);
+}
+.rsm-check-list-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.rsm-check-list-item.rsm-selected { outline: 2px solid var(--rsm-accent); outline-offset: 4px; }
+.rsm-check-list-jump {
+  justify-self: start;
+  border: 1px solid var(--rsm-border);
+  background: var(--rsm-surface);
+  color: var(--rsm-accent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rsm-check-list-jump:hover { background: var(--rsm-hover); }
+.rsm-check-empty { margin: 0; font-size: 13px; color: var(--rsm-muted); }
+
+/* 卡片內容 */
+.rsm-check-card { display: grid; gap: 8px; font-size: 13px; line-height: 1.55; }
+.rsm-check-card-head { display: flex; align-items: baseline; gap: 8px; }
+.rsm-check-title { font-weight: 700; }
+.rsm-check-chip {
+  flex: none;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  background: var(--rsm-check-info);
+}
+.rsm-check-chip.rsm-check-warn { background: var(--rsm-check-warn); }
+.rsm-check-chip.rsm-check-error { background: var(--rsm-check-error); }
+.rsm-check-desc { margin: 0; color: var(--rsm-fg); }
+.rsm-check-steps { margin: 0; padding-left: 20px; display: grid; gap: 3px; }
+
+.rsm-check-snippet { border: 1px solid var(--rsm-border); border-radius: 6px; overflow: hidden; }
+.rsm-check-snippet-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  background: var(--rsm-hover);
+}
+.rsm-check-lang {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--rsm-muted);
+}
+.rsm-check-snippet-head .rsm-check-copy { margin-left: auto; padding: 2px 8px; font-size: 12px; }
+.rsm-check-code {
+  margin: 0;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  color: var(--rsm-fg);
+}
+.rsm-check-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rsm-check-elk { display: inline-flex; align-items: center; gap: 6px; }
+.rsm-check-elk-error { font-size: 12px; color: var(--rsm-check-error); }
+.rsm-check-link,
+.rsm-check-elk-link { text-decoration: none; }
+
 .rsm-root.rsm-dark {
   /* 暗色面板對齊 VS Code Dark+ / Dark Modern 的中性灰(非藍調)。 */
   --rsm-border: #3c3c3c;

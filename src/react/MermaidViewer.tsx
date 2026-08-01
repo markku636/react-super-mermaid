@@ -1,5 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type {
+  DiagramCheck,
+  ElkLinkConfig,
   ExportRasterOptions,
   MermaidSource,
   MermaidTheme,
@@ -7,8 +9,10 @@ import type {
   SearchState,
   SvgPanZoomSource,
 } from '../types';
+import type { ResolvedCheckGroup } from '../core/checks/annotate';
 import { useMermaidViewer } from './useMermaidViewer';
 import { DEFAULT_THEME_OPTIONS, Toolbar, type ThemeOption } from './Toolbar';
+import { CheckList, CheckPopover, type CheckResolveElkLink } from './CheckPanel';
 
 /** 圖樣循環順序(快捷鍵 B):無 → 網點 → 網格 → 無。 */
 const PATTERN_CYCLE: RsmPattern[] = ['none', 'dots', 'grid'];
@@ -59,6 +63,21 @@ export interface MermaidViewerProps {
   svgPanZoom?: SvgPanZoomSource;
   /** 是否注入套件內建 CSS,預設 true。 */
   injectStyles?: boolean;
+  /**
+   * 檢查提示(「這一步異常時怎麼查」)。與原始碼裡的 `%% @check` 指令合併,
+   * 同一個 target 以此處為準。
+   */
+  checks?: DiagramCheck[];
+  /** 是否解析原始碼中的 `%% @check` 指令,預設 true。 */
+  checksFromSource?: boolean;
+  /** 角標初始是否顯示,預設 true(工具列與 H 鍵可切換)。 */
+  defaultChecksVisible?: boolean;
+  /** 使用者點開某則提示時觸發。 */
+  onCheckSelect?: (check: DiagramCheck) => void;
+  /** 內建 Kibana Discover 連結設定(host 已知 data view UUID 時免後端)。 */
+  elk?: ElkLinkConfig;
+  /** 覆寫 ELK 連結產生方式;需要打後端解析 data view 的 host 走這條。 */
+  onResolveElkLink?: CheckResolveElkLink;
   className?: string;
   style?: React.CSSProperties;
   onRender?: (svg: SVGSVGElement) => void;
@@ -92,6 +111,14 @@ export interface MermaidViewerHandle {
   /** 設定底色(hex);null = 透明 / 跟隨頁面。 */
   setSolidColor: (color: string | null) => void;
   getSolidColor: () => string | null;
+  /** 合併後的檢查提示清單。 */
+  getChecks: () => DiagramCheck[];
+  /** 顯示 / 隱藏節點角標。 */
+  showChecks: (visible: boolean) => void;
+  /** 平移到某個提示節點並高亮;target 找不到時無動作。 */
+  focusCheck: (target: string) => void;
+  openChecklist: () => void;
+  closeChecklist: () => void;
 }
 
 /** 畫布底色 / 純色背景的預設顏色(對齊 VS Code editor-background)。 */
@@ -156,6 +183,12 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       mermaidConfig,
       svgPanZoom,
       injectStyles = true,
+      checks: checksProp,
+      checksFromSource = true,
+      defaultChecksVisible = true,
+      onCheckSelect,
+      elk,
+      onResolveElkLink,
       className,
       style,
       onRender,
@@ -195,8 +228,36 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
 
     const [isFullscreen, setIsFullscreen] = useState(false);
 
+    // 檢查提示:角標顯示與否、目前開啟的跳窗、側邊清單是否展開。
+    const [checksVisible, setChecksVisible] = useState(defaultChecksVisible);
+    const [activeGroup, setActiveGroup] = useState<ResolvedCheckGroup | null>(null);
+    const [anchor, setAnchor] = useState({ left: 0, top: 0 });
+    const [checklistOpen, setChecklistOpen] = useState(false);
+
     const rootRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // 把角標的螢幕座標換算成畫布內的相對座標(跳窗是畫布的絕對定位子元素)。
+    const measureAnchor = useCallback((group: ResolvedCheckGroup): void => {
+      const canvas = canvasRef.current;
+      const badge = group.badge;
+      if (!canvas || typeof badge.getBoundingClientRect !== 'function') {
+        return;
+      }
+      const c = canvas.getBoundingClientRect();
+      const b = badge.getBoundingClientRect();
+      setAnchor({ left: b.right - c.left + 8, top: b.top - c.top });
+    }, []);
+
+    const openCheck = useCallback(
+      (group: ResolvedCheckGroup): void => {
+        setActiveGroup(group);
+        measureAnchor(group);
+        onCheckSelect?.(group.checks[0]);
+      },
+      [measureAnchor, onCheckSelect],
+    );
 
     const vm = useMermaidViewer({
       code,
@@ -210,6 +271,10 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       panZoom,
       touchGestures,
       injectStyles,
+      checks: checksProp,
+      checksFromSource,
+      checksVisible,
+      onCheckActivate: openCheck,
       onRender,
       onError,
     });
@@ -269,6 +334,74 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         setExporting(false);
       }
     }, [vm, onError, pattern, solidColor, dark]);
+
+    const closeCheck = useCallback((): void => {
+      setActiveGroup(null);
+      vm.focusCheck(undefined);
+    }, [vm]);
+
+    const toggleChecks = useCallback((): void => {
+      setChecksVisible((v) => {
+        if (v) {
+          // 藏起角標時一併收掉跳窗,否則會留一張沒有錨點的卡片浮在畫布上。
+          setActiveGroup(null);
+        }
+        return !v;
+      });
+    }, []);
+
+    const toggleChecklist = useCallback((): void => {
+      setChecklistOpen((o) => !o);
+    }, []);
+
+    // 圖被縮放 / 拖曳 / 視窗改變後,角標的螢幕位置就變了 —— 跳窗要跟著重算,否則會飄離節點。
+    // zoom 由 vm.zoomPercent 觸發;平移沒有事件可掛,改在畫布的 pointerup 收尾時重算。
+    useEffect(() => {
+      if (!activeGroup) {
+        return undefined;
+      }
+      measureAnchor(activeGroup);
+      const canvas = canvasRef.current;
+      const onSettle = (): void => measureAnchor(activeGroup);
+      window.addEventListener('resize', onSettle);
+      canvas?.addEventListener('pointerup', onSettle);
+      return () => {
+        window.removeEventListener('resize', onSettle);
+        canvas?.removeEventListener('pointerup', onSettle);
+      };
+    }, [activeGroup, measureAnchor, vm.zoomPercent]);
+
+    // 重繪(換主題 / 換碼)後舊的 group 物件已失效,關掉跳窗避免指向被移除的 DOM。
+    useEffect(() => {
+      setActiveGroup(null);
+    }, [vm.checkGroups]);
+
+    // 跳窗 / 清單開著時,Esc 額外掛到 document 上。
+    // 主要的鍵盤處理綁在 viewer root,需要焦點留在 .rsm-root 內才收得到 —— 但焦點很容易跑掉
+    // (點畫布空白處、瀏覽器不聚焦被點的 SVG 元素…),那時使用者按 Esc 會沒反應、只能去找 ✕。
+    // 這層只處理 Esc,不攔其他按鍵,不會干擾 host 的全域快捷鍵。
+    useEffect(() => {
+      if (!activeGroup && !checklistOpen) {
+        return undefined;
+      }
+      const onDocKey = (e: KeyboardEvent): void => {
+        if (e.key !== 'Escape') {
+          return;
+        }
+        // 焦點已在 viewer 內時交給 root 的處理器,避免同一次按鍵關掉兩層。
+        if (rootRef.current?.contains(document.activeElement)) {
+          return;
+        }
+        e.preventDefault();
+        if (activeGroup) {
+          closeCheck();
+        } else {
+          setChecklistOpen(false);
+        }
+      };
+      document.addEventListener('keydown', onDocKey);
+      return () => document.removeEventListener('keydown', onDocKey);
+    }, [activeGroup, checklistOpen, closeCheck]);
 
     const cyclePattern = useCallback((): void => {
       setPatternState((prev) => {
@@ -391,6 +524,17 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           openSearch();
           return;
         }
+        // Esc 逐層收合:跳窗 → 清單 → 搜尋 → 全螢幕,一次只關一層。
+        if (e.key === 'Escape' && activeGroup) {
+          e.preventDefault();
+          closeCheck();
+          return;
+        }
+        if (e.key === 'Escape' && checklistOpen) {
+          e.preventDefault();
+          setChecklistOpen(false);
+          return;
+        }
         if (e.key === 'Escape' && searchOpen) {
           closeSearch();
           return;
@@ -401,6 +545,16 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           return;
         }
         if (typing) {
+          return;
+        }
+        if (vm.checkGroups.length > 0 && (e.key === 'h' || e.key === 'H')) {
+          e.preventDefault();
+          toggleChecks();
+          return;
+        }
+        if (vm.checkGroups.length > 0 && (e.key === 'c' || e.key === 'C')) {
+          e.preventDefault();
+          toggleChecklist();
           return;
         }
         if (e.key === '+' || e.key === '=') {
@@ -435,6 +589,11 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
       cyclePattern,
       fullscreenEnabled,
       backgroundEnabled,
+      activeGroup,
+      checklistOpen,
+      closeCheck,
+      toggleChecks,
+      toggleChecklist,
     ]);
 
     useImperativeHandle(
@@ -464,6 +623,21 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
         getPattern: () => pattern,
         setSolidColor,
         getSolidColor: () => solidColor,
+        getChecks: () => vm.checks,
+        showChecks: (visible: boolean) => {
+          setChecksVisible(visible);
+          if (!visible) {
+            setActiveGroup(null);
+          }
+        },
+        focusCheck: (target: string) => {
+          const group = vm.checkGroups.find((g) => g.checks.some((c) => c.target === target));
+          if (group) {
+            vm.panToCheck(group);
+          }
+        },
+        openChecklist: () => setChecklistOpen(true),
+        closeChecklist: () => setChecklistOpen(false),
       }),
       [
         vm,
@@ -538,6 +712,11 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
             fullscreenEnabled={fullscreenEnabled}
             fullscreen={isFullscreen}
             onToggleFullscreen={toggleFullscreen}
+            checkCount={vm.checkGroups.length}
+            checksVisible={checksVisible}
+            onToggleChecks={toggleChecks}
+            checklistOpen={checklistOpen}
+            onToggleChecklist={toggleChecklist}
           />
         ) : null}
 
@@ -578,7 +757,7 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           </div>
         ) : null}
 
-        <div className="rsm-canvas">
+        <div ref={canvasRef} className="rsm-canvas">
           {vm.status === 'loading' ? <div className="rsm-overlay">圖表渲染中…</div> : null}
           {vm.status === 'error' ? (
             <div className="rsm-overlay rsm-error">圖表載入失敗：{vm.error}</div>
@@ -595,6 +774,30 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
             </button>
           ) : null}
           <div ref={vm.stageRef} className="rsm-stage" />
+
+          {activeGroup && checksVisible ? (
+            <CheckPopover
+              group={activeGroup}
+              anchor={anchor}
+              elk={elk}
+              onResolveElkLink={onResolveElkLink}
+              onClose={closeCheck}
+            />
+          ) : null}
+
+          {checklistOpen ? (
+            <CheckList
+              groups={vm.checkGroups}
+              activeKey={activeGroup?.key}
+              elk={elk}
+              onResolveElkLink={onResolveElkLink}
+              onSelect={(group) => {
+                vm.panToCheck(group);
+                setActiveGroup(null);
+              }}
+              onClose={() => setChecklistOpen(false)}
+            />
+          ) : null}
         </div>
       </div>
     );

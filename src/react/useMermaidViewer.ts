@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type {
+  DiagramCheck,
   ExportRasterOptions,
   MermaidSource,
   MermaidTheme,
@@ -16,6 +17,12 @@ import { applyPostProcess, mountSvg, renderToSvg } from '../core/render-pipeline
 import { resolveTheme } from '../core/resolve-theme';
 import { attachPanZoom, type PanZoomController } from '../core/pan-zoom';
 import { createSearch, type SearchController } from '../core/search';
+import { mergeChecks, parseChecks } from '../core/checks/parse';
+import {
+  annotateChecks,
+  type ChecksController,
+  type ResolvedCheckGroup,
+} from '../core/checks/annotate';
 import {
   downloadBlob,
   prepareSvgElement,
@@ -38,6 +45,14 @@ export interface UseMermaidViewerOptions {
   panZoom: boolean;
   touchGestures: boolean;
   injectStyles: boolean;
+  /** host 傳入的檢查提示(與原始碼解析結果合併,同 target 覆寫)。 */
+  checks?: DiagramCheck[];
+  /** 是否解析原始碼中的 `%% @check` 指令,預設 true。 */
+  checksFromSource?: boolean;
+  /** 角標初始是否顯示。 */
+  checksVisible?: boolean;
+  /** 點擊角標時觸發(host 用來開跳窗)。 */
+  onCheckActivate?: (group: ResolvedCheckGroup) => void;
   onRender?: (svg: SVGSVGElement) => void;
   onError?: (err: Error) => void;
 }
@@ -62,6 +77,14 @@ export interface UseMermaidViewerResult {
   downloadSvg: (filename?: string) => void;
   downloadPng: (filename?: string, opts?: ExportRasterOptions) => Promise<void>;
   getSvg: () => SVGSVGElement | null;
+  /** 本次渲染成功掛上的提示群組(每次重繪後會換新物件)。 */
+  checkGroups: ResolvedCheckGroup[];
+  /** 合併後的提示清單(含未能在圖上定位的)。 */
+  checks: DiagramCheck[];
+  /** 高亮某個提示節點;undefined = 清除。 */
+  focusCheck: (key: string | undefined) => void;
+  /** 把圖平移到某個提示節點並高亮。 */
+  panToCheck: (group: ResolvedCheckGroup) => void;
 }
 
 export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewerResult {
@@ -77,6 +100,10 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     panZoom,
     touchGestures,
     injectStyles,
+    checks: checksProp,
+    checksFromSource = true,
+    checksVisible = true,
+    onCheckActivate,
     onRender,
     onError,
   } = opts;
@@ -84,11 +111,29 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
   const [status, setStatus] = useState<RenderStatus>('loading');
   const [error, setError] = useState('');
   const [zoomPercent, setZoomPercent] = useState(100);
+  const [checkGroups, setCheckGroups] = useState<ResolvedCheckGroup[]>([]);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const pzRef = useRef<PanZoomController | null>(null);
   const prevCodeRef = useRef<string | null>(null);
+  const checksRef = useRef<ChecksController | null>(null);
+
+  // 提示解析只跟原始碼有關,memo 起來避免每次 render 重跑正則。
+  const sourceChecks = useMemo(
+    () => (checksFromSource ? parseChecks(code) : []),
+    [code, checksFromSource],
+  );
+  const checks = useMemo(
+    () => mergeChecks(sourceChecks, checksProp),
+    [sourceChecks, checksProp],
+  );
+
+  // 這兩個值在 async 渲染流程中被讀取,放 ref 避免列進 effect 依賴而造成整張圖重繪。
+  const checksVisibleRef = useRef(checksVisible);
+  checksVisibleRef.current = checksVisible;
+  const onCheckActivateRef = useRef(onCheckActivate);
+  onCheckActivateRef.current = onCheckActivate;
 
   // 把易變的設定放進 ref,讓 async loader / 匯出讀到最新值而不必列為 effect 依賴。
   const mermaidSourceRef = useRef<MermaidSource | undefined>(mermaid);
@@ -99,9 +144,11 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     fontUrl?: string;
     mermaidConfig?: Record<string, unknown>;
     code: string;
-  }>({ theme, dark, seed, fontUrl, mermaidConfig, code });
+    checks: DiagramCheck[];
+    checksVisible: boolean;
+  }>({ theme, dark, seed, fontUrl, mermaidConfig, code, checks: [], checksVisible: true });
   mermaidSourceRef.current = mermaid;
-  cfgRef.current = { theme, dark, seed, fontUrl, mermaidConfig, code };
+  cfgRef.current = { theme, dark, seed, fontUrl, mermaidConfig, code, checks, checksVisible };
 
   const getSvg = useCallback(() => svgRef.current, []);
 
@@ -140,7 +187,7 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
       setError('');
       try {
         const mermaidInst = await loadMermaid({ source: mermaidSourceRef.current });
-        const { svgString, postProcess } = await renderToSvg({
+        const { svgString, postProcess, id: renderId } = await renderToSvg({
           code,
           theme,
           dark,
@@ -156,12 +203,27 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
         const prevView = keepView ? (pzRef.current?.capture() ?? null) : null;
         pzRef.current?.destroy();
         pzRef.current = null;
+        checksRef.current?.destroy();
+        checksRef.current = null;
 
         const svg = mountSvg(host, svgString, postProcess, { dark, seed });
         if (!svg) {
           throw new Error('mermaid 未輸出 SVG。');
         }
         svgRef.current = svg;
+
+        // 注意順序:必須在 mountSvg(內含 applyPostProcess)之後才掛角標 ——
+        // colorize 會重刷節點樣式,先掛會被洗掉。
+        if (checks.length > 0) {
+          checksRef.current = annotateChecks(svg, checks, {
+            renderId,
+            visible: checksVisibleRef.current,
+            onActivate: (group) => onCheckActivateRef.current?.(group),
+          });
+          setCheckGroups(checksRef.current.groups);
+        } else {
+          setCheckGroups([]);
+        }
 
         if (panZoom) {
           const factory = await loadSvgPanZoom(svgPanZoom);
@@ -201,13 +263,31 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, theme, dark, seed, fontUrl, mermaidConfigKey, panZoom, touchGestures, injectStyles]);
+  }, [
+    code,
+    theme,
+    dark,
+    seed,
+    fontUrl,
+    mermaidConfigKey,
+    panZoom,
+    touchGestures,
+    injectStyles,
+    checks,
+  ]);
 
-  // 卸載時清掉 pan-zoom 監聽。
+  // 角標顯示 / 隱藏不需要重繪整張圖,直接操作既有 controller。
+  useEffect(() => {
+    checksRef.current?.setVisible(checksVisible);
+  }, [checksVisible, checkGroups]);
+
+  // 卸載時清掉 pan-zoom 與角標監聽。
   useEffect(() => {
     return () => {
       pzRef.current?.destroy();
       pzRef.current = null;
+      checksRef.current?.destroy();
+      checksRef.current = null;
     };
   }, []);
 
@@ -217,6 +297,15 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
   const reset = useCallback(() => pzRef.current?.reset(), []);
   const actualSize = useCallback(() => pzRef.current?.actualSize(), []);
   const getZoomPercent = useCallback(() => pzRef.current?.getZoomPercent() ?? 100, []);
+
+  const focusCheck = useCallback((key: string | undefined) => {
+    checksRef.current?.focus(key);
+  }, []);
+
+  const panToCheck = useCallback((group: ResolvedCheckGroup) => {
+    pzRef.current?.panToElement(group.node);
+    checksRef.current?.focus(group.key);
+  }, []);
 
   const search = useCallback(
     (term: string, pan = true) => searchController.search(term, pan),
@@ -246,7 +335,7 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     let prepared = serializeLiveSvg(svg);
     try {
       const mermaidInst = await loadMermaid({ source: mermaidSourceRef.current });
-      const { svgString } = await renderToSvg({
+      const { svgString, id: renderId } = await renderToSvg({
         code: cfg.code,
         theme: cfg.theme,
         dark: cfg.dark,
@@ -264,6 +353,17 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
           dark: cfg.dark,
           seed: cfg.seed,
         });
+        // 這是獨立重繪的乾淨 SVG,沒有現場那份的角標 —— 要補掛,否則 PNG 會漏掉提示。
+        // (需暫時掛進文件,getBBox 在 detached 節點上量不到尺寸。)
+        if (cfgRef.current.checks.length > 0 && cfgRef.current.checksVisible) {
+          holder.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;';
+          document.body.appendChild(holder);
+          try {
+            annotateChecks(pristineSvg, cfgRef.current.checks, { renderId });
+          } finally {
+            holder.remove();
+          }
+        }
         prepared = prepareSvgElement(pristineSvg);
       }
     } catch {
@@ -307,5 +407,9 @@ export function useMermaidViewer(opts: UseMermaidViewerOptions): UseMermaidViewe
     downloadSvg,
     downloadPng,
     getSvg,
+    checkGroups,
+    checks,
+    focusCheck,
+    panToCheck,
   };
 }

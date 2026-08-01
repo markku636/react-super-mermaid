@@ -14,7 +14,19 @@ Key facts:
 - `MermaidViewer` — full viewer with toolbar (theme picker, search, zoom, export, fullscreen, background). Props: `code` (required string), `theme`, `dark`, `toolbar`, `panZoom`, `touchGestures` (pinch-to-zoom + drag-to-pan on touch screens, default true, needs `panZoom`), `search`, `exportable`, `background` (show the background picker), `pattern` (`none|dots|grid`, default `dots`), `solidColor` (`string|null`; canvas surface color, `null` = transparent/follow page), `fullscreen`, `onFullscreenChange`, `keyboard`, `seed`, `fontUrl`, `mermaid` (`{instance?,cdnUrl?}`), `svgPanZoom`, `mermaidConfig`, `injectStyles`, `className`, `style`, `onRender`, `onError`. The background picker = preset surface swatches + a custom color well + an independent none/dots/grid pattern toggle (`BACKGROUND_PRESETS` / `PATTERN_OPTIONS` are exported).
 - `MermaidDiagram` — diagram only (equivalent to `<MermaidViewer toolbar={false} />`).
 - `useMermaidViewer` — hook backing the components for custom UIs.
-- Imperative ref handle (`MermaidViewerHandle`): `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setPattern / cyclePattern / getPattern / setSolidColor / getSolidColor`.
+- Imperative ref handle (`MermaidViewerHandle`): `zoomIn / zoomOut / fit / reset / actualSize / getZoomPercent / search / next / prev / clearSearch / exportSvg / exportPng / downloadSvg / downloadPng / getSvg / enterFullscreen / exitFullscreen / toggleFullscreen / isFullscreen / setPattern / cyclePattern / getPattern / setSolidColor / getSolidColor / getChecks / showChecks / focusCheck / openChecklist / closeChecklist`.
+- `CheckCard` / `CheckPopover` / `CheckList` — the check-hint UI pieces, exported for custom layouts.
+
+## Check hints (`%% @check`)
+
+Attach "how do I diagnose this step?" notes to diagram nodes — severity badge on the node, a card with ordered steps, copyable SQL/KQL snippets, links, and a Kibana Discover URL.
+
+- Authored **inside the mermaid source** so an LLM-generated diagram carries its own runbook in one fenced block; directives are stripped before mermaid parses the source. Props (`checks`) are the alternative/override channel — same `target` means the prop wins.
+- Syntax: `%% @check <target> [title]` opens a block; following `%% key: value` lines are its fields, ending at the next `%% @check` or a non-comment line. `key: |` starts a YAML-style block scalar for multi-line values (SQL). Reserved keys are `severity` (info/warn/error), `desc`, `steps`, `link` (`label | url`, repeatable), `match` (id/label), `elk` (KQL); **every other key becomes a copyable snippet whose language is the key name** (`sql:`, `kql:`, `sh:`…), so new snippet types need no parser change.
+- `target` matches the author-written node id; quote it to match on label text instead. Multiple checks can share a target — the badge shows a count.
+- Badges are SVG elements parented to their node, so they pan/zoom with the diagram and survive SVG **and** PNG export (styles are injected into the SVG, not only the page stylesheet).
+- ELK links: declarative `elk={{ kibanaHost, dataViewId, timeFrom, timeTo }}` uses the built-in builder (no backend); `onResolveElkLink` overrides it for hosts that must resolve a data view server-side. Neither configured → the button degrades to "copy KQL" instead of a dead link.
+- Toolbar gets a badge toggle + check-list drawer; `h` / `c` shortcuts. With zero checks the whole feature stays hidden.
 
 ## Framework-agnostic core API
 
@@ -23,6 +35,10 @@ Key facts:
 - `colorizeDiagram(svgOrRoot, { dark })` — apply the `colorful` post-process (palette + shadows + per-type colouring for flowchart / sequence / class / state / ER / pie / gantt / mindmap / timeline / journey).
 - `boostLegibility(svgOrRoot)` — bump label font-weight for crisp text in every theme (weight-only, never changes colours). Applied automatically by the viewer.
 - `sketchifyDiagram(svgOrRoot, { dark, seed })` — apply the Excalidraw hand-drawn post-process (sequence diagrams especially).
+- `parseChecks(code)` / `stripCheckDirectives(code)` / `mergeChecks(base, overrides)` — the `%% @check` directive parser.
+- `annotateChecks(svg, checks, { renderId, onActivate, visible })` — inject severity badges into a rendered SVG; returns a controller (`groups`, `unresolved`, `setVisible`, `focus`, `destroy`).
+- `buildKibanaDiscoverUrl({ kibanaHost, dataViewId, kql, timeFrom, timeTo, columns })` — pure rison → Discover URL builder (no network). `elkLinkFromConfig(query, config)` applies a viewer's `elk` config to one check.
+- `findDiagramNode(svg, target, { renderId, match })` / `authorIdFromDomId(domId, renderId)` / `nodeLabelText(el)` — map an author-written node id back to its rendered SVG element.
 - `resolveTheme(theme, dark)`, `ensureStyles()`, `loadSvgPanZoom()`, and export helpers (`serializeLiveSvg`, `prepareSvgString`, `prepareSvgElement`, `rasterizeToBlob`, `svgBlob`, `downloadBlob`).
 
 ## Styling
@@ -32,7 +48,7 @@ Key facts:
 
 ## Keyboard shortcuts
 
-Focus the viewer: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` fullscreen · `b` cycle background pattern (none / dots / grid) · `Esc` close search / exit fullscreen. Touch: pinch to zoom, two-finger drag to pan (inline a single finger scrolls the page; fullscreen a single finger pans).
+Focus the viewer: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` fullscreen · `b` cycle background pattern (none / dots / grid) · `h` toggle check badges · `c` toggle the check list · `Esc` closes the topmost layer (hint card → check list → search → fullscreen). Touch: pinch to zoom, two-finger drag to pan (inline a single finger scrolls the page; fullscreen a single finger pans).
 
 ## Links
 

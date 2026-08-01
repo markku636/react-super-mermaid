@@ -7,6 +7,13 @@ export type { MermaidViewerProps, MermaidViewerHandle } from './react/MermaidVie
 export { MermaidDiagram } from './react/MermaidDiagram';
 export { Toolbar, DEFAULT_THEME_OPTIONS, BACKGROUND_PRESETS, PATTERN_OPTIONS } from './react/Toolbar';
 export type { ToolbarProps, ThemeOption } from './react/Toolbar';
+export { CheckCard, CheckList, CheckPopover } from './react/CheckPanel';
+export type {
+  CheckCardProps,
+  CheckListProps,
+  CheckPopoverProps,
+  CheckResolveElkLink,
+} from './react/CheckPanel';
 export { useMermaidViewer } from './react/useMermaidViewer';
 export type {
   UseMermaidViewerOptions,
@@ -64,6 +71,19 @@ export {
   type PreparedSvg,
 } from './core/export';
 
+// ── 檢查提示(checks)的框架無關工具 ──
+export { parseChecks, stripCheckDirectives, mergeChecks } from './core/checks/parse';
+export { annotateChecks } from './core/checks/annotate';
+export type {
+  AnnotateOptions,
+  ChecksController,
+  ResolvedCheckGroup,
+} from './core/checks/annotate';
+export { buildKibanaDiscoverUrl, elkLinkFromConfig } from './core/checks/kibana';
+export type { KibanaDiscoverUrlInput } from './core/checks/kibana';
+export { authorIdFromDomId, findDiagramNode, nodeLabelText } from './core/node-index';
+export type { FindNodeOptions } from './core/node-index';
+
 // ── 型別 ──
 export type {
   MermaidTheme,
@@ -80,4 +100,10 @@ export type {
   SearchState,
   RsmPattern,
   RsmBackgroundPreset,
+  DiagramCheck,
+  CheckSeverity,
+  CheckSnippet,
+  CheckLink,
+  CheckElkQuery,
+  ElkLinkConfig,
 } from './types';

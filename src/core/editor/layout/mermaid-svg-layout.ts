@@ -3,24 +3,13 @@
 
 import { assertBrowser } from '../../../env';
 import { loadMermaid } from '../../load-mermaid';
+import { authorIdFromDomId } from '../../node-index';
 import { renderToSvg } from '../../render-pipeline';
 import { boundingBox, type Rect } from '../scene/geometry';
 import type { EditorScene, SceneNode } from '../scene/types';
 import type { LayoutContext, LayoutEngine } from './types';
 
-// mermaid 11 的 flowchart 節點 DOM id 形如 `<renderId>-flowchart-<作者id>-<n>`
-// (例:rsm-1-flowchart-A-0)。先剝掉已知的 renderId 前綴,再用 `<型別>-<作者id>-<n>`
-// 取出作者 id(作者 id 可含連字號,故用貪婪 (.+) 搭配尾端 -<數字>)。
-const NODE_ID_RE = /^[A-Za-z][\w]*-(.+)-\d+$/;
-
 const PADDING = 40;
-
-function authorIdFromDomId(domId: string, renderId: string): string | undefined {
-  const prefix = `${renderId}-`;
-  const rest = domId.startsWith(prefix) ? domId.slice(prefix.length) : domId;
-  const m = rest.match(NODE_ID_RE);
-  return m ? m[1] : undefined;
-}
 
 /** 取元素在 SVG root 座標系中的中心點與尺寸(假設無縮放,mermaid useMaxWidth:false 成立)。 */
 function readBox(g: SVGGraphicsElement): { cx: number; cy: number; w: number; h: number } | null {

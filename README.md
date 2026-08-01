@@ -183,6 +183,7 @@ gitGraph
 - 🎨 **Beautified themes** — `colorful` (palette + shadows) and `sketch` (Excalidraw hand-drawn), plus native themes and `auto`.
 - 🧰 **Toolbox or diagram-only** — show the built-in toolbar, or just the chart with `toolbar={false}`.
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).
+- 🩺 **Inline check hints** — attach "how do I diagnose this step?" notes to nodes: severity badges, click-to-open cards with ordered steps, copyable SQL/KQL snippets, links, and a generated Kibana Discover URL. Authored **inside the mermaid source** with `%% @check`, so an AI-generated diagram carries its own runbook.
 - 🖐️ **Pan & zoom** — fit, actual size, keyboard `+ - 0 1 w`, mouse wheel, and **touch gestures** (pinch-to-zoom + drag-to-pan) via `svg-pan-zoom`.
 - ⛶ **Fullscreen modal** — open the diagram in a viewport-filling, RWD-friendly popup (`f` / `Esc`); body scroll locked, auto re-fit.
 - ▦ **Background picker** — a swatch popover to set the canvas **surface** (preset colors + a custom color well) and an independent **pattern** (none / dots / grid lines, cycle with `b`). Surface + pattern combine freely and carry through to exports.
@@ -280,6 +281,12 @@ Resolution order is **injected → peer import → CDN**, memoized so mermaid lo
 | `svgPanZoom` | `{ instance?, cdnUrl? }` | — | how to obtain svg-pan-zoom |
 | `mermaidConfig` | `object` | — | passthrough to `mermaid.initialize` |
 | `injectStyles` | `boolean` | `true` | inject the package's CSS once |
+| `checks` | `DiagramCheck[]` | — | programmatic check hints; merged with `%% @check` (same `target` → this wins) |
+| `checksFromSource` | `boolean` | `true` | parse `%% @check` directives out of `code` |
+| `defaultChecksVisible` | `boolean` | `true` | show badges initially (toolbar / `h` toggles) |
+| `onCheckSelect` | `(check) => void` | — | fired when a hint card is opened |
+| `elk` | `{ kibanaHost, dataViewId, timeFrom?, timeTo?, columns? }` | — | built-in Kibana Discover link builder |
+| `onResolveElkLink` | `(check) => string \| Promise<string \| null>` | — | override link generation (e.g. resolve the data view server-side) |
 | `className` / `style` | — | — | on the root element |
 | `onRender` | `(svg) => void` | — | after each successful render |
 | `onError` | `(err) => void` | — | render/export errors |
@@ -298,6 +305,7 @@ const ref = useRef<MermaidViewerHandle>(null);
 ref.current?.zoomIn();
 ref.current?.fit();
 ref.current?.search('Bob');
+ref.current?.focusCheck('A'); // pan to the node carrying that check + highlight it
 await ref.current?.downloadPng('diagram.png', { scale: 4 });
 const svgString = ref.current?.exportSvg();
 ```
@@ -326,9 +334,100 @@ Styles are injected automatically (`injectStyles` default `true`) — no CSS imp
 }
 ```
 
+## Check hints — "how do I diagnose this step?"
+
+A troubleshooting flowchart tells you *where* things break but not *how to check*. Check hints pin that
+second half onto the nodes: a severity badge in the corner, a card with ordered steps, copyable SQL / KQL,
+reference links, and a one-click Kibana Discover URL.
+
+### Authoring inside the mermaid source (recommended)
+
+Write `%% @check` directives in the diagram itself. The whole runbook then travels in a single ```mermaid
+fence — which matters when an LLM generates the diagram at runtime and there's no place to attach a
+side-channel JSON payload. The directives are stripped before mermaid ever sees the source.
+
+````markdown
+```mermaid
+flowchart TD
+  A[Create deposit order] --> B{Call gateway}
+  B -->|failed| C[Mark failed]
+
+%% @check A Order never made it to the gateway
+%% severity: error
+%% desc: No DepositInfo row means we failed before the outbound call.
+%% steps:
+%%   Check DepositInfo for the TransId
+%%   If missing, check the app log for a validation rejection
+%% sql: |
+%%   SELECT * FROM DepositInfo
+%%   WHERE TransId = '{TransId}';
+%% elk: Properties.TransId : "{TransId}" and level : "Error"
+%% link: Runbook | https://wiki.example.com/deposit-runbook
+```
+````
+
+**Syntax**
+
+- `%% @check <target> [title…]` opens a block; following `%% key: value` lines belong to it, until the next
+  `%% @check` or a non-comment line.
+- `key: |` starts a block scalar — indented continuation lines become a multi-line value (use it for SQL).
+- `steps:` with no value works the same way, one step per indented line.
+- **Reserved keys**: `severity` (`info` / `warn` / `error`), `desc`, `steps`, `link` (`label | url`, repeatable),
+  `match` (`id` / `label`), `elk` (KQL).
+- **Any other key becomes a copyable snippet, and the key name is its language** — `sql:`, `kql:`, `sh:`,
+  `json:` all work with no parser change.
+- `target` matches the author-written node id. Quote it (`%% @check "Create deposit order"`) to match on the
+  node's label text instead.
+- Omit the title and the node's own label is used. Several checks may share one target — the badge then shows
+  a count and the card lists them all.
+
+### Authoring from props
+
+```tsx
+<MermaidViewer
+  code={code}
+  checks={[
+    {
+      target: 'A',
+      severity: 'error',
+      title: 'Order never made it to the gateway',
+      steps: ['Check DepositInfo for the TransId'],
+      snippets: [{ lang: 'sql', code: "SELECT * FROM DepositInfo WHERE TransId = '{TransId}';" }],
+      links: [{ label: 'Runbook', url: 'https://wiki.example.com/deposit-runbook' }],
+      elk: { kql: 'Properties.TransId : "{TransId}"' },
+    },
+  ]}
+/>
+```
+
+Both sources are merged; a prop check replaces the source checks that share its `target`.
+
+### Kibana Discover links
+
+An `elk` query renders an "open Kibana" button. Two ways to turn it into a URL:
+
+```tsx
+// 1. Declarative — you already know the data view UUID, no backend needed.
+<MermaidViewer code={code} elk={{ kibanaHost: 'https://kibana.example.com', dataViewId: '…', timeFrom: 'now-24h' }} />
+
+// 2. Callback — resolve it yourself (e.g. hit your API to look the data view up by index name).
+<MermaidViewer code={code} onResolveElkLink={async (check) => (await api.kibanaLink(check.elk.kql)).url} />
+```
+
+With neither configured the button degrades to "copy the KQL" rather than rendering a dead link. The URL
+builder is also exported on its own: `buildKibanaDiscoverUrl({ kibanaHost, dataViewId, kql, timeFrom, timeTo })`.
+
+### Notes
+
+- Badges are real SVG elements parented to their node, so they pan/zoom with the diagram **and are included
+  in SVG and PNG exports** (their styling is injected into the SVG, not just the page stylesheet).
+- Hovering a badge shows the check's title and description as a native tooltip (an SVG `<title>`, which
+  doubles as the badge's accessible name). Click to open the full card.
+- With zero checks the entire feature — badges, toolbar buttons, shortcuts — stays out of the way.
+
 ## Keyboard shortcuts
 
-Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` toggle fullscreen · `b` cycle background pattern (none / dots / grid) · `Esc` close search / exit fullscreen.
+Focus the viewer, then: `/` or `Ctrl/Cmd+F` search · `+`/`-` zoom · `0` fit · `1` actual size · `w` fit width · `f` toggle fullscreen · `b` cycle background pattern (none / dots / grid) · `h` toggle check badges · `c` toggle the check list · `Esc` closes the topmost layer (hint card → check list → search → fullscreen).
 
 On touch screens, **pinch** to zoom and **drag with two fingers** to pan. Inline, a single finger still scrolls the page; in fullscreen a single finger pans the diagram.
 

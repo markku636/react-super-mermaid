@@ -132,3 +132,65 @@ export interface SearchState {
   current: number;
   total: number;
 }
+
+// ── 檢查提示(checks)──
+// 把「這一步異常時怎麼查」掛回圖上的節點。來源有二:mermaid 原始碼裡的 `%% @check` 指令,
+// 以及 host 傳入的 `checks` prop(同 target 由 prop 覆寫)。
+
+/** 檢查點的嚴重度 — 決定角標與卡片的配色。 */
+export type CheckSeverity = 'info' | 'warn' | 'error';
+
+/** 一段可複製的檢查片段(SQL / KQL / 指令…)。`lang` 同時作為顯示標籤。 */
+export interface CheckSnippet {
+  /** 語言 / 類型,例 `sql`、`kql`、`sh`。來自指令的鍵名。 */
+  lang?: string;
+  /** 覆寫顯示標籤;省略時顯示 `lang`。 */
+  label?: string;
+  code: string;
+}
+
+/** 外部參考連結(Runbook / Jira / Confluence…)。 */
+export interface CheckLink {
+  label: string;
+  url: string;
+}
+
+/** ELK 查詢條件;`kql` 由套件內建 builder 消費,`dsl` 僅交給 host callback。 */
+export interface CheckElkQuery {
+  kql?: string;
+  /** 完整 ES DSL — 內建 builder 不處理(含 `-` 的欄位需 custom filter pill),僅供 callback 使用。 */
+  dsl?: Record<string, unknown>;
+  /** 覆寫 index / data view(交給 callback 判斷用)。 */
+  index?: string;
+  /** 覆寫按鈕文字。 */
+  label?: string;
+}
+
+/** 掛在某個圖形節點上的一則檢查提示。 */
+export interface DiagramCheck {
+  /** 對應的節點:預設比對作者 id,`match: 'label'` 時比對節點標籤文字。 */
+  target: string;
+  match?: 'id' | 'label';
+  /** 省略時渲染期以節點自身的標籤文字遞補。 */
+  title?: string;
+  severity?: CheckSeverity;
+  desc?: string;
+  /** 逐步檢查步驟(有序)。 */
+  steps?: string[];
+  snippets?: CheckSnippet[];
+  links?: CheckLink[];
+  elk?: CheckElkQuery;
+}
+
+/** 內建 Kibana Discover 連結設定;host 已知 data view UUID 時可免後端直接產連結。 */
+export interface ElkLinkConfig {
+  /** Kibana 站台網址,例 `https://kibana.example.com`。 */
+  kibanaHost: string;
+  /** data view(index pattern)的 UUID。 */
+  dataViewId: string;
+  /** 時間範圍,支援絕對 ISO 或相對值(`now-24h`)。預設 `now-24h` → `now`。 */
+  timeFrom?: string;
+  timeTo?: string;
+  /** Discover 預設顯示欄位。 */
+  columns?: string[];
+}
