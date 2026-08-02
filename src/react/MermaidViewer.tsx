@@ -30,6 +30,11 @@ export interface MermaidViewerProps {
   toolbar?: boolean;
   /** 自訂 toolbar 上的主題選項。 */
   themeOptions?: ThemeOption[];
+  /**
+   * 使用者在 toolbar 切換主題時通知 host。內建主題選單仍是唯一的主題 UI,
+   * host 只是「跟著知道」——例如要把主題寫回網址 / 存成偏好設定時用。
+   */
+  onThemeChange?: (theme: MermaidTheme) => void;
   /** 是否啟用 pan/zoom。預設 true。 */
   panZoom?: boolean;
   /** 是否啟用觸控手勢(雙指捏合縮放 + 拖曳平移)。需 panZoom=true。預設 true。 */
@@ -719,7 +724,10 @@ export const MermaidViewer = forwardRef<MermaidViewerHandle, MermaidViewerProps>
           <Toolbar
             theme={theme}
             themeOptions={themeOptions}
-            onThemeChange={setTheme}
+            onThemeChange={(t) => {
+              setTheme(t);
+              props.onThemeChange?.(t);
+            }}
             zoomPercent={vm.zoomPercent}
             onZoomIn={vm.zoomIn}
             onZoomOut={vm.zoomOut}

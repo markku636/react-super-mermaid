@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.2 — `onThemeChange`
+
+- **Feature**: `MermaidViewer` accepts `onThemeChange` — fires when the user picks a theme in
+  the built-in toolbar. The toolbar stays the only theme UI; the host just gets to know, which
+  is what a page needs in order to persist the choice (into a URL, a settings store, …) without
+  building a duplicate theme selector next to the diagram.
+
 ## 0.8.1 — close button on the editor's source panel
 
 - **Feature**: the built-in Mermaid source panel gets a `✕` next to `複製`. Closing it used to
