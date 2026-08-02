@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1 — close button on the editor's source panel
+
+- **Feature**: the built-in Mermaid source panel gets a `✕` next to `複製`. Closing it used to
+  mean going back up to the toolbar and finding the `</> 原始碼` toggle again; the panel now
+  carries its own exit. It writes the same state the toolbar reads, so the toggle's pressed
+  state stays in sync.
+
 ## 0.8.0 — node hover tips (`%% @tip`)
 
 - **Feature**: rest the mouse on a node and a themed HTML tooltip appears — the one-liner

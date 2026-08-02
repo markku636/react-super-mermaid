@@ -133,6 +133,17 @@ export const MermaidEditor = forwardRef<MermaidEditorHandle, MermaidEditorProps>
                   <button type="button" className="rsm-btn" onClick={copySource}>
                     {copied ? '✓ 已複製' : '複製'}
                   </button>
+                  {/* 關掉面板的最短路徑。工具列的「</> 原始碼」讀同一個 state,
+                      按這裡它會一起退出 pressed 狀態。 */}
+                  <button
+                    type="button"
+                    className="rsm-btn"
+                    onClick={() => setShowSource(false)}
+                    title="關閉原始碼面板"
+                    aria-label="關閉原始碼面板"
+                  >
+                    ✕
+                  </button>
                 </span>
               </div>
               <textarea
