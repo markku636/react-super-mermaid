@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.4 — sequence editor: draggable bottom row, colored lifelines, discoverable hint
+
+- **Fix**: the bottom (duplicate) participant box in a sequence diagram had no `data-node-id`,
+  so dragging it fell through to the canvas and panned the whole view instead of reordering the
+  column. Both the top and bottom boxes now share the same id and register the drag.
+- **Feature**: lifelines are tinted to match each participant's own palette color (with reduced
+  opacity) instead of one flat gray line for every column — sequence diagrams were the only
+  diagram type in the editor with no per-node color variation.
+- **Fix**: the toolbar hint only mentioned "right-click empty space to add a participant /
+  message" — reordering by dragging a participant existed but wasn't advertised anywhere, so it
+  went undiscovered. Now reads "Drag a participant to reorder · right-click empty space to add a
+  participant / message."
+
 ## 0.8.2 — `onThemeChange`
 
 - **Feature**: `MermaidViewer` accepts `onThemeChange` — fires when the user picks a theme in

@@ -434,11 +434,12 @@ export class SceneRenderer {
       y1: number,
       x2: number,
       y2: number,
-      o: { dash?: boolean; w?: number; marker?: boolean } = {},
+      o: { dash?: boolean; w?: number; marker?: boolean; stroke?: string; opacity?: number } = {},
     ): SVGPathElement => {
-      const p = svgEl('path', { d: `M${x1},${y1} L${x2},${y2}`, fill: 'none', stroke: ink, 'stroke-width': o.w ?? 1.6 });
+      const p = svgEl('path', { d: `M${x1},${y1} L${x2},${y2}`, fill: 'none', stroke: o.stroke ?? ink, 'stroke-width': o.w ?? 1.6 });
       p.setAttribute('vector-effect', 'non-scaling-stroke');
       if (o.dash) p.setAttribute('stroke-dasharray', '5 4');
+      if (o.opacity != null) p.style.opacity = String(o.opacity);
       const mk = markerIdFor('arrow', this.dark);
       if (o.marker && mk) p.setAttribute('marker-end', `url(#${mk})`);
       p.style.pointerEvents = 'none';
@@ -465,8 +466,10 @@ export class SceneRenderer {
       }
     }
 
-    // 生命線
-    for (const c of cols) g.appendChild(line(c.cx, HEAD_Y + HEAD_H, c.cx, bottomY, { dash: true, w: 1 }));
+    // 生命線:淡色比照該欄參與者的色票(而非整張圖同一種灰),弱化「一排黑虛線」的呆板感。
+    cols.forEach((c, i) => {
+      g.appendChild(line(c.cx, HEAD_Y + HEAD_H, c.cx, bottomY, { dash: true, w: 1, stroke: paletteByIndex(i).stroke, opacity: 0.55 }));
+    });
 
     // 啟用區(activation bars):依訊息 +/- 簡寫配對,在生命線上畫窄矩形。
     const actStack = new Map<string, number[]>();
@@ -562,23 +565,31 @@ export class SceneRenderer {
       }
     }
 
-    // 參與者方框:頂端(帶 data-node-id 供選取 / 雙擊改名)+ 底端(裝飾)。
-    // clean 風套用與一般節點相同的柔和陰影,視覺一致。
+    // 參與者方框:頂端 + 底端「都」帶 data-node-id(同一個 id)供選取 / 拖曳換序 / 雙擊改名 ——
+    // 兩者缺一都會讓使用者在其中一顆框上拖曳時穿透命中背景,onPointerDown 落入「空白處」
+    // 分支變成平移整張畫布,體感就是「拖了但沒反應,而且畫面還亂飄」。
+    // 左右拖曳換序、cursor 用 ew-resize 明講「只能左右」,不是通用的 move。
+    // 配色比照 flowchart 節點依序取 paletteByIndex(彩色卡片),不再全部同一片 fillBox ——
+    // 之前參與者一律灰白,是這個編輯器裡唯一沒有色彩變化的圖種,跟其它圖種的觀感不一致。
+    // 文字固定用 INK(深色),因為色票 fill 一律是淺色,不必再分深色模式。
     const shadow = this.look === 'clean' ? `url(#${NODE_SHADOW_ID})` : '';
-    const txt = this.dark ? '#e9ecef' : '#1f2937';
-    for (const c of cols) {
+    cols.forEach((c, i) => {
+      const pal = paletteByIndex(i);
       const top = svgEl('g', { 'data-node-id': c.id, class: 'rsm-node' });
-      const tb = svgEl('rect', { x: c.x, y: c.y, width: c.w, height: c.h, rx: c.actor ? 16 : 6, fill: fillBox, stroke: ink, 'stroke-width': 1.5 });
+      const tb = svgEl('rect', { x: c.x, y: c.y, width: c.w, height: c.h, rx: c.actor ? 16 : 6, fill: pal.fill, stroke: pal.stroke, 'stroke-width': 1.5 });
       if (shadow) tb.style.filter = shadow;
+      tb.style.cursor = 'ew-resize';
       top.appendChild(tb);
-      top.appendChild(this.seqText(c.cx, c.y + c.h / 2 + 1, c.label, txt, 13, 700, 'middle'));
+      top.appendChild(this.seqText(c.cx, c.y + c.h / 2 + 1, c.label, INK, 13, 700, 'middle'));
       g.appendChild(top);
-      const bb = svgEl('rect', { x: c.x, y: bottomY + 4, width: c.w, height: HEAD_H, rx: c.actor ? 16 : 6, fill: fillBox, stroke: ink, 'stroke-width': 1.5 });
+      const bottom = svgEl('g', { 'data-node-id': c.id, class: 'rsm-node' });
+      const bb = svgEl('rect', { x: c.x, y: bottomY + 4, width: c.w, height: HEAD_H, rx: c.actor ? 16 : 6, fill: pal.fill, stroke: pal.stroke, 'stroke-width': 1.5 });
       if (shadow) bb.style.filter = shadow;
-      bb.style.pointerEvents = 'none';
-      g.appendChild(bb);
-      g.appendChild(this.seqText(c.cx, bottomY + 4 + HEAD_H / 2 + 1, c.label, txt, 13, 700, 'middle'));
-    }
+      bb.style.cursor = 'ew-resize';
+      bottom.appendChild(bb);
+      bottom.appendChild(this.seqText(c.cx, bottomY + 4 + HEAD_H / 2 + 1, c.label, INK, 13, 700, 'middle'));
+      g.appendChild(bottom);
+    });
 
     // 整張 sequence 的世界範圍(含底部參與者框 + 片段框左緣),供 fit 用。
     const minX = Math.min(10, cols[0]?.x ?? 40);

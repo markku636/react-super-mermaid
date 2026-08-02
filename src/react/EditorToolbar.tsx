@@ -229,7 +229,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
         </select>
       )}
 
-      {isSeq && <span className="rsm-tb-hint">右鍵空白處：新增參與者 / 訊息</span>}
+      {isSeq && (
+        <span className="rsm-tb-hint">拖曳參與者可重新排序 · 右鍵空白處：新增參與者 / 訊息</span>
+      )}
 
       {/* 連線樣式:線型 + 箭頭。作用於選取的連線;未選取時設為「新連線」的預設。 */}
       {(showLineKinds || showArrowEnd) && <span className="rsm-tb-sep" aria-hidden="true" />}
