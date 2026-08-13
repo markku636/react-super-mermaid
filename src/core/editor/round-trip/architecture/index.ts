@@ -13,8 +13,8 @@ import type { ParseResult, ParseWarning } from '../../adapters/types';
 import type { DataLossWarning, SerializeResult } from '../../adapters/types';
 import type { EditorScene, SceneContainer, SceneEdge, SceneNode } from '../../scene/types';
 
-const NODE_W = 132;
-const NODE_H = 96;
+const NODE_W = 76;
+const NODE_H = 76;
 
 const DECL_RE = /^(group|service|junction)\s+([A-Za-z0-9_-]+)\s*(?:\(([^)]*)\))?\s*(?:\[([^\]]*)\])?\s*(?:in\s+([A-Za-z0-9_-]+))?\s*$/i;
 const EDGE_RE = /^([A-Za-z0-9_-]+):([TBLR])\s*(<-->|-->|<--|--)\s*([TBLR]):([A-Za-z0-9_-]+)\s*$/;

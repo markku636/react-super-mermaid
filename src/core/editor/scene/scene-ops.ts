@@ -51,10 +51,20 @@ export function getNode(scene: EditorScene, id: string): SceneNode | undefined {
 const C_PAD = 18;
 const C_LABEL_H = 22;
 
-/** 容器(複合狀態 / subgraph)外框矩形:遞迴涵蓋子節點 + 子容器(巢狀 subgraph)+ 內距。 */
+/**
+ * 容器(複合狀態 / subgraph / 泳道)外框矩形:遞迴涵蓋子節點 + 子容器 + 內距。
+ *
+ * 這是「容器畫出來多大」的**唯一**定義 —— 渲染、符合畫面、匯出 SVG 都走這裡。
+ * 先前渲染器另外抄了一份同樣的算式,結果是任何一邊調內距,框線就會和點擊 / 裁切範圍對不上。
+ */
 export function containerRect(scene: EditorScene, id: string): Rect | null {
   const c = scene.containers.find((k) => k.id === id);
   if (!c) return null;
+  // 看板的欄與 git 線圖的分支是**固定泳道**,不是「包住小孩的框」:空的泳道也必須畫得出來
+  // (不然拖不進去),寬度也不該隨裡面幾張卡片而忽長忽短。所以直接用容器自己的幾何。
+  if (scene.diagramType === 'kanban' || scene.diagramType === 'gitgraph') {
+    return { x: c.x, y: c.y, w: c.w, h: c.h };
+  }
   const rects = c.childNodeIds
     .map((cid) => getNode(scene, cid))
     .filter((n): n is SceneNode => Boolean(n))
@@ -67,7 +77,28 @@ export function containerRect(scene: EditorScene, id: string): Rect | null {
   }
   const bb = boundingBox(rects);
   if (!bb) return null;
-  return { x: bb.x - C_PAD, y: bb.y - C_PAD - C_LABEL_H, w: bb.w + C_PAD * 2, h: bb.h + C_PAD * 2 + C_LABEL_H };
+  // architecture 的服務名稱掛在方塊**外面**下方(方塊本身要等於節點框,連線才接得上),
+  // 所以群組下緣要多讓一截,否則最底下那排名稱會壓在群組邊框上。
+  const bottom = scene.diagramType === 'architecture' ? C_PAD + 26 : C_PAD;
+  return {
+    x: bb.x - C_PAD,
+    y: bb.y - C_PAD - C_LABEL_H,
+    w: bb.w + C_PAD * 2,
+    h: bb.h + C_PAD + bottom + C_LABEL_H,
+  };
+}
+
+/**
+ * 一張圖「實際畫出來多大」:節點 + 容器框。
+ *
+ * 容器框比裡面的節點大一圈,標題還畫在框的上緣 —— 只量節點的話,「符合畫面」與匯出 SVG
+ * 都會把群組名稱、泳道欄名切在畫面外。
+ */
+export function sceneRects(scene: EditorScene): Rect[] {
+  const containerRects = scene.containers
+    .map((c) => containerRect(scene, c.id))
+    .filter((r): r is Rect => Boolean(r));
+  return [...scene.nodes.map(nodeRect), ...containerRects];
 }
 
 /**

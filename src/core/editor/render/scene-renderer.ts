@@ -5,12 +5,13 @@
 import rough from 'roughjs';
 import { ensureSketchFont } from '../../themes/sketch';
 import { boundingBox } from '../scene/geometry';
-import { moveNodes } from '../scene/scene-ops';
+import { containerRect, moveNodes } from '../scene/scene-ops';
 import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { c4Lines, requirementKind, requirementRows, textWidth } from './node-metrics';
+import { archIconGroup } from './arch-icon';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { PIE as PIE_GEO, angleOf as pieAngleOf, sliceAngles as pieSliceAngles } from '../round-trip/pie';
 import { XY as XY_PLOT, bandX as xyBandX, yToValue as xyYToValue } from '../round-trip/xychart';
@@ -1072,35 +1073,40 @@ export class SceneRenderer {
       );
       return;
     }
-    const box = 56;
-    const bx = (node.w - box) / 2;
+    // 方塊就是整個節點 —— 先前只在節點中央畫一個 56px 的小框,連線卻接在(看不見的)節點外框上,
+    // 於是每條線都停在方塊外面一段距離,看起來根本沒接上。
     g.appendChild(
       svgEl('rect', {
-        x: bx,
-        y: 4,
-        width: box,
-        height: box,
-        rx: 10,
+        x: 0,
+        y: 0,
+        width: node.w,
+        height: node.h,
+        rx: 12,
         fill: pal.fill,
         stroke: pal.stroke,
         'stroke-width': 1.6,
       }),
     );
-    // 圖示名只用一個字母代表(不內嵌 icon 套件,離線包不多背一份圖庫)。
-    const initial = (d?.icon ?? node.label ?? '?').trim().charAt(0).toUpperCase();
-    const t = svgEl('text', {
-      x: node.w / 2,
-      y: 4 + box / 2,
-      fill: pal.stroke,
-      'text-anchor': 'middle',
-      'dominant-baseline': 'central',
-      style: 'font:700 22px var(--rsm-editor-font);pointer-events:none;',
-    });
-    t.textContent = initial;
-    g.appendChild(t);
+    const iconG = archIconGroup(d?.icon, pal.stroke, node.w / 2, node.h / 2, Math.min(node.w, node.h) * 0.62);
+    if (iconG) g.appendChild(iconG);
+    else {
+      // 不認得的圖示名:退回首字母,至少看得出彼此不同。
+      const t = svgEl('text', {
+        x: node.w / 2,
+        y: node.h / 2,
+        fill: pal.stroke,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'central',
+        style: 'font:700 22px var(--rsm-editor-font);pointer-events:none;',
+      });
+      t.textContent = (d?.icon ?? node.label ?? '?').trim().charAt(0).toUpperCase();
+      g.appendChild(t);
+    }
 
-    const fo = svgEl('foreignObject', { x: 0, y: box + 8, width: node.w, height: node.h - box - 8 });
+    // 名稱掛在方塊下方(節點外),節點框才等於畫出來的方塊。
+    const fo = svgEl('foreignObject', { x: -30, y: node.h + 4, width: node.w + 60, height: 40 });
     fo.style.pointerEvents = 'none';
+    fo.style.overflow = 'visible';
     const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     div.textContent = node.label;
     div.setAttribute(
@@ -1703,30 +1709,10 @@ export class SceneRenderer {
   private renderContainers(scene: EditorScene): void {
     while (this.containersLayer.firstChild) this.containersLayer.removeChild(this.containersLayer.firstChild);
     if (scene.containers.length === 0) return;
-    const byId = new Map(scene.nodes.map((n) => [n.id, n] as const));
-    const PAD = 18;
     const LABEL_H = 22;
-    // 容器外框需「遞迴」涵蓋子節點 + 子容器(巢狀 subgraph 才會外層包住內層,而非並排)。
-    const childContainers = (cid: string) => scene.containers.filter((k) => k.parentId === cid);
-    const effRect = (c: SceneContainer): { x: number; y: number; w: number; h: number } | null => {
-      // 看板的欄是**固定泳道**,不是「包住小孩的框」:空的欄也必須畫出來(不然拖不進去),
-      // 而且欄寬不能隨卡片長短變。所以直接用容器自己的幾何。
-      // git 線圖的分支泳道同理:空分支也要看得見才拖得進去,寬度也不該隨提交多寡忽長忽短。
-      if (scene.diagramType === 'kanban' || scene.diagramType === 'gitgraph') {
-        return { x: c.x, y: c.y, w: c.w, h: c.h };
-      }
-      const rects = c.childNodeIds
-        .map((id) => byId.get(id))
-        .filter((n): n is SceneNode => Boolean(n))
-        .map((n) => ({ x: n.x, y: n.y, w: n.w, h: n.h }));
-      for (const sub of childContainers(c.id)) {
-        const sr = effRect(sub);
-        if (sr) rects.push(sr);
-      }
-      const bb = boundingBox(rects);
-      if (!bb) return null;
-      return { x: bb.x - PAD, y: bb.y - PAD - LABEL_H, w: bb.w + PAD * 2, h: bb.h + PAD * 2 + LABEL_H };
-    };
+    // 外框幾何一律問 scene-ops(連線錨點、符合畫面、匯出 SVG 都用同一個)。這裡曾經自己抄一份
+    // 同樣的算式,於是任何一邊改內距,畫出來的框就會和點擊 / 裁切範圍差一截。
+    const effRect = (c: SceneContainer) => containerRect(scene, c.id);
     let ci = 0;
     for (const c of scene.containers) {
       // 對齊 Edit Diagram:每個 subgraph 取叢集底色 + 同色標題(色相循序)。

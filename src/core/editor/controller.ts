@@ -51,7 +51,7 @@ import {
 } from './interaction/commands';
 import { NODE_PALETTE } from './render/palette';
 import { classBoxSize, erEntitySize, requirementBoxSize, requirementRows } from './render/node-metrics';
-import { containerRect, nextEdgeId, nextNodeId } from './scene/scene-ops';
+import { nextEdgeId, nextNodeId, sceneRects } from './scene/scene-ops';
 import { defaultShapeFor, makeEdgeFor, makeNodeFor } from './scene/node-factory';
 import { laneRect } from './layout/lanes';
 import { GIT_COMMIT_TYPES, gitLaneRect } from './round-trip/gitgraph';
@@ -1253,11 +1253,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     }
     // 用與 fit() 相同的內容範圍:sequence 用 renderer.getContentBounds()(節點只含頂端參與者列,
     // 用 node bbox 會把訊息 / 生命線裁掉);其餘退回節點 + 容器 bbox。
-    const containerRects = scene.containers
-      .map((c) => containerRect(scene, c.id))
-      .filter((r): r is NonNullable<typeof r> => Boolean(r));
-    const bb =
-      renderer.getContentBounds() ?? boundingBox([...scene.nodes.map(nodeRect), ...containerRects]);
+    const bb = renderer.getContentBounds() ?? boundingBox(sceneRects(scene));
     const pad = 24;
     if (bb) {
       clone.setAttribute('viewBox', `${bb.x - pad} ${bb.y - pad} ${bb.w + pad * 2} ${bb.h + pad * 2}`);
@@ -1418,7 +1414,9 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     fit: () => {
       if (formActive) return; // form 模式無畫布視窗
       // sequence:內容延伸到節點下方,用渲染器回報的整張範圍;其他圖種用節點 bbox。
-      viewport.fit(renderer.getContentBounds() ?? boundingBox(scene.nodes.map(nodeRect)));
+      // 容器也要算進來:群組 / 泳道 / subgraph 的框比裡面的節點大一圈,標題還畫在框的上緣。
+      // 只框節點的話,「符合畫面」會把 architecture 的 group 名稱、看板的欄名切在畫面外。
+      viewport.fit(renderer.getContentBounds() ?? boundingBox(sceneRects(scene)));
       refreshOverlay();
     },
     resetView: () => {

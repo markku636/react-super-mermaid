@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.23.0 — architecture diagrams get real icons, and "fit" stops cropping groups
+
+- **architecture**: services drew a 56px box in the middle of a 132px node, so every connection
+  stopped a visible distance short of the box it was meant to reach — the line was attaching to an
+  invisible node border. The drawn box **is** the node now, and the service name hangs below it.
+- **architecture**: the icon was the first letter of the icon name, so `database` and `disk` were
+  both a large "D". The five icons mermaid ships (cloud / database / disk / server / internet) are
+  now drawn as real glyphs — hand-written paths, so the offline bundle still carries no icon library.
+  An unrecognised name still falls back to its initial.
+- **Fix**: 「符合畫面」 measured **only nodes**, while SVG export measured nodes *and* containers. Any
+  diagram whose container is bigger than its contents — an architecture `group`, a subgraph, a kanban
+  column — had its group name cropped off the top of the canvas. Both paths now use one
+  `sceneRects()`.
+- **Internal**: the renderer kept its own copy of the container-rectangle formula, so the drawn frame
+  and the clickable / croppable frame could drift apart whenever either padding changed. There is one
+  `containerRect()` now, and rendering asks it like everyone else.
+
 ## 0.22.2 — cards, bars and people
 
 - **kanban / user journey / gantt**: these three draw their own filled box, but the shape layer had
