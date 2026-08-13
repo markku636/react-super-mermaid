@@ -13,6 +13,7 @@ import { registerKanbanAdapter } from '../core/editor/adapters/kanban';
 import { registerSankeyAdapter } from '../core/editor/adapters/sankey';
 import { registerJourneyAdapter } from '../core/editor/adapters/journey';
 import { registerGanttAdapter } from '../core/editor/adapters/gantt';
+import { registerPieAdapter } from '../core/editor/adapters/pie';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -32,6 +33,7 @@ registerKanbanAdapter();
 registerSankeyAdapter();
 registerJourneyAdapter();
 registerGanttAdapter();
+registerPieAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

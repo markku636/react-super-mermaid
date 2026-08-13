@@ -12,6 +12,7 @@ import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edg
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { c4Lines, requirementKind, requirementRows } from './node-metrics';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
+import { PIE as PIE_GEO, angleOf as pieAngleOf, sliceAngles as pieSliceAngles } from '../round-trip/pie';
 import { DAY_W as GANTT_DAY_W, ORIGIN as GANTT_ORIGIN, ROW_H as GANTT_ROW_H, formatDay as ganttFormatDay } from '../round-trip/gantt/model';
 
 /** 甘特圖的版面常數(集中成一個物件,渲染這邊讀起來比一串同名 import 清楚)。 */
@@ -166,9 +167,14 @@ export class SceneRenderer {
     hit.style.cursor = 'move';
     g.appendChild(hit);
 
-    // 象限圖的點:不走外形 / 手繪那一套(它就是一個資料點,畫成手繪多邊形只會變糊)。
+    // 資料點 / 扇形把手:不走外形 + 手繪那一套。它們不是「框」,外形描邊只會多畫一個
+    // 沒有意義的方框(圓餅圖的把手尤其明顯:文字外面憑空多一個框)。
     if (node.data?.kind === 'quadrant') {
       this.fillQuadrantPoint(g, node);
+      return;
+    }
+    if (node.data?.kind === 'pie') {
+      this.fillPieSlice(g, node);
       return;
     }
 
@@ -535,6 +541,105 @@ export class SceneRenderer {
       w: right - GANTT.ORIGIN.x + 120,
       h: bottom - top + 70,
     };
+  }
+
+  /** 圓餅圖外框:標題 + 各扇形(扇形本身畫在這裡,節點只是它的質心把手)。 */
+  private renderPieFrame(scene: EditorScene): void {
+    const meta = scene.meta.type === 'pie' ? scene.meta : undefined;
+    const ink = this.dark ? INK_DARK : INK;
+    const g = this.frameLayer;
+    // 順序由角度決定 —— 與序列化同一套判定,畫面才會等於存檔內容。
+    const ordered = [...scene.nodes].sort(
+      (a, b) => pieAngleOf(a.x + a.w / 2, a.y + a.h / 2) - pieAngleOf(b.x + b.w / 2, b.y + b.h / 2),
+    );
+    const values = ordered.map((n) => (n.data?.kind === 'pie' ? n.data.value : 0));
+    const total = values.reduce((s, v) => s + Math.max(0, v), 0);
+    const angles = pieSliceAngles(values);
+    const arc = (from: number, to: number): string => {
+      // 整圈用兩段半圓畫(單一 arc 起訖同點會退化成什麼都畫不出來)。
+      if (to - from >= Math.PI * 2 - 1e-6) {
+        return (
+          `M${PIE_GEO.cx},${PIE_GEO.cy - PIE_GEO.r} A${PIE_GEO.r},${PIE_GEO.r} 0 1 1 ${PIE_GEO.cx},${PIE_GEO.cy + PIE_GEO.r}` +
+          ` A${PIE_GEO.r},${PIE_GEO.r} 0 1 1 ${PIE_GEO.cx},${PIE_GEO.cy - PIE_GEO.r} Z`
+        );
+      }
+      const x1 = PIE_GEO.cx + Math.cos(from) * PIE_GEO.r;
+      const y1 = PIE_GEO.cy + Math.sin(from) * PIE_GEO.r;
+      const x2 = PIE_GEO.cx + Math.cos(to) * PIE_GEO.r;
+      const y2 = PIE_GEO.cy + Math.sin(to) * PIE_GEO.r;
+      const large = to - from > Math.PI ? 1 : 0;
+      return `M${PIE_GEO.cx},${PIE_GEO.cy} L${x1},${y1} A${PIE_GEO.r},${PIE_GEO.r} 0 ${large} 1 ${x2},${y2} Z`;
+    };
+    ordered.forEach((n, i) => {
+      const pal = paletteByIndex(i);
+      g.appendChild(
+        svgEl('path', {
+          d: arc(angles[i].from, angles[i].to),
+          fill: pal.fill,
+          stroke: this.dark ? '#23232e' : '#ffffff',
+          'stroke-width': 2,
+        }),
+      );
+    });
+    if (meta?.title) {
+      const t = svgEl('text', {
+        x: PIE_GEO.cx,
+        y: PIE_GEO.cy - PIE_GEO.r - 28,
+        fill: ink,
+        'text-anchor': 'middle',
+        style: 'font:700 17px var(--rsm-editor-font);pointer-events:none;',
+      });
+      t.textContent = meta.title;
+      g.appendChild(t);
+    }
+    // 百分比只有在總和有意義時才標。
+    if (total > 0) {
+      ordered.forEach((n, i) => {
+        const share = Math.round((Math.max(0, values[i]) / total) * 1000) / 10;
+        if (share < 3) return; // 太窄的扇形標了只會疊在一起
+        const mid = (angles[i].from + angles[i].to) / 2;
+        const t = svgEl('text', {
+          x: PIE_GEO.cx + Math.cos(mid) * PIE_GEO.r * 0.86,
+          y: PIE_GEO.cy + Math.sin(mid) * PIE_GEO.r * 0.86,
+          fill: ink,
+          'text-anchor': 'middle',
+          'dominant-baseline': 'middle',
+          style: 'font:600 11px var(--rsm-editor-font);opacity:0.75;pointer-events:none;',
+        });
+        t.textContent = `${share}%`;
+        g.appendChild(t);
+      });
+    }
+    this.seqBounds = {
+      x: PIE_GEO.cx - PIE_GEO.r - 60,
+      y: PIE_GEO.cy - PIE_GEO.r - 60,
+      w: PIE_GEO.r * 2 + 120,
+      h: PIE_GEO.r * 2 + 110,
+    };
+  }
+
+  /** 圓餅扇形的把手:標籤 + 數值(扇形本身畫在外框層)。 */
+  private fillPieSlice(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'pie' ? node.data : undefined;
+    const fo = svgEl('foreignObject', { x: -20, y: 0, width: node.w + 40, height: node.h });
+    fo.style.pointerEvents = 'none';
+    fo.style.overflow = 'visible';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:1px;' +
+        `text-align:center;color:${this.dark ? INK_DARK : INK};`,
+    );
+    const name = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    name.textContent = node.label;
+    name.setAttribute('style', 'font:700 12px/1.3 var(--rsm-editor-font);word-break:break-word;');
+    root.appendChild(name as unknown as Node);
+    const val = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    val.textContent = String(d?.value ?? 0);
+    val.setAttribute('style', 'font:11px/1.2 var(--rsm-editor-font);opacity:0.75;');
+    root.appendChild(val as unknown as Node);
+    fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
   }
 
   /** 甘特長條:實心圓角條 + 條上任務名;milestone 畫成菱形。 */
@@ -1049,6 +1154,7 @@ export class SceneRenderer {
       this.seqBounds = SceneRenderer.quadrantBounds();
     }
     if (scene.diagramType === 'gantt') this.renderGanttFrame(scene);
+    if (scene.diagramType === 'pie') this.renderPieFrame(scene);
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 — pie charts are editable
+
+- **Feature**: new `pieAdapter`. The pie itself is drawn on the canvas (slices, separators and a
+  percentage per slice); each slice carries a handle showing its label and value. Dragging a handle
+  **around the circle reorders the slices**, and double-clicking edits the label and value.
+- Slice *values* are deliberately not draggable. A pie's angles are relative, so "dragging one slice
+  bigger" necessarily rewrites everyone else's share — an edit that looks local but isn't. Ordering
+  is the operation that really is local, so that's the one bound to the drag.
+
 ## 0.16.0 — gantt charts: drag a bar to reschedule it
 
 - **Feature**: new `ganttAdapter`. A task's **x is its start date, its width is its duration, and its

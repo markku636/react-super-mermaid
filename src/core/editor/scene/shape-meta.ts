@@ -60,6 +60,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   journeyTask: { glyph: '▤', label: '任務' },
   // gantt
   ganttBar: { glyph: '▬', label: '任務' },
+  // pie
+  pieSlice: { glyph: '◔', label: '扇形' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };
