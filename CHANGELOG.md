@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.19.0 — architecture diagrams are drawable
+
+- **Feature**: new `architectureAdapter`. Services and junctions become draggable nodes, `group`s
+  become nested containers, and `a:L -- R:b` edges keep the side they attach to. Written by hand
+  rather than through the DB: architecture is parsed by langium and its DB exposes **no** getters at
+  all, so nothing is recoverable from it — but its four line forms are simple enough to parse
+  exactly and reversibly.
+- Labels follow the three rules mermaid actually enforces (established by asking it, not by
+  guessing): `[中文]` is a lexer error but `["中文"]` is fine, and `[]` is an error so a node with no
+  label omits the brackets entirely.
+- New `scripts/checkSyntax.mjs` in the extension repo asks mermaid directly whether a snippet parses.
+  Three diagram types in a row turned out to have non-obvious rules about non-ASCII text
+  (requirement names reject it outright, sankey rejects it even quoted, architecture needs quotes),
+  and guessing produces serialization that looks right and renders as an error.
+
 ## 0.18.0 — xy charts: drag a point to change the number
 
 - **Feature**: new `xychartAdapter`. Each data point is a node whose **vertical position is its

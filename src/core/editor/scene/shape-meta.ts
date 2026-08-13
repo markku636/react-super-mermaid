@@ -64,6 +64,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   pieSlice: { glyph: '◔', label: '扇形' },
   // xychart
   xyPoint: { glyph: '●', label: '資料點' },
+  // architecture
+  archNode: { glyph: '▣', label: '服務' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

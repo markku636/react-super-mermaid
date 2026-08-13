@@ -182,6 +182,10 @@ export class SceneRenderer {
       this.fillXyPoint(g, node);
       return;
     }
+    if (node.data?.kind === 'architecture') {
+      this.fillArchNode(g, node);
+      return;
+    }
 
     // 依節點順序循序取色(非 hash),相鄰節點配色和諧。
     const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
@@ -784,6 +788,57 @@ export class SceneRenderer {
     val.setAttribute('style', 'font:11px/1.2 var(--rsm-editor-font);opacity:0.75;');
     root.appendChild(val as unknown as Node);
     fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
+  }
+
+  /** architecture 服務:圖示方塊 + 下方名稱;junction 只畫一個小點。 */
+  private fillArchNode(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'architecture' ? node.data : undefined;
+    const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
+    const pal = paletteByIndex(idx >= 0 ? idx : 0);
+    const ink = this.dark ? INK_DARK : INK;
+    if (d?.junction) {
+      g.appendChild(
+        svgEl('circle', { cx: node.w / 2, cy: node.h / 2, r: 7, fill: ink, stroke: 'none' }),
+      );
+      return;
+    }
+    const box = 56;
+    const bx = (node.w - box) / 2;
+    g.appendChild(
+      svgEl('rect', {
+        x: bx,
+        y: 4,
+        width: box,
+        height: box,
+        rx: 10,
+        fill: pal.fill,
+        stroke: pal.stroke,
+        'stroke-width': 1.6,
+      }),
+    );
+    // 圖示名只用一個字母代表(不內嵌 icon 套件,離線包不多背一份圖庫)。
+    const initial = (d?.icon ?? node.label ?? '?').trim().charAt(0).toUpperCase();
+    const t = svgEl('text', {
+      x: node.w / 2,
+      y: 4 + box / 2,
+      fill: pal.stroke,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'central',
+      style: 'font:700 22px var(--rsm-editor-font);pointer-events:none;',
+    });
+    t.textContent = initial;
+    g.appendChild(t);
+
+    const fo = svgEl('foreignObject', { x: 0, y: box + 8, width: node.w, height: node.h - box - 8 });
+    fo.style.pointerEvents = 'none';
+    const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    div.textContent = node.label;
+    div.setAttribute(
+      'style',
+      `text-align:center;font:600 12px/1.3 var(--rsm-editor-font);color:${ink};word-break:break-word;`,
+    );
+    fo.appendChild(div as unknown as Node);
     g.appendChild(fo);
   }
 

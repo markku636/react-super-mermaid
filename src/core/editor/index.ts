@@ -31,6 +31,7 @@ export { journeyAdapter, registerJourneyAdapter } from './adapters/journey';
 export { ganttAdapter, registerGanttAdapter } from './adapters/gantt';
 export { pieAdapter, registerPieAdapter } from './adapters/pie';
 export { xychartAdapter, registerXychartAdapter } from './adapters/xychart';
+export { architectureAdapter, registerArchitectureAdapter } from './adapters/architecture';
 export { PLOT as QUADRANT_PLOT, valueToScene, sceneToValue } from './round-trip/quadrant/model';
 
 export type { EditorLook } from './render/scene-renderer';

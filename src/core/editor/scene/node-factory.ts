@@ -67,6 +67,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'pieSlice';
     case 'xychart':
       return 'xyPoint';
+    case 'architecture':
+      return 'archNode';
     case 'sequence':
       return 'participant';
     default:
@@ -141,6 +143,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'pie', value: 1 };
     case 'xychart':
       return { kind: 'xy', series: 0, index: 0 };
+    case 'architecture':
+      return { kind: 'architecture' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:
@@ -248,6 +252,8 @@ function defaultEdgeDataFor(type: DiagramType): SceneEdge['data'] {
       return { kind: 'requirement', relation: 'satisfies' };
     case 'c4':
       return { kind: 'c4', relType: 'rel' };
+    case 'architecture':
+      return { kind: 'architecture', fromSide: 'R', toSide: 'L' };
     default:
       return { kind: 'flowchart' };
   }

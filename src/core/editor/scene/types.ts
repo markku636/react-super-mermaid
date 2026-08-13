@@ -22,6 +22,7 @@ export type DiagramType =
   | 'gantt'
   | 'pie'
   | 'xychart'
+  | 'architecture'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -76,6 +77,8 @@ export type NodeShape =
   | 'pieSlice'
   // xychart:一個資料點(垂直位置就是它的值)
   | 'xyPoint'
+  // architecture:一個服務 / junction
+  | 'archNode'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -145,6 +148,8 @@ export type NodeData =
   | { kind: 'pie'; value: number }
   /** xychart 資料點:屬於第幾組系列、第幾個類別(值由節點的 y 決定)。 */
   | { kind: 'xy'; series: number; index: number }
+  /** architecture 服務:圖示名(cloud/database/disk/server/internet)與是否為 junction。 */
+  | { kind: 'architecture'; icon?: string; junction?: boolean }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -259,7 +264,9 @@ export type EdgeData =
   | { kind: 'requirement'; relation: ReqRelation }
   | { kind: 'c4'; relType: string; techn?: string; descr?: string }
   /** sankey 的連線帶「流量」;線寬也依它決定。 */
-  | { kind: 'sankey'; value: number };
+  | { kind: 'sankey'; value: number }
+  /** architecture 連線:兩端接在節點的哪一邊(T/B/L/R)。 */
+  | { kind: 'architecture'; fromSide: string; toSide: string };
 
 /** ER 連線端的基數(crow's foot)。 */
 export type ErCardinality = 'zeroOrOne' | 'onlyOne' | 'zeroOrMore' | 'oneOrMore';
@@ -325,6 +332,7 @@ export type SceneMeta =
   | { type: 'gantt'; gantt: GanttMeta }
   | { type: 'pie'; title?: string; showData: boolean }
   | { type: 'xychart'; xy: XyChartMeta }
+  | { type: 'architecture' }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -391,6 +399,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   gantt: { type: 'gantt', gantt: { settings: [] } },
   pie: { type: 'pie', showData: false },
   xychart: { type: 'xychart', xy: { categories: [], series: [], yMin: 0, yMax: 100 } },
+  architecture: { type: 'architecture' },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };
