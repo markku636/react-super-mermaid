@@ -386,6 +386,24 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         '  quadrant-1 該做\n  quadrant-2 快贏\n  quadrant-3 別做\n  quadrant-4 再想想\n  範例: [0.4, 0.6]',
     ],
     ['流量圖', 'sankey-beta\n\nGrid,Homes,30\nGrid,Industry,45'],
+    [
+      '甘特圖',
+      'gantt\n  title 專案時程\n  dateFormat YYYY-MM-DD\n  section 階段一\n' +
+        '    第一項任務 :a1, 2026-01-01, 7d\n    第二項任務 :after a1, 5d',
+    ],
+    ['圓餅圖', 'pie showData title 佔比\n    "第一項" : 50\n    "第二項" : 30\n    "第三項" : 20'],
+    [
+      'XY 圖',
+      'xychart-beta\n    title "趨勢"\n    x-axis [Q1, Q2, Q3, Q4]\n    y-axis "數值" 0 --> 100\n' +
+        '    bar [30, 55, 80, 62]',
+    ],
+    [
+      '架構圖',
+      'architecture-beta\n    group api(cloud)[系統]\n    service db(database)[資料庫] in api\n' +
+        '    service server(server)[伺服器] in api\n    db:L -- R:server',
+    ],
+    ['積木圖', 'block-beta\n  columns 3\n  a["前端"] b["後端"] c[("資料庫")]\n  a --> b'],
+    ['封包圖', 'packet-beta\ntitle 封包\n0-15: "來源埠"\n16-31: "目的埠"'],
     ['時間軸', 'timeline\n  title 時間軸標題\n  section 區段一\n    時間點 : 事件'],
   ];
   function updateEmptyHint(): void {
