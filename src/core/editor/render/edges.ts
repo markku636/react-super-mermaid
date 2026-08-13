@@ -114,6 +114,26 @@ function pathThrough(points: Point[]): string {
   return d;
 }
 
+/** 依圖種挑線形:心智圖走平滑曲線,其餘沿用折線。 */
+function edgePath(scene: EditorScene, points: Point[]): string {
+  return scene.diagramType === 'mindmap' ? mindmapPath(points) : pathThrough(points);
+}
+
+/**
+ * 心智圖的分枝畫成平滑曲線。
+ *
+ * 心智圖的線就是「從這裡長出去」,直線折線看起來會像流程圖的箭頭。控制點只往水平方向拉,
+ * 分枝離開父節點與接進子節點時都保持水平,和手畫的心智圖一樣。使用者自己拗過折點(waypoints)
+ * 就照他拗的走,不自作主張。
+ */
+function mindmapPath(points: Point[]): string {
+  if (points.length !== 2) return pathThrough(points);
+  const [a, b] = points;
+  const k = Math.max(24, Math.abs(b.x - a.x) * 0.45);
+  const dir = b.x >= a.x ? 1 : -1;
+  return `M${a.x},${a.y} C${a.x + k * dir},${a.y} ${b.x - k * dir},${b.y} ${b.x},${b.y}`;
+}
+
 function midpoint(points: Point[]): Point {
   if (points.length === 0) return { x: 0, y: 0 };
   const i = Math.floor((points.length - 1) / 2);
@@ -204,7 +224,7 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
   const ink = dark ? INK_DARK : INK;
   const g = svgEl('g', { 'data-edge-id': edge.id, class: 'rsm-edge' });
   const pts = edgePoints(scene, edge);
-  const d = pts ? pathThrough(pts) : '';
+  const d = pts ? edgePath(scene, pts) : '';
 
   // 粗透明 hit path(讓細線好點選)。
   const hit = svgEl('path', { d, fill: 'none', stroke: 'transparent', 'stroke-width': 14, 'data-edge-hit': edge.id });
@@ -301,7 +321,7 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
 /** 只更新既有邊 <g> 的幾何(端點移動時重繞,不重建)。 */
 export function updateEdgeGeometry(g: SVGGElement, scene: EditorScene, edge: SceneEdge): void {
   const pts = edgePoints(scene, edge);
-  const d = pts ? pathThrough(pts) : '';
+  const d = pts ? edgePath(scene, pts) : '';
   g.querySelectorAll('path').forEach((p) => p.setAttribute('d', d));
   const fo = g.querySelector('foreignObject');
   if (fo && pts) {

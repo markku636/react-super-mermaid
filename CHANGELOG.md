@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.2 — mindmap branches curve
+
+- **mindmap**: branches were straight polylines, which read as flowchart arrows rather than as
+  something growing out of the parent. They're smooth curves now, leaving the parent and entering the
+  child horizontally, the way a mind map is drawn by hand. A branch the user has bent by hand
+  (waypoints) still follows exactly the points they set.
+
 ## 0.23.1 — the grid-shaped types get their grid back
 
 - **block**: the diagram is *about* which cell a block sits in, and the canvas drew no cell
