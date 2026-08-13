@@ -1000,8 +1000,11 @@ export class SceneRenderer {
         fill: cp.fill,
         stroke: cp.stroke,
         'stroke-width': 1.5,
+        'data-container-id': c.id,
       });
-      box.style.pointerEvents = 'none';
+      // 泳道圖的欄要可以被右鍵點到(改名 / 刪欄);其他圖種的容器框維持穿透,
+      // 免得擋住框內節點的點擊。
+      box.style.pointerEvents = scene.diagramType === 'kanban' || scene.diagramType === 'journey' ? 'auto' : 'none';
       this.containersLayer.appendChild(box);
       if (c.label) {
         const fo = svgEl('foreignObject', { x, y: y + 2, width: w, height: LABEL_H });

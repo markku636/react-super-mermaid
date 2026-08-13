@@ -165,8 +165,9 @@ export function c4BoxSize(
   const parts = c4Lines(label, data);
   const w = Math.max(C4_W, Math.ceil(textWidth(label, C4_TITLE_FONT) + 32));
   const inner = w - 24;
-  // 人物圖示頂端多留一點高度(頭像圓)。
-  const head = data.c4Type.includes('person') ? 16 : 0;
+  // 人物圖示頂端多留一點高度(頭像圓)。圓半徑 10 + 上緣 2 → 內容從 y=20 起算,
+  // 這裡只需補上圓突出框內的那一段,補太多框上方就會空一塊。
+  const head = data.c4Type.includes('person') ? 20 : 0;
   const rows =
     wrapRows(parts.kind, C4_META_FONT, inner) +
     wrapRows(parts.title, C4_TITLE_FONT, inner) +

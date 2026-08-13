@@ -80,22 +80,22 @@ function drawErCardinality(
   };
   const isMany = card === 'zeroOrMore' || card === 'oneOrMore';
   const isOptional = card === 'zeroOrOne' || card === 'zeroOrMore';
-  // 內層基數
+  // 由實體往外:先畫基數(鳥足 / 單槓),再畫模態(圓圈 / 單槓)。
+  // 記號要貼著實體框畫 —— 離太遠會看起來像浮在線中間的裝飾,而不是這一端的基數。
   if (isMany) {
-    const tip = at(15);
+    const tip = at(13);
     const b = at(0);
-    const bp = { x: b.x + vx * 7, y: b.y + vy * 7 };
-    const bm = { x: b.x - vx * 7, y: b.y - vy * 7 };
+    const bp = { x: b.x + vx * 6.5, y: b.y + vy * 6.5 };
+    const bm = { x: b.x - vx * 6.5, y: b.y - vy * 6.5 };
     stroke(`M${tip.x},${tip.y} L${bp.x},${bp.y} M${tip.x},${tip.y} L${b.x},${b.y} M${tip.x},${tip.y} L${bm.x},${bm.y}`);
   } else {
-    stroke(tick(11, 7));
+    stroke(tick(5, 6.5));
   }
-  // 外層模態
   if (isOptional) {
-    const c = at(22);
-    g.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 5, fill: bg, stroke: ink, 'stroke-width': 1.4 }));
+    const c = at(isMany ? 20 : 13);
+    g.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: 4.5, fill: bg, stroke: ink, 'stroke-width': 1.4 }));
   } else {
-    stroke(tick(19, 7));
+    stroke(tick(isMany ? 19 : 12, 6.5));
   }
 }
 

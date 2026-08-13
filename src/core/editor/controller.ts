@@ -18,13 +18,16 @@ import { mermaidSvgLayout } from './layout/mermaid-svg-layout';
 import {
   History,
   cmdAddConnectedNode,
+  cmdAddContainer,
   cmdAddElements,
   cmdAddNode,
   cmdAddSeqMessage,
   cmdAddSeqNote,
   cmdAddSeqParticipant,
+  cmdDeleteContainer,
   cmdDeleteSeqParticipant,
   cmdDeleteSeqStatement,
+  cmdSetContainerLabel,
   cmdToggleSeqArrow,
   cmdAlignNodes,
   cmdDeleteSelection,
@@ -50,6 +53,7 @@ import { NODE_PALETTE } from './render/palette';
 import { classBoxSize, erEntitySize, requirementBoxSize, requirementRows } from './render/node-metrics';
 import { containerRect, nextEdgeId, nextNodeId } from './scene/scene-ops';
 import { defaultShapeFor, makeEdgeFor, makeNodeFor } from './scene/node-factory';
+import { laneRect } from './layout/lanes';
 import { shapeMeta } from './scene/shape-meta';
 import { PointerController, type PointerHost, type Tool } from './interaction/pointer';
 import { openTextEditor } from './interaction/text-edit';
@@ -355,13 +359,34 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     emptyHintGrace = false;
     updateEmptyHint();
   }, 600);
-  // 空白畫布的起手範本(對標付費工具的範本庫)。
+  // 空白畫布的起手範本(對標付費工具的範本庫)。每個可拖拉繪製的圖種都要有一個入口 ——
+  // 否則使用者在空白畫布上根本無從得知這個編輯器還會畫看板 / 象限圖 / C4。
   const STARTERS: Array<[string, string]> = [
     ['流程圖', 'flowchart TD\n  A[開始] --> B{判斷}\n  B -->|是| C[處理]\n  B -->|否| D[結束]'],
     ['序列圖', 'sequenceDiagram\n  使用者->>系統: 請求\n  系統-->>使用者: 回應'],
     ['類別圖', 'classDiagram\n  class Animal {\n    +name string\n    +move()\n  }\n  Animal <|-- Dog'],
+    ['狀態圖', 'stateDiagram-v2\n  [*] --> 閒置\n  閒置 --> 執行中: 啟動\n  執行中 --> [*]: 完成'],
     ['ER 圖', 'erDiagram\n  CUSTOMER ||--o{ ORDER : places\n  ORDER {\n    int id PK\n    int customerId FK\n  }'],
     ['心智圖', 'mindmap\n  root((主題))\n    分支A\n    分支B\n      子項'],
+    [
+      'C4 情境圖',
+      'C4Context\n  title 系統情境圖\n  Person(user, "使用者", "使用系統的人")\n' +
+        '  System(app, "本系統", "提供服務")\n  Rel(user, app, "使用", "HTTPS")',
+    ],
+    [
+      '需求圖',
+      'requirementDiagram\n  requirement req1 {\n    id: 1\n    text: "待填寫需求描述"\n    risk: medium\n    verifymethod: test\n  }\n' +
+        '  element impl {\n    type: simulation\n  }\n  impl - satisfies -> req1',
+    ],
+    ['看板', 'kanban\n  todo[待辦]\n    [第一張卡片]\n  doing[進行中]\n  done[完成]'],
+    ['旅程圖', 'journey\n  title 我的一天\n  section 早上\n    起床: 3: 我\n  section 下午\n    寫程式: 5: 我'],
+    [
+      '象限圖',
+      'quadrantChart\n  title 專案評估\n  x-axis 低成本 --> 高成本\n  y-axis 低效益 --> 高效益\n' +
+        '  quadrant-1 該做\n  quadrant-2 快贏\n  quadrant-3 別做\n  quadrant-4 再想想\n  範例: [0.4, 0.6]',
+    ],
+    ['流量圖', 'sankey-beta\n\nGrid,Homes,30\nGrid,Industry,45'],
+    ['時間軸', 'timeline\n  title 時間軸標題\n  section 區段一\n    時間點 : 事件'],
   ];
   function updateEmptyHint(): void {
     if (formActive) {
@@ -554,6 +579,31 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
           if (cur && cur.kind === 'message' && value !== (cur.text ?? '')) {
             pointerHost.runCommand(cmdSetSeqMessageText(index, value), 'seq-msg');
           }
+        },
+        () => {
+          cancelTextEdit = null;
+        },
+      );
+    }, 0);
+    cancelTextEdit = () => clearTimeout(timer);
+  }
+
+  /** 泳道欄名的就地編輯(欄標題就畫在欄框左上角)。 */
+  function openLaneEditor(containerId: string): void {
+    const lane = scene.containers.find((c) => c.id === containerId);
+    if (!lane) return;
+    const z = viewport.getZoom();
+    const s = viewport.worldToScreen({ x: lane.x + 8, y: lane.y + 4 });
+    cancelTextEdit?.();
+    const timer = setTimeout(() => {
+      cancelTextEdit = openTextEditor(
+        host,
+        { left: s.x, top: s.y, width: Math.max(120, (lane.w - 16) * z), height: 28 },
+        lane.label,
+        (value) => {
+          cancelTextEdit = null;
+          const cur = scene.containers.find((c) => c.id === containerId);
+          if (cur && value !== cur.label) pointerHost.runCommand(cmdSetContainerLabel(containerId, value), 'lane-name');
         },
         () => {
           cancelTextEdit = null;
@@ -809,6 +859,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     const nodeEl = t.closest('[data-node-id]');
     const edgeEl = t.closest('[data-edge-hit]');
     const seqMsgEl = t.closest('[data-seq-msg]');
+    const laneEl = t.closest('[data-container-id]');
     const menu = document.createElement('div');
     menu.className = 'rsm-ctx';
     const addItem = (label: string, fn: () => void): void => {
@@ -972,6 +1023,51 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       });
       addSep();
       addItem('整理排版', () => void handle.tidy());
+    } else if (laneEl && (scene.diagramType === 'kanban' || scene.diagramType === 'journey')) {
+      // 欄位本身的右鍵:改名 / 刪整欄(卡片一起走)。
+      const cid = laneEl.getAttribute('data-container-id') as string;
+      const lane = scene.containers.find((c) => c.id === cid);
+      const isJourney = scene.diagramType === 'journey';
+      addItem(isJourney ? '改 section 名稱' : '改欄位名稱', () => openLaneEditor(cid));
+      addSep();
+      addItem(isJourney ? '刪除這個 section' : '刪除這一欄', () => {
+        pointerHost.runCommand(cmdDeleteContainer(cid, lane?.childNodeIds ?? []), 'del-lane');
+        void handle.tidy();
+      });
+    } else if (scene.diagramType === 'kanban' || scene.diagramType === 'journey') {
+      // 泳道圖:空白處右鍵 → 新增欄位 / 卡片。沒有這個入口就沒有辦法從零開一塊看板
+      // (卡片一定要落在某一欄裡,而欄只能從這裡長出來)。
+      const isJourney = scene.diagramType === 'journey';
+      addItem(isJourney ? '新增 section' : '新增欄位', () => {
+        const taken = new Set(scene.containers.map((c) => c.id));
+        let k = scene.containers.length + 1;
+        while (taken.has(`col${k}`)) k += 1;
+        const id = `col${k}`;
+        pointerHost.runCommand(
+          cmdAddContainer({
+            id,
+            label: isJourney ? `階段 ${k}` : `欄位 ${k}`,
+            ...laneRect(scene.containers.length, 260),
+            parentId: null,
+            childNodeIds: [],
+            sourceIndex: scene.containers.length,
+          }),
+          'add-lane',
+        );
+        void handle.tidy();
+      });
+      if (scene.containers.length > 0) {
+        addItem(isJourney ? '新增任務' : '新增卡片', () => {
+          const nid = nextNodeId(scene);
+          const world2 = viewport.screenToWorld(e.clientX, e.clientY);
+          pointerHost.runCommand(cmdAddNode(makeNodeFor(scene, nid, world2, {})), 'add-node');
+          pointer.setSelection([nid]);
+          openEditor(nid);
+        });
+      }
+      addSep();
+      addItem('整理排版', () => void handle.tidy());
+      addItem('全選', () => pointer.selectAll());
     } else {
       const world = viewport.screenToWorld(e.clientX, e.clientY);
       addItem('在此新增節點', () => {

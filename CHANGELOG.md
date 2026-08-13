@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.1 — starting from blank, and running a board
+
+- **Fix**: a kanban board or user journey could not be built from nothing — a card has to land in a
+  column, and there was no way to make a column. Right-clicking empty canvas now offers 新增欄位 /
+  新增 section (and 新增卡片 / 新增任務), and right-clicking a column offers rename and delete
+  (its cards go with it). Lane rectangles became hit-testable for those two types only; every other
+  diagram's container frame stays click-through so it can't swallow clicks meant for the nodes inside.
+- **Change**: the blank-canvas starter row lists all thirteen drawable types instead of five. On an
+  empty canvas the starters are the only discoverable evidence that this editor draws kanban boards,
+  quadrant charts and C4 diagrams at all.
+- **Fix**: ER cardinality marks floated well clear of the entity, reading as decoration on the line
+  rather than as that end's cardinality. They now sit against the box, as in standard crow's-foot
+  notation.
+- **Fix**: C4 person boxes reserved too much room above the head circle, leaving a blank strip.
+- **Fix**: kanban / journey cards sat flush against the lane border, and with their shadow and
+  colour bar they read as overflowing it.
+
 ## 0.15.0 — user journeys are drawable
 
 - **Feature**: new `journeyAdapter`. Sections become lanes and tasks become cards showing the mood

@@ -6,8 +6,9 @@
 
 import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 
-export const LANE = { x0: 40, y0: 40, w: 230, gap: 26, headerH: 44, pad: 14, cardGap: 12 } as const;
-export const CARD = { w: LANE.w - LANE.pad * 2, minH: 46 } as const;
+export const LANE = { x0: 40, y0: 40, w: 240, gap: 26, headerH: 44, pad: 16, cardGap: 12 } as const;
+// 卡片再內縮一點:卡片有陰影與左緣色條,貼著欄框畫會看起來像「溢出欄外」。
+export const CARD = { w: LANE.w - LANE.pad * 2 - 4, minH: 46 } as const;
 
 /** 第 i 欄的矩形(高度由呼叫端依內容決定)。 */
 export function laneRect(i: number, h: number): { x: number; y: number; w: number; h: number } {

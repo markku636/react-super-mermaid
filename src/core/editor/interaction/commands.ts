@@ -375,6 +375,36 @@ export function cmdReorderSeqParticipant(id: string, targetIndex: number): Comma
   };
 }
 
+/** 新增一個容器(看板 / 旅程圖的欄位;不含任何子節點)。 */
+export function cmdAddContainer(container: SceneContainer): Command {
+  return (scene) => ({
+    scene: { ...scene, containers: [...scene.containers, container] },
+    patch: { containers: [container.id], structural: true },
+  });
+}
+
+/** 改容器標籤(看板欄名 / 旅程圖 section 名)。 */
+export function cmdSetContainerLabel(id: string, label: string): Command {
+  return (scene) => ({
+    scene: { ...scene, containers: scene.containers.map((c) => (c.id === id ? { ...c, label } : c)) },
+    patch: { containers: [id], structural: true },
+  });
+}
+
+/** 刪除容器(連同它目前涵蓋的子節點一起,語意上等於「刪掉這一欄」)。 */
+export function cmdDeleteContainer(id: string, childIds: string[]): Command {
+  const kill = new Set(childIds);
+  return (scene) => ({
+    scene: {
+      ...scene,
+      containers: scene.containers.filter((c) => c.id !== id),
+      nodes: scene.nodes.filter((n) => !kill.has(n.id)),
+      edges: scene.edges.filter((e) => !kill.has(e.source) && !kill.has(e.target)),
+    },
+    patch: { structural: true },
+  });
+}
+
 /** 設定連線的型別專屬資料(需求圖的關係種類 / ER 基數等)。 */
 export function cmdSetEdgeData(edgeId: string, data: EdgeData): Command {
   return (scene) => ({
