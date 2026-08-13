@@ -3,6 +3,7 @@
 
 import type {
   EdgeAnchor,
+  EdgeData,
   EditorScene,
   ElementStyle,
   LineKind,
@@ -372,6 +373,14 @@ export function cmdReorderSeqParticipant(id: string, targetIndex: number): Comma
       patch: { nodes: relaid.map((n) => n.id), structural: true },
     };
   };
+}
+
+/** 設定連線的型別專屬資料(需求圖的關係種類 / ER 基數等)。 */
+export function cmdSetEdgeData(edgeId: string, data: EdgeData): Command {
+  return (scene) => ({
+    scene: { ...scene, edges: scene.edges.map((e) => (e.id === edgeId ? { ...e, data } : e)) },
+    patch: { edges: [edgeId], structural: true },
+  });
 }
 
 /** 設定節點的 label + data(+ 重算尺寸)。供 ER 屬性 / class 成員結構化編輯。 */

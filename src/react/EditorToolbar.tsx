@@ -139,7 +139,10 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
     props.diagramType === 'state' ||
     props.diagramType === 'class' ||
     props.diagramType === 'er' ||
+    props.diagramType === 'requirement' ||
     props.diagramType === undefined;
+  // 需求圖的連線意義由「關係種類」決定(右鍵切換),沒有線型 / 箭頭可調。
+  const isReq = props.diagramType === 'requirement';
 
   // 連線樣式控制項:依目前圖種能力顯示(只有一種選擇時整組隱藏,因無從選起)。
   const caps = h?.getCapabilities() ?? null;
@@ -149,7 +152,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const allShapes = caps?.shapes ?? [];
   const quickShapes = caps?.quickShapes ?? allShapes;
   const moreShapes = allShapes.filter((s) => !quickShapes.includes(s));
-  const showEdgeStyle = !isSeq && !isTimeline && caps !== null;
+  const showEdgeStyle = !isSeq && !isTimeline && !isReq && caps !== null;
   const showLineKinds = showEdgeStyle && lineKinds.length > 1;
   const showArrowEnd = showEdgeStyle && arrowHeads.length > 1;
   // 雙向箭頭(`<-->`)目前只在 flowchart 有明確語法。

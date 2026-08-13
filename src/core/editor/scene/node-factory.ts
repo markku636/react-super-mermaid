@@ -18,7 +18,22 @@ import type {
   SceneEdge,
   SceneNode,
 } from './types';
-import { classBoxSize, erEntitySize } from '../render/node-metrics';
+import { classBoxSize, erEntitySize, requirementBoxSize } from '../render/node-metrics';
+
+/**
+ * 新拖出來的需求 / 元素預填的內容。
+ * mermaid 的 requirementDiagram 對這兩者的必填欄位很嚴格(需求少了 id 或 text 就整份語法錯誤),
+ * 所以「空白節點」不能真的空白 —— 一律先給合法的預設值,使用者再改。
+ */
+const NEW_REQUIREMENT = {
+  element: false as const,
+  reqType: 'requirement' as const,
+  reqId: '1',
+  text: '待填寫需求描述',
+  risk: 'medium' as const,
+  verifyMethod: 'test' as const,
+};
+const NEW_ELEMENT = { element: true as const, elementType: 'simulation' };
 
 /** 各圖種新節點的預設外形(adapter capabilities.defaults.nodeShape 的 core 版對照)。 */
 export function defaultShapeFor(type: DiagramType): NodeShape {
@@ -31,6 +46,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'entity';
     case 'mindmap':
       return 'rounded';
+    case 'requirement':
+      return 'requirementBox';
     case 'sequence':
       return 'participant';
     default:
@@ -57,6 +74,10 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
       return classBoxSize('', {});
     case 'entity':
       return erEntitySize('', []);
+    case 'requirementBox':
+      return requirementBoxSize('', NEW_REQUIREMENT);
+    case 'elementBox':
+      return requirementBoxSize('', NEW_ELEMENT);
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
   }
@@ -73,6 +94,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'er', attributes: [] };
     case 'mindmap':
       return { kind: 'mindmap', shapeType: mindmapShapeType(shape) };
+    case 'requirement':
+      return { kind: 'requirement', req: shape === 'elementBox' ? { ...NEW_ELEMENT } : { ...NEW_REQUIREMENT } };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:
@@ -176,6 +199,8 @@ function defaultEdgeDataFor(type: DiagramType): SceneEdge['data'] {
       return { kind: 'class', relation: 'association' };
     case 'er':
       return { kind: 'er', identifying: true, cardStart: 'onlyOne', cardEnd: 'zeroOrMore' };
+    case 'requirement':
+      return { kind: 'requirement', relation: 'satisfies' };
     default:
       return { kind: 'flowchart' };
   }

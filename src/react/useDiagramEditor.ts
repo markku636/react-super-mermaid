@@ -6,6 +6,7 @@ import { registerErAdapter } from '../core/editor/adapters/er';
 import { registerClassAdapter } from '../core/editor/adapters/class';
 import { registerMindmapAdapter } from '../core/editor/adapters/mindmap';
 import { registerSequenceAdapter } from '../core/editor/adapters/sequence';
+import { registerRequirementAdapter } from '../core/editor/adapters/requirement';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -18,6 +19,7 @@ registerErAdapter();
 registerClassAdapter();
 registerMindmapAdapter();
 registerSequenceAdapter();
+registerRequirementAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

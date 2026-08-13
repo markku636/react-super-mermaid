@@ -10,6 +10,7 @@ import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
+import { requirementKind, requirementRows } from './node-metrics';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -200,6 +201,10 @@ export class SceneRenderer {
       this.fillClassBox(g, node);
       return;
     }
+    if (node.data?.kind === 'requirement') {
+      this.fillRequirementBox(g, node);
+      return;
+    }
 
     // label foreignObject(置中):預設深色墨字(節點底色多為淺色);classDef/style 指定 color 時尊重之
     // (例如深底 fill + color:#fff)。
@@ -323,6 +328,47 @@ export class SceneRenderer {
     const hasMethods = (data?.methods?.length ?? 0) > 0;
     addRows(data?.members ?? [], false, !hasMethods);
     addRows(data?.methods ?? [], hasMembers, true);
+    fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
+  }
+
+  /** 需求框 / 元素框:«型別» + 名稱 + 欄位列(對齊 mermaid requirementDiagram 的外觀)。 */
+  private fillRequirementBox(g: SVGGElement, node: SceneNode): void {
+    const req = node.data?.kind === 'requirement' ? node.data.req : undefined;
+    if (!req) return;
+    const ink = this.dark ? INK_DARK : INK;
+    const fo = svgEl('foreignObject', { x: 0, y: 0, width: node.w, height: node.h });
+    fo.style.pointerEvents = 'none';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;width:100%;height:100%;box-sizing:border-box;' +
+        `overflow:hidden;font:11px/1.45 var(--rsm-editor-font);color:${ink};`,
+    );
+    const head = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    head.textContent = requirementKind(req);
+    head.setAttribute('style', 'text-align:center;opacity:0.7;font-size:10px;padding-top:3px;white-space:nowrap;');
+    root.appendChild(head as unknown as Node);
+    const title = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    title.textContent = node.label;
+    const rows = requirementRows(req);
+    title.setAttribute(
+      'style',
+      `font:700 12px/1.4 var(--rsm-editor-font);text-align:center;padding:1px 8px 5px;` +
+        `${rows.length ? `border-bottom:1px solid ${ink};` : ''}white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`,
+    );
+    root.appendChild(title as unknown as Node);
+    if (rows.length) {
+      const body = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+      body.setAttribute('style', 'flex:1;padding:3px 8px;overflow:hidden;');
+      for (const r of rows) {
+        const row = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+        row.textContent = r;
+        row.setAttribute('style', 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;');
+        body.appendChild(row as unknown as Node);
+      }
+      root.appendChild(body as unknown as Node);
+    }
     fo.appendChild(root as unknown as Node);
     g.appendChild(fo);
   }

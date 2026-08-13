@@ -3,7 +3,7 @@
 
 import { assertBrowser } from '../../../env';
 import { loadMermaid } from '../../load-mermaid';
-import { authorIdFromDomId } from '../../node-index';
+import { authorIdFromDomId, nodeLabelText } from '../../node-index';
 import { renderToSvg } from '../../render-pipeline';
 import { boundingBox, type Rect } from '../scene/geometry';
 import { fitToContent } from '../render/node-metrics';
@@ -54,12 +54,22 @@ export const mermaidSvgLayout: LayoutEngine = {
     try {
       const svg = host.querySelector('svg');
       if (svg) {
+        const spare: Array<{ text: string; box: NonNullable<ReturnType<typeof readBox>> }> = [];
         svg.querySelectorAll<SVGGElement>('g.node[id]').forEach((g) => {
-          const author = authorIdFromDomId(g.id, renderId);
-          if (!author) return;
           const box = readBox(g);
-          if (box) positions.set(author, box);
+          if (!box) return;
+          const author = authorIdFromDomId(g.id, renderId);
+          if (author) positions.set(author, box);
+          spare.push({ text: nodeLabelText(g), box });
         });
+        // 退路:用「節點文字含這個 id / label」對。各圖種的 DOM id 規則不一致,萬一 id 還原失敗,
+        // 沒有這條退路整張圖會全部疊在原點(比錯位難看得多)。
+        for (const n of scene.nodes) {
+          if (positions.has(n.id)) continue;
+          const key = (n.label || n.id).trim();
+          const hit = key ? spare.find((s) => s.text.includes(key)) : undefined;
+          if (hit) positions.set(n.id, hit.box);
+        }
       }
     } finally {
       host.remove();

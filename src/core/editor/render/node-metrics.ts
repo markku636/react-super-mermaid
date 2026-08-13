@@ -7,7 +7,7 @@
 //
 // 常數對齊 scene-renderer 的 fillClassBox / fillErEntity 內聯樣式;改那邊的 padding / font 要一起改。
 
-import type { ErAttribute, NodeData, SceneNode } from '../scene/types';
+import type { ErAttribute, NodeData, RequirementData, SceneNode } from '../scene/types';
 
 /** 全形(CJK / 全形標點)視為 1em,其餘約 0.55em。用於免 DOM 的文字寬度估算。 */
 const WIDE = /[ᄀ-ᅟ⺀-鿿가-힣豈-﫿︰-﹏＀-｠￠-￦]/;
@@ -81,14 +81,65 @@ export function erEntitySize(label: string, attributes: readonly ErAttribute[]):
   return { w, h: Math.ceil(h) + 2 };
 }
 
+// ── requirement ────────────────────────────────────────────────────────────
+const REQ_TITLE_FONT = 12;
+const REQ_ROW_FONT = 11;
+const REQ_KIND_H = 15; // «Requirement» 那一行
+const REQ_TITLE_H = Math.round(REQ_TITLE_FONT * 1.4) + 8;
+const REQ_ROW_H = Math.round(REQ_ROW_FONT * 1.45) + 2;
+const REQ_PAD_X = 16 + 12;
+
+/** 需求框 / 元素框上要顯示的欄位列(渲染與量測共用,避免兩邊算出不同高度)。 */
+export function requirementRows(req: RequirementData): string[] {
+  if (req.element) {
+    const rows = [`type: ${req.elementType ?? ''}`];
+    if (req.docRef) rows.push(`docRef: ${req.docRef}`);
+    return rows;
+  }
+  const rows: string[] = [];
+  if (req.reqId) rows.push(`id: ${req.reqId}`);
+  if (req.text) rows.push(`text: ${req.text}`);
+  if (req.risk) rows.push(`risk: ${req.risk}`);
+  if (req.verifyMethod) rows.push(`verify: ${req.verifyMethod}`);
+  return rows;
+}
+
+/** 需求框上方的類別標示(mermaid 也是這樣畫的:«Requirement» / «Element»)。 */
+export function requirementKind(req: RequirementData): string {
+  if (req.element) return '«Element»';
+  const spaced = req.reqType.replace(/([A-Z])/g, ' $1');
+  return `«${spaced.charAt(0).toUpperCase()}${spaced.slice(1)}»`;
+}
+
+export function requirementBoxSize(label: string, req: RequirementData): { w: number; h: number } {
+  const rows = requirementRows(req);
+  const kind = requirementKind(req);
+  const w = Math.max(
+    132,
+    Math.min(
+      320,
+      Math.ceil(
+        Math.max(
+          textWidth(label, REQ_TITLE_FONT) + 4,
+          textWidth(kind, REQ_ROW_FONT),
+          widest(rows, REQ_ROW_FONT),
+        ) + REQ_PAD_X,
+      ),
+    ),
+  );
+  const h = REQ_KIND_H + REQ_TITLE_H + (rows.length ? 6 + rows.length * REQ_ROW_H : 8);
+  return { w, h: Math.ceil(h) + 2 };
+}
+
 /**
- * 依節點內容算出它「該有」的尺寸。只有隔間框(class / er)有自己的內容模型;
+ * 依節點內容算出它「該有」的尺寸。只有隔間框(class / er / requirement)有自己的內容模型;
  * 其餘外形交給排版引擎 / 使用者拖曳決定,回傳 null 表示「不要動它」。
  */
 export function contentSize(node: { label: string; data?: NodeData }): { w: number; h: number } | null {
   const d = node.data;
   if (d?.kind === 'class') return classBoxSize(node.label, d);
   if (d?.kind === 'er') return erEntitySize(node.label, d.attributes);
+  if (d?.kind === 'requirement') return requirementBoxSize(node.label, d.req);
   return null;
 }
 

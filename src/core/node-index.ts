@@ -9,12 +9,17 @@
  * (作者 id 可含連字號,故用貪婪 `(.+)` 搭配尾端 `-<數字>`)。
  */
 const NODE_ID_RE = /^[A-Za-z][\w]*-(.+)-\d+$/;
+/**
+ * 退路:少了型別那一段的 `<作者id>-<n>`。requirementDiagram 就是這種形狀
+ * (`rsm-1-login_req-0`),用嚴格式會還原不出來,整張圖的節點就全部落在原點。
+ */
+const NODE_ID_RE_LOOSE = /^(.+)-\d+$/;
 
 /** 從節點的 DOM id 還原作者在原始碼寫的 id;取不到回 undefined。 */
 export function authorIdFromDomId(domId: string, renderId?: string): string | undefined {
   const prefix = renderId ? `${renderId}-` : '';
   const rest = prefix && domId.startsWith(prefix) ? domId.slice(prefix.length) : domId;
-  const m = rest.match(NODE_ID_RE);
+  const m = rest.match(NODE_ID_RE) ?? rest.match(NODE_ID_RE_LOOSE);
   return m ? m[1] : undefined;
 }
 

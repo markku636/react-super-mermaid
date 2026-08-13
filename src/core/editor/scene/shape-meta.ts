@@ -42,6 +42,9 @@ const META: Record<NodeShape, ShapeMeta> = {
   actor: { glyph: '☻', label: '角色' },
   participant: { glyph: '▭', label: '參與者' },
   note: { glyph: '🗒', label: '筆記' },
+  // requirement
+  requirementBox: { glyph: '▤', label: '需求' },
+  elementBox: { glyph: '▥', label: '元素' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

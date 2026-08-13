@@ -68,6 +68,11 @@ function body(shape: NodeShape): string {
       return `<rect x="3" y="4" width="18" height="8" rx="1" ${S}/>`;
     case 'note':
       return `<path d="M4 2h11l5 5v9H4z" ${S}/><path d="M15 2v5h5" ${S}/>`;
+    // ── requirement ──
+    case 'requirementBox':
+      return `<rect x="3" y="2" width="18" height="12" rx="1" ${S}/><path d="M3 7h18" ${S}/><path d="M6 10h12" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.65"/>`;
+    case 'elementBox':
+      return `<rect x="3" y="2" width="18" height="12" rx="1" stroke-dasharray="3 2" ${S}/><path d="M3 7h18" ${S}/>`;
     case 'rectangle':
     default:
       return `<rect x="2" y="3" width="20" height="10" ${S}/>`;

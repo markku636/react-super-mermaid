@@ -6,7 +6,15 @@
 //   但以 `layoutOwner:'engine'` 標記其座標為衍生值。
 // - 型別差異收進判別式 data / meta;新增圖種只加 variant,不動共用形狀。
 
-export type DiagramType = 'flowchart' | 'sequence' | 'class' | 'er' | 'state' | 'mindmap' | 'timeline';
+export type DiagramType =
+  | 'flowchart'
+  | 'sequence'
+  | 'class'
+  | 'er'
+  | 'state'
+  | 'mindmap'
+  | 'requirement'
+  | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
 export type NodeShape =
@@ -38,6 +46,9 @@ export type NodeShape =
   | 'actor'
   | 'participant'
   | 'note'
+  // requirement
+  | 'requirementBox'
+  | 'elementBox'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -94,7 +105,39 @@ export type NodeData =
   | { kind: 'class'; members: string[]; methods: string[]; stereotype?: string; generic?: string }
   | { kind: 'er'; attributes: ErAttribute[] }
   | { kind: 'mindmap'; shapeType: number }
+  | { kind: 'requirement'; req: RequirementData }
   | { kind: 'note'; text: string };
+
+/** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
+export type RequirementData =
+  | {
+      element: false;
+      /** mermaid 關鍵字:requirement / functionalRequirement / …(見 REQ_TYPE_KEYWORD)。 */
+      reqType: ReqType;
+      reqId?: string;
+      text?: string;
+      risk?: ReqRisk;
+      verifyMethod?: ReqVerify;
+    }
+  | { element: true; elementType?: string; docRef?: string };
+
+export type ReqType =
+  | 'requirement'
+  | 'functionalRequirement'
+  | 'interfaceRequirement'
+  | 'performanceRequirement'
+  | 'physicalRequirement'
+  | 'designConstraint';
+export type ReqRisk = 'low' | 'medium' | 'high';
+export type ReqVerify = 'analysis' | 'inspection' | 'test' | 'demonstration';
+export type ReqRelation =
+  | 'contains'
+  | 'copies'
+  | 'derives'
+  | 'satisfies'
+  | 'verifies'
+  | 'refines'
+  | 'traces';
 
 export interface ErAttribute {
   name: string;
@@ -141,7 +184,8 @@ export type EdgeData =
       cardinalitySource?: string;
       cardinalityTarget?: string;
     }
-  | { kind: 'er'; identifying: boolean; cardStart?: ErCardinality; cardEnd?: ErCardinality };
+  | { kind: 'er'; identifying: boolean; cardStart?: ErCardinality; cardEnd?: ErCardinality }
+  | { kind: 'requirement'; relation: ReqRelation };
 
 /** ER 連線端的基數(crow's foot)。 */
 export type ErCardinality = 'zeroOrOne' | 'onlyOne' | 'zeroOrMore' | 'oneOrMore';
@@ -195,6 +239,7 @@ export type SceneMeta =
   | { type: 'class'; direction?: FlowDirection }
   | { type: 'er'; direction?: FlowDirection }
   | { type: 'mindmap' }
+  | { type: 'requirement'; direction?: FlowDirection }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -245,22 +290,21 @@ export interface EditorScene {
   layoutOwner: 'user' | 'engine';
 }
 
+/** 各圖種的空 meta(新增圖種時只要在這張表補一列)。 */
+const EMPTY_META: Record<DiagramType, SceneMeta> = {
+  flowchart: { type: 'flowchart', direction: 'TB' },
+  state: { type: 'state' },
+  sequence: { type: 'sequence', autonumber: false },
+  class: { type: 'class' },
+  mindmap: { type: 'mindmap' },
+  requirement: { type: 'requirement' },
+  timeline: { type: 'timeline' },
+  er: { type: 'er' },
+};
+
 /** 建立一個空的 flowchart 場景。 */
 export function emptyScene(diagramType: DiagramType = 'flowchart'): EditorScene {
-  const meta: SceneMeta =
-    diagramType === 'flowchart'
-      ? { type: 'flowchart', direction: 'TB' }
-      : diagramType === 'state'
-        ? { type: 'state' }
-        : diagramType === 'sequence'
-          ? { type: 'sequence', autonumber: false }
-          : diagramType === 'class'
-            ? { type: 'class' }
-            : diagramType === 'mindmap'
-              ? { type: 'mindmap' }
-              : diagramType === 'timeline'
-                ? { type: 'timeline' }
-                : { type: 'er' };
+  const meta: SceneMeta = EMPTY_META[diagramType] ?? EMPTY_META.flowchart;
   return {
     version: 1,
     diagramType,

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.0 — requirement diagrams are drawable
+
+- **Feature**: new `requirementAdapter`. Requirement diagrams now open on the canvas instead of
+  falling back to the flowchart adapter's verbatim passthrough: drop 需求 / 元素 boxes from the
+  toolbar, drag a connection to relate them, double-click for a structured multi-line editor
+  (`id:` / `text:` / `risk:` / `verify:`, or `type:` / `docRef:` for elements), and right-click an
+  arrow to switch among the seven trace relations (contains / copies / derives / satisfies /
+  verifies / refines / traces). The relation is what the arrow's label shows, as in mermaid.
+- Two mermaid constraints shaped the design, both found by round-tripping through the real parser:
+  a requirement **name** is an identifier and its lexer only accepts `[A-Za-z0-9_]` — CJK names are
+  a hard parse error, with no alias syntax to fall back on (unlike ER's quoted names or class's
+  `["label"]`). Names are therefore slugged, with a data-loss warning naming the rewrite, and the
+  Chinese belongs in `text:`. **Values** meanwhile *can* hold CJK, but only quoted, so they now are
+  whenever they leave ASCII.
+- **Fix**: `authorIdFromDomId` only understood mermaid's `<renderId>-<type>-<id>-<n>` node ids.
+  Requirement diagrams emit `<renderId>-<id>-<n>` — no type segment — so every node failed id
+  recovery, the layout engine found no positions at all, and the whole diagram stacked up on the
+  origin. Added the type-less form, plus a label-containment fallback in the layout step so a future
+  diagram type with yet another id scheme degrades to "slightly misplaced" instead of "all in a pile".
+
 ## 0.9.1 — class / ER boxes fit their contents; shape buttons get real icons
 
 - **Fix**: every class box and ER entity was drawn far taller than its content, leaving a slab of dead

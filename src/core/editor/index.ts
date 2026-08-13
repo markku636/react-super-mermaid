@@ -22,6 +22,7 @@ export { erAdapter, registerErAdapter } from './adapters/er';
 export { classAdapter, registerClassAdapter } from './adapters/class';
 export { mindmapAdapter, registerMindmapAdapter } from './adapters/mindmap';
 export { sequenceAdapter, registerSequenceAdapter } from './adapters/sequence';
+export { requirementAdapter, registerRequirementAdapter } from './adapters/requirement';
 
 export type { EditorLook } from './render/scene-renderer';
 export { mermaidSvgLayout } from './layout/mermaid-svg-layout';

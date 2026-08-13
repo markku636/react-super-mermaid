@@ -33,6 +33,7 @@ import {
   cmdMoveNodes,
   cmdUngroup,
   cmdSetDirection,
+  cmdSetEdgeData,
   cmdSetEdgeStyle,
   cmdSetEdgesStyle,
   cmdRenameSeqParticipant,
@@ -46,7 +47,7 @@ import {
   type Command,
 } from './interaction/commands';
 import { NODE_PALETTE } from './render/palette';
-import { classBoxSize, erEntitySize } from './render/node-metrics';
+import { classBoxSize, erEntitySize, requirementBoxSize, requirementRows } from './render/node-metrics';
 import { containerRect, nextEdgeId, nextNodeId } from './scene/scene-ops';
 import { defaultShapeFor, makeEdgeFor, makeNodeFor } from './scene/node-factory';
 import { shapeMeta } from './scene/shape-meta';
@@ -61,7 +62,18 @@ import { svgEl } from './render/dom';
 import { boundingBox, nodeRect } from './scene/geometry';
 import { edgePoints } from './render/edges';
 import { emptyScene } from './scene/types';
-import type { ArrowHead, DiagramType, EditorScene, FlowDirection, LineKind, NodeShape, Point, SceneNode } from './scene/types';
+import type {
+  ArrowHead,
+  DiagramType,
+  EditorScene,
+  FlowDirection,
+  LineKind,
+  NodeShape,
+  Point,
+  ReqRelation,
+  RequirementData,
+  SceneNode,
+} from './scene/types';
 import { renderDiagram } from '../render-pipeline';
 
 export type EditorEvent =
@@ -176,6 +188,26 @@ const FORM_KEYWORDS = new Set(['timeline']);
 //  按下去就把節點改成該圖種序列化不出來的外形。)
 const ctxShapesFor = (caps: DiagramCapabilities | null): NodeShape[] => caps?.shapes ?? [];
 
+// requirementDiagram 的七種追溯關係(右鍵切換用;它取代了一般圖種的線型 / 箭頭選單)。
+const REQ_RELATIONS: ReqRelation[] = [
+  'contains',
+  'copies',
+  'derives',
+  'satisfies',
+  'verifies',
+  'refines',
+  'traces',
+];
+const REQ_RELATION_LABEL: Record<ReqRelation, string> = {
+  contains: 'contains(包含)',
+  copies: 'copies(複製)',
+  derives: 'derives(衍生)',
+  satisfies: 'satisfies(滿足)',
+  verifies: 'verifies(驗證)',
+  refines: 'refines(細化)',
+  traces: 'traces(追溯)',
+};
+
 /** ER 實體 / class 節點 → 可編輯多行文字(第一行=名稱,其餘=屬性 / 成員)。 */
 function nodeToEditText(node: SceneNode): string {
   if (node.data?.kind === 'er') {
@@ -192,7 +224,42 @@ function nodeToEditText(node: SceneNode): string {
     ];
     return [node.label, ...rows].join('\n');
   }
+  if (node.data?.kind === 'requirement') {
+    return [node.label, ...requirementRows(node.data.req)].join('\n');
+  }
   return node.label;
+}
+
+/** 「欄位: 值」多行文字 → 需求 / 元素資料。欄位名不分大小寫,未知欄位忽略。 */
+function parseRequirementText(prev: RequirementData, rest: string[]): RequirementData {
+  const field = new Map<string, string>();
+  for (const line of rest) {
+    const m = /^([A-Za-z]+)\s*[:：]\s*(.*)$/.exec(line);
+    if (m) field.set(m[1].toLowerCase(), m[2].trim());
+  }
+  if (prev.element) {
+    return {
+      element: true,
+      elementType: field.get('type') ?? prev.elementType,
+      docRef: field.get('docref') ?? prev.docRef,
+    };
+  }
+  const risk = field.get('risk');
+  const verify = field.get('verify') ?? field.get('verifymethod');
+  const oneOf = <T extends string>(list: readonly T[], v: string | undefined, fallback: T | undefined): T | undefined =>
+    (list as readonly string[]).includes(v ?? '') ? (v as T) : fallback;
+  return {
+    element: false,
+    reqType: prev.reqType,
+    reqId: field.get('id') ?? prev.reqId,
+    text: field.get('text') ?? prev.text,
+    risk: oneOf(['low', 'medium', 'high'] as const, risk?.toLowerCase(), prev.risk),
+    verifyMethod: oneOf(
+      ['analysis', 'inspection', 'test', 'demonstration'] as const,
+      verify?.toLowerCase(),
+      prev.verifyMethod,
+    ),
+  };
 }
 
 /** 多行編輯文字 → 節點 patch(label + data + 重算尺寸)。 */
@@ -241,6 +308,10 @@ function parseEditText(
       data: { kind: 'class', members, methods, stereotype, generic },
       ...classBoxSize(label, { members, methods, stereotype, generic }),
     };
+  }
+  if (node.data?.kind === 'requirement') {
+    const req = parseRequirementText(node.data.req, rest);
+    return { label, data: { kind: 'requirement', req }, ...requirementBoxSize(label, req) };
   }
   return null;
 }
@@ -424,7 +495,8 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     const tl = viewport.worldToScreen({ x: node.x, y: node.y });
     const z = viewport.getZoom();
     // ER 實體 / class 用「多行結構編輯」(第一行=名稱,其餘=屬性 / 成員)。
-    const structured = node.data?.kind === 'er' || node.data?.kind === 'class';
+    const structured =
+      node.data?.kind === 'er' || node.data?.kind === 'class' || node.data?.kind === 'requirement';
     const initial = structured ? nodeToEditText(node) : node.label;
     const editW = Math.max(node.w, structured ? 200 : 0);
     const editH = Math.max(node.h, structured ? 120 : 0);
@@ -838,6 +910,19 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         }
         addSep();
       }
+      addItem('刪除', () => handle.deleteSelection());
+    } else if (edgeEl && scene.diagramType === 'requirement') {
+      // 需求圖的連線沒有「線型 / 箭頭」可調 —— 它的意義完全由關係種類決定。
+      const id = edgeEl.getAttribute('data-edge-hit') as string;
+      pointer.setSelection([id]);
+      const cur = scene.edges.find((e) => e.id === id);
+      const now = cur?.data?.kind === 'requirement' ? cur.data.relation : undefined;
+      for (const rel of REQ_RELATIONS) {
+        addItem(`${rel === now ? '● ' : '　'}${REQ_RELATION_LABEL[rel]}`, () =>
+          pointerHost.runCommand(cmdSetEdgeData(id, { kind: 'requirement', relation: rel }), 'req-relation'),
+        );
+      }
+      addSep();
       addItem('刪除', () => handle.deleteSelection());
     } else if (edgeEl) {
       const id = edgeEl.getAttribute('data-edge-hit') as string;
