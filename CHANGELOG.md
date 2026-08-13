@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.24.0 — you can see where a drag will land
+
+On the types where **position is the data**, letting go rewrites the source immediately — but nothing
+on the canvas told you which column, lane or cell you were about to drop into. You dragged, looked at
+the result, and dragged back if it was wrong.
+
+- **Feature**: while dragging on a kanban board, user journey, git graph or block diagram, the target
+  column / lane / cell is outlined and follows the pointer. It clears on release, including when the
+  drag ends without moving anything.
+- The drag harness now asserts the outline appears mid-gesture and is gone after release. Confirmed
+  to fail (4 cases) with the feature switched off.
+
 ## 0.23.3 — a gantt `done` bar's label was invisible on a dark canvas
 
 The label moved inside the bar in 0.22.2, and it took the theme's ink with it. Node fills come from

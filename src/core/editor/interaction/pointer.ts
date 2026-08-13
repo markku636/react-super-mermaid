@@ -681,6 +681,8 @@ export class PointerController {
     this.mode = { kind: 'idle' };
 
     if (m.kind === 'move') {
+      // 沒有實際位移時不會走 runCommand → 不會重繪 → 落點提示會留在畫面上,這裡自己收掉。
+      this.host.renderer.clearDropTarget();
       if (m.dx !== 0 || m.dy !== 0) this.host.runCommand(cmdMoveNodes(m.ids, m.dx, m.dy), 'move');
       this.host.overlay.clearGuides();
       this.host.refreshOverlay();

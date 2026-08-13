@@ -1818,6 +1818,66 @@ export class SceneRenderer {
       const g = this.edgeEls.get(edge.id);
       if (g) updateEdgeGeometry(g, preview, edge);
     }
+    this.showDropTarget(preview, ids);
+  }
+
+  /**
+   * 「放開會落在哪裡」的即時提示。
+   *
+   * 位置即資料的那幾種圖(看板欄 / 旅程階段 / git 分支 / 積木格),放手的瞬間就會改寫原始碼,
+   * 可是拖的過程中畫面上完全沒有東西告訴使用者會落到哪一格 —— 只能拖完看結果、錯了再拖回來。
+   * 這裡把即將落入的那一格描一圈,拖曳時同步跟著走。
+   */
+  private showDropTarget(preview: EditorScene, ids: Set<string>): void {
+    this.clearDropTarget();
+    const node = preview.nodes.find((n) => ids.has(n.id));
+    if (!node) return;
+    const type = preview.diagramType;
+    let rect: { x: number; y: number; w: number; h: number } | null = null;
+    if (type === 'kanban' || type === 'journey' || type === 'gitgraph') {
+      // 泳道類:節點中心落在哪一條泳道,就框那一條。
+      const cx = node.x + node.w / 2;
+      const cy = node.y + node.h / 2;
+      const hit = preview.containers
+        .map((c) => containerRect(preview, c.id))
+        .filter((r): r is NonNullable<typeof r> => Boolean(r))
+        .find((r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+      rect = hit ?? null;
+    } else if (type === 'block') {
+      const stepX = BLOCK_CELL.w + BLOCK_CELL.gapX;
+      const stepY = BLOCK_CELL.h + BLOCK_CELL.gapY;
+      const col = Math.max(0, Math.round((node.x - BLOCK_CELL.x0) / stepX));
+      const row = Math.max(0, Math.round((node.y - BLOCK_CELL.y0) / stepY));
+      rect = {
+        x: BLOCK_CELL.x0 + col * stepX,
+        y: BLOCK_CELL.y0 + row * stepY,
+        w: node.w,
+        h: BLOCK_CELL.h,
+      };
+    }
+    if (!rect) return;
+    const ink = this.dark ? INK_DARK : INK;
+    const box = svgEl('rect', {
+      class: 'rsm-drop-target',
+      x: rect.x,
+      y: rect.y,
+      width: rect.w,
+      height: rect.h,
+      rx: 8,
+      fill: ink,
+      'fill-opacity': 0.06,
+      stroke: ink,
+      'stroke-opacity': 0.45,
+      'stroke-width': 2,
+      'stroke-dasharray': '6 4',
+    });
+    box.style.pointerEvents = 'none';
+    this.frameLayer.appendChild(box);
+  }
+
+  /** 移除落點提示(放手 / 取消拖曳時)。 */
+  clearDropTarget(): void {
+    this.frameLayer.querySelectorAll('.rsm-drop-target').forEach((el) => el.remove());
   }
 
   /** 縮放預覽:就地重 rough 該節點 + 重繞入射邊,不寫模型。 */
