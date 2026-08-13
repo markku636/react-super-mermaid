@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.9.1 — class / ER boxes fit their contents; shape buttons get real icons
+
+- **Fix**: every class box and ER entity was drawn far taller than its content, leaving a slab of dead
+  white under the last row. Node geometry for those two types came from mermaid's dagre layout, which
+  measures with *mermaid's* font and padding — but the compartments are drawn by this editor, with its
+  own typography. New `render/node-metrics.ts` is the single source of truth for "how big does this
+  content need to be" (`classBoxSize` / `erEntitySize`), and the layout step now keeps mermaid's
+  *position* while correcting the *size*. In the sample class diagram: 129×129 → 103×73 and 40×79 →
+  92×35. It also replaces three divergent copies of the formula (class parse, ER parse, and the
+  structured-text editor's commit path), and measures CJK at full width instead of counting
+  characters — which is why a `狗` box used to come out 40px wide.
+- **Fix**: a class with no members and an ER entity with no attributes still drew the compartment
+  divider, so they rendered as a title plus one empty box. The divider now appears only when there is
+  a compartment under it.
+- **Fix**: state start / end / fork are *marks*, not states, but they were being coloured from the
+  same rotating palette as everything else — giving you a blue start dot and a purple end ring that
+  read like three peer states. They now render in ink, as mermaid does.
+- **New**: shape buttons show a real drawn icon instead of a text glyph. `⬭ ⬡ ⛁ 🏷` have no glyph in
+  most system UI fonts, so 「圓角 / 橢圓 / 六角」 all degraded to the same circle and 「類別」 shrank to a
+  dot. `shapeIconMarkup(shape)` returns a 24×16 inline SVG, shared by the React toolbar and the
+  VS Code webview toolbar.
+
 ## 0.9.0 — every diagram type gets its own shapes, not the flowchart's
 
 - **Fix**: the shape toolbar and the right-click shape strip were hardcoded to the *flowchart* shape

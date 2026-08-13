@@ -4,6 +4,7 @@
 import type { ParseResult, ParseWarning } from '../../adapters/types';
 import type { EditorScene, ErAttribute, ErCardinality, SceneEdge, SceneNode } from '../../scene/types';
 import type { MermaidLike } from '../../../../types';
+import { erEntitySize } from '../../render/node-metrics';
 
 interface MermaidApiLike {
   mermaidAPI?: { getDiagramFromText?: (t: string) => Promise<{ db?: unknown }> | { db?: unknown } };
@@ -47,14 +48,6 @@ function cardFromArrow(t: string | undefined): ErCardinality {
     default:
       return 'onlyOne';
   }
-}
-
-function entitySize(label: string, attrs: ErAttribute[]): { w: number; h: number } {
-  const rows = attrs.map((a) => `${a.type ?? ''} ${a.name ?? ''} ${(a.keys ?? []).join(',')}`.trim());
-  const longest = Math.max(label.length, ...rows.map((r) => r.length), 8);
-  const w = Math.max(120, longest * 7.5 + 24);
-  const h = 30 + Math.max(1, attrs.length) * 20 + 8;
-  return { w, h };
 }
 
 function prescan(src: string): { comments: string[] } {
@@ -121,7 +114,7 @@ export async function erDbToScene(text: string, mermaid: MermaidLike): Promise<P
       keys: a.keys && a.keys.length ? a.keys : undefined,
       comment: a.comment && a.comment.length ? a.comment : undefined,
     }));
-    const size = entitySize(name, attributes);
+    const size = erEntitySize(name, attributes);
     nodes.push({
       id: name,
       shape: 'entity',

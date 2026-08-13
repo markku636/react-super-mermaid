@@ -46,6 +46,7 @@ import {
   type Command,
 } from './interaction/commands';
 import { NODE_PALETTE } from './render/palette';
+import { classBoxSize, erEntitySize } from './render/node-metrics';
 import { containerRect, nextEdgeId, nextNodeId } from './scene/scene-ops';
 import { defaultShapeFor, makeEdgeFor, makeNodeFor } from './scene/node-factory';
 import { shapeMeta } from './scene/shape-meta';
@@ -202,8 +203,6 @@ function parseEditText(
   const lines = value.split('\n');
   const label = (lines[0] ?? '').trim() || node.id;
   const rest = lines.slice(1).map((l) => l.trim()).filter(Boolean);
-  const widest = Math.max(label.length, ...lines.map((l) => l.trim().length), 8);
-  const w = Math.max(120, widest * 7.5 + 24);
   if (node.data?.kind === 'er') {
     const attributes = rest.map((line) => {
       let comment: string | undefined;
@@ -221,7 +220,7 @@ function parseEditText(
         .map((k) => k.toUpperCase());
       return { name, type, keys: keys.length ? keys : undefined, comment };
     });
-    return { label, data: { kind: 'er', attributes }, w, h: 30 + Math.max(1, attributes.length) * 20 + 8 };
+    return { label, data: { kind: 'er', attributes }, ...erEntitySize(label, attributes) };
   }
   if (node.data?.kind === 'class') {
     let stereotype: string | undefined;
@@ -236,8 +235,12 @@ function parseEditText(
       if (l.includes('(')) methods.push(l);
       else members.push(l);
     }
-    const rows = (stereotype ? 1 : 0) + members.length + methods.length;
-    return { label, data: { kind: 'class', members, methods, stereotype }, w, h: 30 + Math.max(1, rows) * 19 + 12 };
+    const generic = node.data?.kind === 'class' ? node.data.generic : undefined;
+    return {
+      label,
+      data: { kind: 'class', members, methods, stereotype, generic },
+      ...classBoxSize(label, { members, methods, stereotype, generic }),
+    };
   }
   return null;
 }

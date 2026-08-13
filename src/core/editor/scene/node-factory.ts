@@ -18,6 +18,7 @@ import type {
   SceneEdge,
   SceneNode,
 } from './types';
+import { classBoxSize, erEntitySize } from '../render/node-metrics';
 
 /** 各圖種新節點的預設外形(adapter capabilities.defaults.nodeShape 的 core 版對照)。 */
 export function defaultShapeFor(type: DiagramType): NodeShape {
@@ -51,10 +52,11 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
     case 'circle':
     case 'doubleCircle':
       return { w: 76, h: 76 };
+    // 隔間框:交給內容尺寸模型,新建的空框才不會比它畫出來的東西大一圈。
     case 'classBox':
-      return { w: 170, h: 62 };
+      return classBoxSize('', {});
     case 'entity':
-      return { w: 170, h: 58 };
+      return erEntitySize('', []);
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
   }

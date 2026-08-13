@@ -9,7 +9,7 @@ import { moveNodes } from '../scene/scene-ops';
 import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
-import { INK, clusterByIndex, paletteByIndex, seedFor } from './palette';
+import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -153,7 +153,11 @@ export class SceneRenderer {
 
     // 依節點順序循序取色(非 hash),相鄰節點配色和諧。
     const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
-    const pal = paletteByIndex(idx >= 0 ? idx : 0);
+    // 偽狀態(起點 / 終點 / 分岔匯合)是「記號」不是「狀態」,mermaid 一律畫成墨色實心。
+    // 讓它們跟著彩色輪盤走會冒出藍色起點、紫色終點,看起來像三個地位相同的狀態。
+    const isPseudo = node.shape === 'stateStart' || node.shape === 'stateEnd' || node.shape === 'fork';
+    const ink = this.dark ? INK_DARK : INK;
+    const pal = isPseudo ? { fill: ink, stroke: ink } : paletteByIndex(idx >= 0 ? idx : 0);
     const opts = {
       ...ROUGH_LOOKS[this.look],
       seed: seedFor(node.id, this.baseSeed),
@@ -232,7 +236,8 @@ export class SceneRenderer {
     title.textContent = node.label;
     title.setAttribute(
       'style',
-      `font-weight:700;text-align:center;padding:5px 8px;border-bottom:1px solid ${INK};` +
+      // 沒有屬性就不畫分隔線 —— 否則框裡會多出一格空隔間(mermaid 對無屬性的實體也只畫一個名稱框)。
+      `font-weight:700;text-align:center;padding:5px 8px;${attrs.length ? `border-bottom:1px solid ${INK};` : ''}` +
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;',
     );
     root.appendChild(title as unknown as Node);
@@ -282,8 +287,10 @@ export class SceneRenderer {
     };
     // mermaid 泛型語法 ~T~ 在顯示時呈現為 <T>(序列化仍保留 ~T~)。
     const genericDisplay = (s: string): string => s.replace(/~([^~]+)~/g, '<$1>');
+    // 沒有成員也沒有方法就不畫分隔線 —— 否則只有類別名的框裡會多出一整格空隔間。
+    const hasBody = (data?.members?.length ?? 0) > 0 || (data?.methods?.length ?? 0) > 0;
     const title = mkSection(
-      `font-weight:700;text-align:center;padding:4px 8px;border-bottom:1px solid ${INK};white-space:pre-wrap;`,
+      `font-weight:700;text-align:center;padding:4px 8px;${hasBody ? `border-bottom:1px solid ${INK};` : ''}white-space:pre-wrap;`,
     );
     const nameWithGeneric = data?.generic ? `${node.label}~${data.generic}~` : node.label;
     title.textContent = (data?.stereotype ? `«${data.stereotype}»\n` : '') + genericDisplay(nameWithGeneric);

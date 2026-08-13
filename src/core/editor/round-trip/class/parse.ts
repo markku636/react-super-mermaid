@@ -3,6 +3,7 @@
 import type { ParseResult, ParseWarning } from '../../adapters/types';
 import type { ArrowHead, EditorScene, FlowDirection, SceneContainer, SceneEdge, SceneNode } from '../../scene/types';
 import type { MermaidLike } from '../../../../types';
+import { classBoxSize } from '../../render/node-metrics';
 
 interface MermaidApiLike {
   mermaidAPI?: { getDiagramFromText?: (t: string) => Promise<{ db?: unknown }> | { db?: unknown } };
@@ -85,13 +86,6 @@ function methodText(m: ClassMemberLike): string {
   return `${vis}${m.id ?? ''}(${m.parameters ?? ''})${m.classifier ?? ''}${ret}`.trim();
 }
 
-function classSize(label: string, rows: string[]): { w: number; h: number } {
-  const longest = Math.max(label.length, ...rows.map((r) => r.length), 8);
-  const w = Math.max(120, longest * 7.5 + 24);
-  const h = 30 + Math.max(1, rows.length) * 19 + 12;
-  return { w, h };
-}
-
 function prescan(src: string): { comments: string[]; generics: Map<string, string> } {
   const comments: string[] = [];
   // 類別自身的泛型參數(class Foo~T~)被 mermaid getData 丟棄 → 從原文撈回。
@@ -172,7 +166,12 @@ export async function classDbToScene(text: string, mermaid: MermaidLike): Promis
     const members = (dn.members ?? []).map(memberText).filter(Boolean);
     const methods = (dn.methods ?? []).map(methodText).filter(Boolean);
     const stereotype = dn.annotations && dn.annotations.length ? dn.annotations[0] : undefined;
-    const size = classSize(dn.label ?? dn.id, [...members, ...methods]);
+    const size = classBoxSize(dn.label ?? dn.id, {
+      members,
+      methods,
+      stereotype,
+      generic: pre.generics.get(dn.id),
+    });
     nodes.push({
       id: dn.id,
       shape: 'classBox',

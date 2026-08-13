@@ -3,6 +3,7 @@ import type { DiagramEditorHandle } from '../core/editor/controller';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { ArrowHead, LineKind, NodeShape } from '../core/editor/scene/types';
 import { shapeMeta } from '../core/editor/scene/shape-meta';
+import { shapeIconMarkup } from '../core/editor/render/shape-icon';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
 
 export interface EditorToolbarProps {
@@ -183,7 +184,8 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
               title={`新增${m.label}節點`}
               onClick={() => h?.addNode(shape)}
             >
-              <span className="rsm-shape-glyph">{m.glyph}</span>
+              {/* 圖示是 core 產的常數字串(無使用者輸入);字形縮圖在多數系統字型下畫不出來 */}
+              <span className="rsm-shape-glyph" dangerouslySetInnerHTML={{ __html: shapeIconMarkup(shape) }} />
               {m.label}
             </button>
           );

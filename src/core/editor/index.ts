@@ -79,3 +79,11 @@ export {
 export type { MakeNodeOptions, MakeEdgeOptions } from './scene/node-factory';
 export { shapeMeta } from './scene/shape-meta';
 export type { ShapeMeta } from './scene/shape-meta';
+export { shapeIconMarkup } from './render/shape-icon';
+export {
+  classBoxSize,
+  erEntitySize,
+  contentSize,
+  fitToContent,
+  textWidth,
+} from './render/node-metrics';

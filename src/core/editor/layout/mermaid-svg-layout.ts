@@ -6,6 +6,7 @@ import { loadMermaid } from '../../load-mermaid';
 import { authorIdFromDomId } from '../../node-index';
 import { renderToSvg } from '../../render-pipeline';
 import { boundingBox, type Rect } from '../scene/geometry';
+import { fitToContent } from '../render/node-metrics';
 import type { EditorScene, SceneNode } from '../scene/types';
 import type { LayoutContext, LayoutEngine } from './types';
 
@@ -90,13 +91,16 @@ export const mermaidSvgLayout: LayoutEngine = {
       const b = positions.get(n.id);
       if (!b) return n;
       const min = n.label ? labelMin(n.label) : { w: 0, h: 0 };
-      return {
+      const placed: SceneNode = {
         ...n,
         x: b.cx - b.w / 2 + shiftX,
         y: b.cy - b.h / 2 + shiftY,
         w: Math.max(b.w, min.w),
         h: Math.max(b.h, min.h),
       };
+      // class / er 的隔間框是本編輯器自己畫的:mermaid 是用它自己的字型與內距量的,直接沿用
+      // 會讓框比內容高一大截(框底浮一塊死白)。位置照 mermaid 的,尺寸校正回內容尺寸。
+      return fitToContent(placed);
     });
 
     // 容器幾何:由子節點 bounding box + padding 推得(比抓 cluster id 穩健)。
