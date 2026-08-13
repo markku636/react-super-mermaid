@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.19.1 — the new diagram types were unreadable in dark mode
+
+Every diagram type added since 0.10 had only ever been looked at on a light canvas. Running the UI
+check with `--dark` surfaced two systematic mistakes, both of which made real text invisible:
+
+- **Fix**: C4 boxes, requirement boxes and pie slices drew their text in *theme* ink — so on a dark
+  canvas they rendered light-grey text on the light pastel fill of the node itself. Node fills come
+  from a fixed light palette and do not follow the theme, so text sitting **on a node** must not
+  either. It is now pinned to dark ink, matching what flowchart labels already did.
+- **Fix**: the quadrant chart tinted its four quadrants with the node palette's pastel fills, which
+  turn into indistinguishable grey-brown mud over a dark background. They now use the cluster
+  palette — the same saturated-colour-at-low-alpha tint that subgraphs use — which was designed to
+  read on either background. Light mode gets a softer, cleaner wash out of the same change.
+- `verify:ui --dark` now runs the whole matrix on a dark canvas, so this class of regression is
+  caught rather than discovered by a user.
+
 ## 0.19.0 — architecture diagrams are drawable
 
 - **Feature**: new `architectureAdapter`. Services and junctions become draggable nodes, `group`s

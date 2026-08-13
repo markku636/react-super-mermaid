@@ -406,7 +406,9 @@ export class SceneRenderer {
     };
 
     quadrantRects().forEach((r, i) => {
-      const pal = paletteByIndex(i);
+      // 用叢集色(飽和色的低透明度)而不是節點的淺色 fill:淺粉彩壓在深色底上會糊成一片灰褐,
+      // 四個象限就分不出來了。叢集色本來就是為了「淺底深底都成立」設計的。
+      const pal = clusterByIndex(i);
       g.appendChild(
         svgEl('rect', {
           x: r.x,
@@ -414,7 +416,6 @@ export class SceneRenderer {
           width: r.w,
           height: r.h,
           fill: pal.fill,
-          'fill-opacity': this.dark ? 0.22 : 0.55,
           stroke: 'none',
         }),
       );
@@ -750,7 +751,8 @@ export class SceneRenderer {
         const t = svgEl('text', {
           x: PIE_GEO.cx + Math.cos(mid) * PIE_GEO.r * 0.86,
           y: PIE_GEO.cy + Math.sin(mid) * PIE_GEO.r * 0.86,
-          fill: ink,
+          // 百分比寫在淺色扇形上 → 墨色固定深色(跟著主題走會在深色模式消失)。
+          fill: INK,
           'text-anchor': 'middle',
           'dominant-baseline': 'middle',
           style: 'font:600 11px var(--rsm-editor-font);opacity:0.75;pointer-events:none;',
@@ -777,7 +779,8 @@ export class SceneRenderer {
     root.setAttribute(
       'style',
       'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:1px;' +
-        `text-align:center;color:${this.dark ? INK_DARK : INK};`,
+        // 把手文字壓在淺色扇形上 → 墨色固定深色。
+        `text-align:center;color:${INK};`,
     );
     const name = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     name.textContent = node.label;
@@ -983,7 +986,8 @@ export class SceneRenderer {
   private fillC4Box(g: SVGGElement, node: SceneNode): void {
     const d = node.data?.kind === 'c4' ? node.data : undefined;
     if (!d) return;
-    const ink = this.dark ? INK_DARK : INK;
+    // 文字畫在淺色節點底上 → 墨色固定用深色。跟著主題走的話,深色模式會變成淺字寫在淺底上。
+    const ink = INK;
     const parts = c4Lines(node.label, d);
     if (d.c4Type.includes('person')) {
       const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
@@ -1020,7 +1024,8 @@ export class SceneRenderer {
   private fillRequirementBox(g: SVGGElement, node: SceneNode): void {
     const req = node.data?.kind === 'requirement' ? node.data.req : undefined;
     if (!req) return;
-    const ink = this.dark ? INK_DARK : INK;
+    // 文字畫在淺色節點底上 → 墨色固定用深色。跟著主題走的話,深色模式會變成淺字寫在淺底上。
+    const ink = INK;
     const fo = svgEl('foreignObject', { x: 0, y: 0, width: node.w, height: node.h });
     fo.style.pointerEvents = 'none';
     const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
