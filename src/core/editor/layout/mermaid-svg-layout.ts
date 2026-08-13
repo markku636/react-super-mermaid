@@ -26,6 +26,49 @@ function readBox(g: SVGGraphicsElement): { cx: number; cy: number; w: number; h:
   return { cx: c.x, cy: c.y, w: bb.width, h: bb.height };
 }
 
+/**
+ * 內建後援排版:依容器分組,每組排成格狀,組與組之間上下堆疊。
+ *
+ * 只在「向 mermaid 問座標失敗」時用。刻意做得簡單且**確定性** —— 它的工作不是排得漂亮,
+ * 而是保證每個元素都在畫面上、各自分開、可以被拖到使用者要的位置。
+ */
+function gridLayout(scene: EditorScene): EditorScene {
+  const GAP_X = 46;
+  const GAP_Y = 40;
+  const GROUP_GAP = 56;
+  const byParent = new Map<string | null, SceneNode[]>();
+  for (const n of scene.nodes) {
+    const p = n.parentId ?? null;
+    byParent.set(p, [...(byParent.get(p) ?? []), n]);
+  }
+  const placed = new Map<string, { x: number; y: number }>();
+  let cursorY = PADDING;
+  // 先排根層,再依序排每個容器(容器本身的框由 renderer 依子節點 bbox 算)。
+  const groups: Array<string | null> = [null, ...scene.containers.map((c) => c.id)];
+  for (const gid of groups) {
+    const list = byParent.get(gid) ?? [];
+    if (!list.length) continue;
+    const cols = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(list.length))));
+    const colW = Math.max(...list.map((n) => n.w)) + GAP_X;
+    const rowH = Math.max(...list.map((n) => n.h)) + GAP_Y;
+    list.forEach((n, i) => {
+      placed.set(n.id, {
+        x: PADDING + (i % cols) * colW,
+        y: cursorY + Math.floor(i / cols) * rowH,
+      });
+    });
+    cursorY += Math.ceil(list.length / cols) * rowH + GROUP_GAP;
+  }
+  return {
+    ...scene,
+    nodes: scene.nodes.map((n) => {
+      const p = placed.get(n.id);
+      return p ? { ...n, x: p.x, y: p.y } : n;
+    }),
+    layoutOwner: 'user',
+  };
+}
+
 export const mermaidSvgLayout: LayoutEngine = {
   async layout(scene: EditorScene, ctx: LayoutContext): Promise<EditorScene> {
     assertBrowser('mermaidSvgLayout');
@@ -76,8 +119,9 @@ export const mermaidSvgLayout: LayoutEngine = {
     }
 
     if (positions.size === 0) {
-      // 抓不到座標 → 原樣返回(讓互動層用既有/預設座標),避免破壞。
-      return scene;
+      // 有些圖種(C4 等)的渲染器不吐 `g.node[id]`,一個座標都抓不到 —— 原樣返回代表整張圖疊在
+      // 原點,比排得不完美難看得多。改用內建的簡單分組排版,至少每個元素都看得到、拖得動。
+      return gridLayout(scene);
     }
 
     // 正規化:平移使最小左上角落在 (PADDING, PADDING)。

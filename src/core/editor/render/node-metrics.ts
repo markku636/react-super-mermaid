@@ -131,6 +131,50 @@ export function requirementBoxSize(label: string, req: RequirementData): { w: nu
   return { w, h: Math.ceil(h) + 2 };
 }
 
+// ── C4 ─────────────────────────────────────────────────────────────────────
+const C4_W = 190;
+const C4_TITLE_FONT = 13;
+const C4_META_FONT = 10.5;
+const C4_ROW = 15;
+
+/** C4 元素框上的文字列(«型別» / 名稱 / [技術] / 說明);渲染與量測共用。 */
+export function c4Lines(
+  label: string,
+  data: { c4Type: string; techn?: string; descr?: string },
+): { kind: string; title: string; techn?: string; descr?: string } {
+  const t = data.c4Type.replace(/^external_/, '').replace(/_/g, ' ');
+  const ext = data.c4Type.startsWith('external_') ? ', external' : '';
+  return {
+    kind: `«${t}${ext}»`,
+    title: label,
+    techn: data.techn ? `[${data.techn}]` : undefined,
+    descr: data.descr,
+  };
+}
+
+/** 說明文字在固定寬度下大約會佔幾行(免 DOM 的粗估;寧可多算一行也不要被裁掉)。 */
+function wrapRows(text: string | undefined, fontPx: number, innerW: number): number {
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(textWidth(text, fontPx) / innerW));
+}
+
+export function c4BoxSize(
+  label: string,
+  data: { c4Type: string; techn?: string; descr?: string },
+): { w: number; h: number } {
+  const parts = c4Lines(label, data);
+  const w = Math.max(C4_W, Math.ceil(textWidth(label, C4_TITLE_FONT) + 32));
+  const inner = w - 24;
+  // 人物圖示頂端多留一點高度(頭像圓)。
+  const head = data.c4Type.includes('person') ? 16 : 0;
+  const rows =
+    wrapRows(parts.kind, C4_META_FONT, inner) +
+    wrapRows(parts.title, C4_TITLE_FONT, inner) +
+    wrapRows(parts.techn, C4_META_FONT, inner) +
+    wrapRows(parts.descr, C4_META_FONT, inner);
+  return { w, h: Math.max(74, head + 16 + rows * C4_ROW) };
+}
+
 /**
  * 依節點內容算出它「該有」的尺寸。只有隔間框(class / er / requirement)有自己的內容模型;
  * 其餘外形交給排版引擎 / 使用者拖曳決定,回傳 null 表示「不要動它」。
@@ -140,6 +184,7 @@ export function contentSize(node: { label: string; data?: NodeData }): { w: numb
   if (d?.kind === 'class') return classBoxSize(node.label, d);
   if (d?.kind === 'er') return erEntitySize(node.label, d.attributes);
   if (d?.kind === 'requirement') return requirementBoxSize(node.label, d.req);
+  if (d?.kind === 'c4') return c4BoxSize(node.label, d);
   return null;
 }
 

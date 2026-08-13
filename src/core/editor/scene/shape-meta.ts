@@ -47,6 +47,11 @@ const META: Record<NodeShape, ShapeMeta> = {
   elementBox: { glyph: '▥', label: '元素' },
   // quadrant
   point: { glyph: '●', label: '資料點' },
+  // C4
+  c4Person: { glyph: '☻', label: '人員' },
+  c4Box: { glyph: '▭', label: '系統' },
+  c4Db: { glyph: '⛁', label: '資料庫' },
+  c4Queue: { glyph: '▤', label: '佇列' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

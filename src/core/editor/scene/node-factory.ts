@@ -18,8 +18,9 @@ import type {
   SceneEdge,
   SceneNode,
 } from './types';
-import { classBoxSize, erEntitySize, requirementBoxSize } from '../render/node-metrics';
+import { c4BoxSize, classBoxSize, erEntitySize, requirementBoxSize } from '../render/node-metrics';
 import { POINT_BOX } from '../round-trip/quadrant/model';
+import { C4_SHAPE_DEFAULT_TYPE } from '../round-trip/c4/shapes';
 
 /**
  * 新拖出來的需求 / 元素預填的內容。
@@ -51,6 +52,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'requirementBox';
     case 'quadrant':
       return 'point';
+    case 'c4':
+      return 'c4Box';
     case 'sequence':
       return 'participant';
     default:
@@ -83,6 +86,11 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
       return requirementBoxSize('', NEW_ELEMENT);
     case 'point':
       return { w: POINT_BOX, h: POINT_BOX };
+    case 'c4Person':
+    case 'c4Box':
+    case 'c4Db':
+    case 'c4Queue':
+      return c4BoxSize('', { c4Type: C4_SHAPE_DEFAULT_TYPE[shape] ?? 'system' });
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
   }
@@ -103,6 +111,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'requirement', req: shape === 'elementBox' ? { ...NEW_ELEMENT } : { ...NEW_REQUIREMENT } };
     case 'quadrant':
       return { kind: 'quadrant' };
+    case 'c4':
+      return { kind: 'c4', c4Type: C4_SHAPE_DEFAULT_TYPE[shape] ?? 'system' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:
@@ -208,6 +218,8 @@ function defaultEdgeDataFor(type: DiagramType): SceneEdge['data'] {
       return { kind: 'er', identifying: true, cardStart: 'onlyOne', cardEnd: 'zeroOrMore' };
     case 'requirement':
       return { kind: 'requirement', relation: 'satisfies' };
+    case 'c4':
+      return { kind: 'c4', relType: 'rel' };
     default:
       return { kind: 'flowchart' };
   }

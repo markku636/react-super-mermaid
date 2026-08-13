@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.12.0 — C4 diagrams are drawable
+
+- **Feature**: new `c4Adapter`, covering C4Context / C4Container / C4Component / C4Dynamic /
+  C4Deployment. People, systems, containers, components, databases and queues become scene nodes
+  (drawn with their «type», name, technology and description); `*_Boundary(…) { }` blocks become
+  containers, so nesting survives the round trip; `Rel` / `BiRel` and the directional variants become
+  edges. The `external_*` ⇄ `_Ext` and `container_db` ⇄ `ContainerDb` conversions are done by rule
+  rather than by a 20-entry table — a missing entry would silently downgrade an element's type.
+- `UpdateRelStyle` / `UpdateElementStyle` / `UpdateLayoutConfig` are preserved verbatim: mermaid
+  applies them into the model rather than keeping them, so anything reconstructed from the DB would
+  come back subtly different.
+- **Fix**: when mermaid's renderer emits no `g.node[id]` elements at all — which is exactly the case
+  for C4 — the layout step used to return the scene untouched, leaving every node stacked on the
+  origin. It now falls back to a deterministic grid layout grouped by container: not pretty, but
+  every element is visible, separated and draggable.
+
 ## 0.11.0 — quadrant charts, where dragging a point *is* editing its value
 
 - **Feature**: new `quadrantAdapter`. The chart frame (title, four coloured quadrants and their

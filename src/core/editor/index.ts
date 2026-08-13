@@ -24,6 +24,7 @@ export { mindmapAdapter, registerMindmapAdapter } from './adapters/mindmap';
 export { sequenceAdapter, registerSequenceAdapter } from './adapters/sequence';
 export { requirementAdapter, registerRequirementAdapter } from './adapters/requirement';
 export { quadrantAdapter, registerQuadrantAdapter } from './adapters/quadrant';
+export { c4Adapter, registerC4Adapter } from './adapters/c4';
 export { PLOT as QUADRANT_PLOT, valueToScene, sceneToValue } from './round-trip/quadrant/model';
 
 export type { EditorLook } from './render/scene-renderer';

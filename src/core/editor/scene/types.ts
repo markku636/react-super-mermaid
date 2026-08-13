@@ -15,6 +15,7 @@ export type DiagramType =
   | 'mindmap'
   | 'requirement'
   | 'quadrant'
+  | 'c4'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -52,6 +53,11 @@ export type NodeShape =
   | 'elementBox'
   // quadrant chart:一個資料點(位置就是它的值)
   | 'point'
+  // C4:人物 / 一般方塊 / 資料庫 / 佇列(細分的型別放在 data.c4Type)
+  | 'c4Person'
+  | 'c4Box'
+  | 'c4Db'
+  | 'c4Queue'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -111,6 +117,7 @@ export type NodeData =
   | { kind: 'requirement'; req: RequirementData }
   // 象限圖的點:值就是它在圖上的位置,所以這裡只放樣式類的附加設定。
   | { kind: 'quadrant'; radius?: number; color?: string; strokeColor?: string; strokeWidth?: string }
+  | { kind: 'c4'; c4Type: string; techn?: string; descr?: string }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -202,7 +209,8 @@ export type EdgeData =
       cardinalityTarget?: string;
     }
   | { kind: 'er'; identifying: boolean; cardStart?: ErCardinality; cardEnd?: ErCardinality }
-  | { kind: 'requirement'; relation: ReqRelation };
+  | { kind: 'requirement'; relation: ReqRelation }
+  | { kind: 'c4'; relType: string; techn?: string; descr?: string };
 
 /** ER 連線端的基數(crow's foot)。 */
 export type ErCardinality = 'zeroOrOne' | 'onlyOne' | 'zeroOrMore' | 'oneOrMore';
@@ -243,6 +251,8 @@ export interface SceneContainer {
   childContainerIds?: string[];
   /** 容器內方向(per-subgraph direction)。 */
   direction?: FlowDirection;
+  /** C4 邊界的種類(ENTERPRISE / SYSTEM / CONTAINER / …),決定序列化用哪個關鍵字。 */
+  c4Type?: string;
   sourceIndex?: number;
 }
 
@@ -258,6 +268,8 @@ export type SceneMeta =
   | { type: 'mindmap' }
   | { type: 'requirement'; direction?: FlowDirection }
   | { type: 'quadrant'; quadrant: QuadrantMeta }
+  /** c4Type = C4Context / C4Container / C4Component / C4Dynamic / C4Deployment(決定標頭關鍵字)。 */
+  | { type: 'c4'; c4Type: string; title?: string }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -317,6 +329,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   mindmap: { type: 'mindmap' },
   requirement: { type: 'requirement' },
   quadrant: { type: 'quadrant', quadrant: { quadrants: [] } },
+  c4: { type: 'c4', c4Type: 'C4Context' },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

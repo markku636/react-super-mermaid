@@ -154,7 +154,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const allShapes = caps?.shapes ?? [];
   const quickShapes = caps?.quickShapes ?? allShapes;
   const moreShapes = allShapes.filter((s) => !quickShapes.includes(s));
-  const showEdgeStyle = !isSeq && !isTimeline && !isReq && !isQuadrant && caps !== null;
+  // C4 的關係也只有 Rel / BiRel 與方向變體,不吃線型 / 箭頭。
+  const isC4 = props.diagramType === 'c4';
+  const showEdgeStyle = !isSeq && !isTimeline && !isReq && !isQuadrant && !isC4 && caps !== null;
   const showLineKinds = showEdgeStyle && lineKinds.length > 1;
   const showArrowEnd = showEdgeStyle && arrowHeads.length > 1;
   // 雙向箭頭(`<-->`)目前只在 flowchart 有明確語法。

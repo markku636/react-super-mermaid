@@ -10,7 +10,7 @@ import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
-import { requirementKind, requirementRows } from './node-metrics';
+import { c4Lines, requirementKind, requirementRows } from './node-metrics';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
@@ -219,6 +219,10 @@ export class SceneRenderer {
     }
     if (node.data?.kind === 'requirement') {
       this.fillRequirementBox(g, node);
+      return;
+    }
+    if (node.data?.kind === 'c4') {
+      this.fillC4Box(g, node);
       return;
     }
 
@@ -464,6 +468,43 @@ export class SceneRenderer {
         'white-space:nowrap;overflow:visible;',
     );
     fo.appendChild(div as unknown as Node);
+    g.appendChild(fo);
+  }
+
+  /** C4 元素框:«型別» + 名稱 +(技術)+ 說明;person 型別在框上方多一顆頭像圓。 */
+  private fillC4Box(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'c4' ? node.data : undefined;
+    if (!d) return;
+    const ink = this.dark ? INK_DARK : INK;
+    const parts = c4Lines(node.label, d);
+    if (d.c4Type.includes('person')) {
+      const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
+      const pal = paletteByIndex(idx >= 0 ? idx : 0);
+      g.appendChild(
+        svgEl('circle', { cx: node.w / 2, cy: 12, r: 10, fill: pal.fill, stroke: pal.stroke, 'stroke-width': 1.4 }),
+      );
+    }
+    const top = d.c4Type.includes('person') ? 20 : 0;
+    const fo = svgEl('foreignObject', { x: 0, y: top, width: node.w, height: Math.max(0, node.h - top) });
+    fo.style.pointerEvents = 'none';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;' +
+        `width:100%;height:100%;box-sizing:border-box;padding:4px 10px;overflow:hidden;text-align:center;color:${ink};`,
+    );
+    const line = (text: string | undefined, style: string): void => {
+      if (!text) return;
+      const el = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+      el.textContent = text;
+      el.setAttribute('style', style);
+      root.appendChild(el as unknown as Node);
+    };
+    line(parts.kind, `font:10.5px/1.35 var(--rsm-editor-font);opacity:0.65;white-space:nowrap;`);
+    line(parts.title, `font:700 13px/1.35 var(--rsm-editor-font);word-break:break-word;`);
+    line(parts.techn, `font:10.5px/1.35 var(--rsm-editor-font);opacity:0.7;white-space:nowrap;`);
+    line(parts.descr, `font:10.5px/1.4 var(--rsm-editor-font);opacity:0.85;word-break:break-word;`);
+    fo.appendChild(root as unknown as Node);
     g.appendChild(fo);
   }
 

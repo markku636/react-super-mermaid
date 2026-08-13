@@ -75,6 +75,15 @@ function body(shape: NodeShape): string {
       return `<rect x="3" y="2" width="18" height="12" rx="1" stroke-dasharray="3 2" ${S}/><path d="M3 7h18" ${S}/>`;
     case 'point':
       return `<path d="M12 2v12M6 8h12" stroke="currentColor" stroke-width="1" opacity="0.45"/><circle cx="15" cy="5.5" r="3" ${FILL}/>`;
+    // ── C4 ──
+    case 'c4Person':
+      return `<circle cx="12" cy="4" r="2.6" ${S}/><rect x="4" y="7.5" width="16" height="7" rx="1.5" ${S}/>`;
+    case 'c4Box':
+      return `<rect x="3" y="3" width="18" height="10" rx="1.5" ${S}/><path d="M6 6.5h8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.6"/>`;
+    case 'c4Db':
+      return `<path d="M4 5v6a8 2.2 0 0 0 16 0V5" ${S}/><ellipse cx="12" cy="5" rx="8" ry="2.2" ${S}/>`;
+    case 'c4Queue':
+      return `<rect x="3" y="4" width="18" height="8" rx="4" ${S}/><path d="M9 4v8M15 4v8" stroke="currentColor" stroke-width="1.1" opacity="0.6"/>`;
     case 'rectangle':
     default:
       return `<rect x="2" y="3" width="20" height="10" ${S}/>`;
