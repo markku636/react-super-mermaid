@@ -14,6 +14,7 @@ export type DiagramType =
   | 'state'
   | 'mindmap'
   | 'requirement'
+  | 'quadrant'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -49,6 +50,8 @@ export type NodeShape =
   // requirement
   | 'requirementBox'
   | 'elementBox'
+  // quadrant chart:一個資料點(位置就是它的值)
+  | 'point'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -106,6 +109,8 @@ export type NodeData =
   | { kind: 'er'; attributes: ErAttribute[] }
   | { kind: 'mindmap'; shapeType: number }
   | { kind: 'requirement'; req: RequirementData }
+  // 象限圖的點:值就是它在圖上的位置,所以這裡只放樣式類的附加設定。
+  | { kind: 'quadrant'; radius?: number; color?: string; strokeColor?: string; strokeWidth?: string }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -130,6 +135,18 @@ export type ReqType =
   | 'designConstraint';
 export type ReqRisk = 'low' | 'medium' | 'high';
 export type ReqVerify = 'analysis' | 'inspection' | 'test' | 'demonstration';
+/** quadrantChart 的圖表外框資訊(標題 / 兩軸端點文字 / 四個象限名)。點本身是場景節點。 */
+export interface QuadrantMeta {
+  title?: string;
+  /** x 軸左右端文字(`x-axis 低 --> 高`);只給左端時 mermaid 也接受。 */
+  xAxis?: { left: string; right?: string };
+  yAxis?: { bottom: string; top?: string };
+  /** quadrant-1..4 的名稱(1=右上、2=左上、3=左下、4=右下,與 mermaid 一致)。 */
+  quadrants: [string?, string?, string?, string?];
+  /** 未模型化的設定行(%%{init}%% 之外的 `classDef` 等)逐字保留。 */
+  extraLines?: string[];
+}
+
 export type ReqRelation =
   | 'contains'
   | 'copies'
@@ -240,6 +257,7 @@ export type SceneMeta =
   | { type: 'er'; direction?: FlowDirection }
   | { type: 'mindmap' }
   | { type: 'requirement'; direction?: FlowDirection }
+  | { type: 'quadrant'; quadrant: QuadrantMeta }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -298,6 +316,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   class: { type: 'class' },
   mindmap: { type: 'mindmap' },
   requirement: { type: 'requirement' },
+  quadrant: { type: 'quadrant', quadrant: { quadrants: [] } },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

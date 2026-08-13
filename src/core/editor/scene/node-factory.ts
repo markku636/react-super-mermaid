@@ -19,6 +19,7 @@ import type {
   SceneNode,
 } from './types';
 import { classBoxSize, erEntitySize, requirementBoxSize } from '../render/node-metrics';
+import { POINT_BOX } from '../round-trip/quadrant/model';
 
 /**
  * 新拖出來的需求 / 元素預填的內容。
@@ -48,6 +49,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'rounded';
     case 'requirement':
       return 'requirementBox';
+    case 'quadrant':
+      return 'point';
     case 'sequence':
       return 'participant';
     default:
@@ -78,6 +81,8 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
       return requirementBoxSize('', NEW_REQUIREMENT);
     case 'elementBox':
       return requirementBoxSize('', NEW_ELEMENT);
+    case 'point':
+      return { w: POINT_BOX, h: POINT_BOX };
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
   }
@@ -96,6 +101,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'mindmap', shapeType: mindmapShapeType(shape) };
     case 'requirement':
       return { kind: 'requirement', req: shape === 'elementBox' ? { ...NEW_ELEMENT } : { ...NEW_REQUIREMENT } };
+    case 'quadrant':
+      return { kind: 'quadrant' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

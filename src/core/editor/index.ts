@@ -23,6 +23,8 @@ export { classAdapter, registerClassAdapter } from './adapters/class';
 export { mindmapAdapter, registerMindmapAdapter } from './adapters/mindmap';
 export { sequenceAdapter, registerSequenceAdapter } from './adapters/sequence';
 export { requirementAdapter, registerRequirementAdapter } from './adapters/requirement';
+export { quadrantAdapter, registerQuadrantAdapter } from './adapters/quadrant';
+export { PLOT as QUADRANT_PLOT, valueToScene, sceneToValue } from './round-trip/quadrant/model';
 
 export type { EditorLook } from './render/scene-renderer';
 export { mermaidSvgLayout } from './layout/mermaid-svg-layout';

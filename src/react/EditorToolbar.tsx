@@ -143,6 +143,8 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
     props.diagramType === undefined;
   // 需求圖的連線意義由「關係種類」決定(右鍵切換),沒有線型 / 箭頭可調。
   const isReq = props.diagramType === 'requirement';
+  // 象限圖沒有連線,而且點的位置就是資料 → 自動排版會直接竄改數值,所以「連線 / 整理」都不給。
+  const isQuadrant = props.diagramType === 'quadrant';
 
   // 連線樣式控制項:依目前圖種能力顯示(只有一種選擇時整組隱藏,因無從選起)。
   const caps = h?.getCapabilities() ?? null;
@@ -152,7 +154,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const allShapes = caps?.shapes ?? [];
   const quickShapes = caps?.quickShapes ?? allShapes;
   const moreShapes = allShapes.filter((s) => !quickShapes.includes(s));
-  const showEdgeStyle = !isSeq && !isTimeline && !isReq && caps !== null;
+  const showEdgeStyle = !isSeq && !isTimeline && !isReq && !isQuadrant && caps !== null;
   const showLineKinds = showEdgeStyle && lineKinds.length > 1;
   const showArrowEnd = showEdgeStyle && arrowHeads.length > 1;
   // 雙向箭頭(`<-->`)目前只在 flowchart 有明確語法。
@@ -163,6 +165,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
     <div className="rsm-toolbar rsm-editor-toolbar">
       {!isTimeline && toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
       {!isTimeline &&
+        !isQuadrant &&
         toolBtn(
           'edge-create',
           isSeq ? '↘ 訊息' : '↘ 連線',
@@ -303,7 +306,13 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
           <button type="button" className="rsm-btn" onClick={() => h?.fit()} title="符合視窗">
             ⤢
           </button>
-          <button type="button" className="rsm-btn" onClick={() => void h?.tidy()} title="自動整理排版">
+          <button
+            type="button"
+            className="rsm-btn"
+            onClick={() => void h?.tidy()}
+            title="自動整理排版"
+            hidden={isQuadrant}
+          >
             ⌗ 整理
           </button>
         </>

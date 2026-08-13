@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0 — quadrant charts, where dragging a point *is* editing its value
+
+- **Feature**: new `quadrantAdapter`. The chart frame (title, four coloured quadrants and their
+  names, both axes, centre lines) is drawn as a background layer, and each data point is a scene
+  node. Because a point's **position is its value**, dragging needs no special plumbing at all —
+  `x`/`y` are the single source of truth and serialization converts back to `[0.30, 0.60]`. Points
+  are clamped to the plot while dragging rather than only at save time, so what you see is what gets
+  written. Automatic layout is disabled for this type: re-running it would silently rewrite the data.
+- Parsed with a small line parser rather than through mermaid's DB, because `getQuadrantData()`
+  only exposes already-rasterized drawing instructions (pixel coordinates, `hsl(...)` strings) —
+  the 0..1 values and the labels are simply not recoverable from it.
+- The renderer gained a `frameLayer` beneath containers for diagram types that have a *background*
+  rather than only nodes and edges.
+
 ## 0.10.0 — requirement diagrams are drawable
 
 - **Feature**: new `requirementAdapter`. Requirement diagrams now open on the canvas instead of

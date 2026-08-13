@@ -45,6 +45,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   // requirement
   requirementBox: { glyph: '▤', label: '需求' },
   elementBox: { glyph: '▥', label: '元素' },
+  // quadrant
+  point: { glyph: '●', label: '資料點' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

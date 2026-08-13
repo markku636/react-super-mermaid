@@ -73,6 +73,8 @@ function body(shape: NodeShape): string {
       return `<rect x="3" y="2" width="18" height="12" rx="1" ${S}/><path d="M3 7h18" ${S}/><path d="M6 10h12" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.65"/>`;
     case 'elementBox':
       return `<rect x="3" y="2" width="18" height="12" rx="1" stroke-dasharray="3 2" ${S}/><path d="M3 7h18" ${S}/>`;
+    case 'point':
+      return `<path d="M12 2v12M6 8h12" stroke="currentColor" stroke-width="1" opacity="0.45"/><circle cx="15" cy="5.5" r="3" ${FILL}/>`;
     case 'rectangle':
     default:
       return `<rect x="2" y="3" width="20" height="10" ${S}/>`;

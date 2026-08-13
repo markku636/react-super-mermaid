@@ -382,7 +382,9 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         ? '空白序列圖 — 在空白處按右鍵：新增參與者 / 訊息'
         : scene.diagramType === 'mindmap'
           ? '空白心智圖 — 點上方外形按鈕放下主題，再從節點拉線長出分支'
-          : '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
+          : scene.diagramType === 'quadrant'
+            ? '空白象限圖 — 雙擊格線上任一處放一個資料點，拖曳它就是在改它的值'
+            : '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
     emptyHint.appendChild(hintText);
     const sub = document.createElement('div');
     sub.className = 'rsm-empty-sub';

@@ -11,6 +11,7 @@ import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { requirementKind, requirementRows } from './node-metrics';
+import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -44,6 +45,7 @@ export class SceneRenderer {
   private look: EditorLook;
 
   private defs!: SVGDefsElement;
+  private frameLayer!: SVGGElement;
   private containersLayer!: SVGGElement;
   edgesLayer!: SVGGElement;
   nodesLayer!: SVGGElement;
@@ -65,9 +67,14 @@ export class SceneRenderer {
     return this.seqMsgRects.get(index);
   }
 
-  /** sequence 模式下的整張圖範圍(供 fit 用);其他圖種回 null(改用節點 bbox)。 */
+  /** sequence / quadrant 模式下的整張圖範圍(供 fit 用);其他圖種回 null(改用節點 bbox)。 */
   getContentBounds(): { x: number; y: number; w: number; h: number } | null {
     return this.seqBounds;
+  }
+
+  /** quadrant:繪圖區的世界座標(含四周軸標籤留白),供 fit 用。 */
+  private static quadrantBounds(): { x: number; y: number; w: number; h: number } {
+    return { x: PLOT.x - 70, y: PLOT.y - 50, w: PLOT.w + 110, h: PLOT.h + 100 };
   }
 
   constructor(opts: SceneRendererOptions = {}) {
@@ -99,11 +106,14 @@ export class SceneRenderer {
     this.defs = svgEl('defs');
     for (const m of buildMarkers(this.dark)) this.defs.appendChild(m);
     if (this.look === 'clean') this.appendShadowFilter();
+    // 圖表外框(象限圖等「有背景的圖種」)。壓在最底層,不參與節點 / 容器的差異渲染。
+    this.frameLayer = svgEl('g', { class: 'rsm-frame' });
     this.containersLayer = svgEl('g', { class: 'rsm-containers' });
     this.edgesLayer = svgEl('g', { class: 'rsm-edges' });
     this.nodesLayer = svgEl('g', { class: 'rsm-nodes' });
     this.overlayLayer = svgEl('g', { class: 'rsm-overlay' });
     parent.appendChild(this.defs);
+    parent.appendChild(this.frameLayer);
     parent.appendChild(this.containersLayer);
     parent.appendChild(this.edgesLayer);
     parent.appendChild(this.nodesLayer);
@@ -151,6 +161,12 @@ export class SceneRenderer {
     const hit = svgEl('rect', { x: 0, y: 0, width: node.w, height: node.h, fill: 'transparent', rx: 6 });
     hit.style.cursor = 'move';
     g.appendChild(hit);
+
+    // 象限圖的點:不走外形 / 手繪那一套(它就是一個資料點,畫成手繪多邊形只會變糊)。
+    if (node.data?.kind === 'quadrant') {
+      this.fillQuadrantPoint(g, node);
+      return;
+    }
 
     // 依節點順序循序取色(非 hash),相鄰節點配色和諧。
     const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
@@ -329,6 +345,125 @@ export class SceneRenderer {
     addRows(data?.members ?? [], false, !hasMethods);
     addRows(data?.methods ?? [], hasMembers, true);
     fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
+  }
+
+  /** 象限圖外框:四個象限底色 + 名稱、兩軸端點文字、中線、標題。 */
+  private renderQuadrantFrame(scene: EditorScene): void {
+    const meta = scene.meta.type === 'quadrant' ? scene.meta.quadrant : undefined;
+    const ink = this.dark ? INK_DARK : INK;
+    const g = this.frameLayer;
+    const text = (
+      s: string,
+      x: number,
+      y: number,
+      opts: { size?: number; weight?: number; anchor?: string; opacity?: number } = {},
+    ): void => {
+      if (!s) return;
+      const t = svgEl('text', {
+        x,
+        y,
+        fill: ink,
+        'text-anchor': opts.anchor ?? 'middle',
+        'dominant-baseline': 'middle',
+        style:
+          `font:${opts.weight ?? 500} ${opts.size ?? 13}px var(--rsm-editor-font);` +
+          `opacity:${opts.opacity ?? 0.85};pointer-events:none;`,
+      });
+      t.textContent = s;
+      g.appendChild(t);
+    };
+
+    quadrantRects().forEach((r, i) => {
+      const pal = paletteByIndex(i);
+      g.appendChild(
+        svgEl('rect', {
+          x: r.x,
+          y: r.y,
+          width: r.w,
+          height: r.h,
+          fill: pal.fill,
+          'fill-opacity': this.dark ? 0.22 : 0.55,
+          stroke: 'none',
+        }),
+      );
+      // 象限名放在該象限的上緣內側,不會和資料點打架。
+      text(meta?.quadrants[i] ?? '', r.x + r.w / 2, r.y + 20, { size: 14, weight: 600, opacity: 0.75 });
+    });
+
+    // 外框 + 十字中線。
+    g.appendChild(
+      svgEl('rect', {
+        x: PLOT.x,
+        y: PLOT.y,
+        width: PLOT.w,
+        height: PLOT.h,
+        fill: 'none',
+        stroke: ink,
+        'stroke-opacity': 0.35,
+      }),
+    );
+    for (const d of [
+      `M${PLOT.x + PLOT.w / 2},${PLOT.y} L${PLOT.x + PLOT.w / 2},${PLOT.y + PLOT.h}`,
+      `M${PLOT.x},${PLOT.y + PLOT.h / 2} L${PLOT.x + PLOT.w},${PLOT.y + PLOT.h / 2}`,
+    ]) {
+      g.appendChild(svgEl('path', { d, stroke: ink, 'stroke-opacity': 0.25, 'stroke-dasharray': '4 4', fill: 'none' }));
+    }
+
+    if (meta?.title) text(meta.title, PLOT.x + PLOT.w / 2, PLOT.y - 28, { size: 17, weight: 700, opacity: 1 });
+    // x 軸:左右端文字置於下緣;y 軸:上下端文字直排於左緣。
+    if (meta?.xAxis) {
+      text(meta.xAxis.left, PLOT.x + 4, PLOT.y + PLOT.h + 22, { anchor: 'start', opacity: 0.7 });
+      text(meta.xAxis.right ?? '', PLOT.x + PLOT.w - 4, PLOT.y + PLOT.h + 22, { anchor: 'end', opacity: 0.7 });
+    }
+    if (meta?.yAxis) {
+      const rot = (s: string, y: number, anchor: string): void => {
+        if (!s) return;
+        const t = svgEl('text', {
+          x: PLOT.x - 24,
+          y,
+          fill: ink,
+          'text-anchor': anchor,
+          'dominant-baseline': 'middle',
+          transform: `rotate(-90 ${PLOT.x - 24} ${y})`,
+          style: 'font:500 13px var(--rsm-editor-font);opacity:0.7;pointer-events:none;',
+        });
+        t.textContent = s;
+        g.appendChild(t);
+      };
+      rot(meta.yAxis.bottom, PLOT.y + PLOT.h - 4, 'start');
+      rot(meta.yAxis.top ?? '', PLOT.y + 4, 'end');
+    }
+  }
+
+  /** 象限圖資料點:小圓 + 下方標籤(標籤不吃指標事件,才不會擋住拖曳)。 */
+  private fillQuadrantPoint(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'quadrant' ? node.data : undefined;
+    const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
+    const pal = paletteByIndex(idx >= 0 ? idx : 0);
+    const r = Math.max(4, Math.min(14, d?.radius ?? 7));
+    g.appendChild(
+      svgEl('circle', {
+        cx: node.w / 2,
+        cy: node.h / 2,
+        r,
+        fill: d?.color ?? pal.stroke,
+        stroke: d?.strokeColor ?? (this.dark ? '#0b1220' : '#ffffff'),
+        'stroke-width': 2,
+      }),
+    );
+    if (!node.label) return;
+    const fo = svgEl('foreignObject', { x: -60 + node.w / 2, y: node.h / 2 + r, width: 120, height: 22 });
+    fo.style.pointerEvents = 'none';
+    fo.style.overflow = 'visible';
+    const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    div.textContent = node.label;
+    div.setAttribute(
+      'style',
+      `text-align:center;font:600 12px/1.5 var(--rsm-editor-font);color:${this.dark ? INK_DARK : INK};` +
+        'white-space:nowrap;overflow:visible;',
+    );
+    fo.appendChild(div as unknown as Node);
     g.appendChild(fo);
   }
 
@@ -662,6 +797,13 @@ export class SceneRenderer {
       return;
     }
     this.seqBounds = null;
+    // 象限圖:先畫圖表外框(四象限 + 兩軸 + 標題),點才有可讀的參照。
+    // 它是「背景」而非場景元素,所以有自己的圖層、每次重畫、也不進節點快取。
+    while (this.frameLayer.firstChild) this.frameLayer.removeChild(this.frameLayer.firstChild);
+    if (scene.diagramType === 'quadrant') {
+      this.renderQuadrantFrame(scene);
+      this.seqBounds = SceneRenderer.quadrantBounds();
+    }
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {
