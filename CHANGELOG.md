@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.0 — xy charts: drag a point to change the number
+
+- **Feature**: new `xychartAdapter`. Each data point is a node whose **vertical position is its
+  value** — drag it up and the number goes up, with the value shown above the point as you move it.
+  Horizontal movement is locked to the point's category: x is a categorical axis, so sliding
+  sideways would only look like it changed something. Bars and lines are drawn from the live node
+  positions, so a drag updates the chart immediately, and the y range clamps the value.
+- Parsed line-by-line rather than via mermaid's DB, which again only exposes rasterized drawing
+  geometry. `horizontal` layouts are passed through read-only rather than half-supported.
+
 ## 0.17.0 — pie charts are editable
 
 - **Feature**: new `pieAdapter`. The pie itself is drawn on the canvas (slices, separators and a

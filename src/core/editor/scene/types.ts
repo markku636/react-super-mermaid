@@ -21,6 +21,7 @@ export type DiagramType =
   | 'journey'
   | 'gantt'
   | 'pie'
+  | 'xychart'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -73,6 +74,8 @@ export type NodeShape =
   | 'ganttBar'
   // pie:一個扇形(節點是它的質心把手)
   | 'pieSlice'
+  // xychart:一個資料點(垂直位置就是它的值)
+  | 'xyPoint'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -140,6 +143,8 @@ export type NodeData =
   /** 甘特任務:旗標(done/active/crit/milestone)+ 原始的起訖寫法(保留 after / 工期單位)。 */
   | { kind: 'gantt'; flags: string[]; startRaw: string; endRaw: string; afterId?: string }
   | { kind: 'pie'; value: number }
+  /** xychart 資料點:屬於第幾組系列、第幾個類別(值由節點的 y 決定)。 */
+  | { kind: 'xy'; series: number; index: number }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -183,6 +188,17 @@ export interface GanttMeta {
   epoch?: number;
   /** excludes / todayMarker / tickInterval 等 DB 未建模的設定行,逐字保留。 */
   settings: string[];
+}
+
+/** xychart 的圖表層資訊。資料值本身由節點的 y 決定,這裡只留類別與系列的骨架。 */
+export interface XyChartMeta {
+  title?: string;
+  xTitle?: string;
+  yTitle?: string;
+  yMin: number;
+  yMax: number;
+  categories: string[];
+  series: Array<{ kind: 'bar' | 'line'; name?: string; values: number[] }>;
 }
 
 export type ReqRelation =
@@ -308,6 +324,7 @@ export type SceneMeta =
   | { type: 'journey'; title?: string }
   | { type: 'gantt'; gantt: GanttMeta }
   | { type: 'pie'; title?: string; showData: boolean }
+  | { type: 'xychart'; xy: XyChartMeta }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -373,6 +390,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   journey: { type: 'journey' },
   gantt: { type: 'gantt', gantt: { settings: [] } },
   pie: { type: 'pie', showData: false },
+  xychart: { type: 'xychart', xy: { categories: [], series: [], yMin: 0, yMax: 100 } },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

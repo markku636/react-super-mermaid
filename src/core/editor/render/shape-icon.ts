@@ -86,6 +86,8 @@ function body(shape: NodeShape): string {
       return `<rect x="3" y="4" width="18" height="8" rx="4" ${S}/><path d="M9 4v8M15 4v8" stroke="currentColor" stroke-width="1.1" opacity="0.6"/>`;
     case 'sankeyNode':
       return `<rect x="3" y="2" width="4" height="12" rx="1" ${FILL}/><path d="M8 6h9" stroke="currentColor" stroke-width="3.4" opacity="0.5" stroke-linecap="round"/><path d="M8 11h6" stroke="currentColor" stroke-width="1.8" opacity="0.5" stroke-linecap="round"/><rect x="18" y="2" width="3" height="12" rx="1" ${FILL}/>`;
+    case 'xyPoint':
+      return `<path d="M3 14V2M3 14h18" stroke="currentColor" stroke-width="1.2" opacity="0.5" fill="none"/><path d="M6 11l4-4 4 3 5-6" ${S}/>`;
     case 'pieSlice':
       return `<circle cx="12" cy="8" r="6" ${S}/><path d="M12 8 L12 2 A6 6 0 0 1 17.2 11 Z" ${FILL}/>`;
     case 'ganttBar':

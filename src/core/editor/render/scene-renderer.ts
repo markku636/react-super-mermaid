@@ -13,6 +13,7 @@ import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palett
 import { c4Lines, requirementKind, requirementRows } from './node-metrics';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { PIE as PIE_GEO, angleOf as pieAngleOf, sliceAngles as pieSliceAngles } from '../round-trip/pie';
+import { XY as XY_PLOT, bandX as xyBandX, yToValue as xyYToValue } from '../round-trip/xychart';
 import { DAY_W as GANTT_DAY_W, ORIGIN as GANTT_ORIGIN, ROW_H as GANTT_ROW_H, formatDay as ganttFormatDay } from '../round-trip/gantt/model';
 
 /** 甘特圖的版面常數(集中成一個物件,渲染這邊讀起來比一串同名 import 清楚)。 */
@@ -175,6 +176,10 @@ export class SceneRenderer {
     }
     if (node.data?.kind === 'pie') {
       this.fillPieSlice(g, node);
+      return;
+    }
+    if (node.data?.kind === 'xy') {
+      this.fillXyPoint(g, node);
       return;
     }
 
@@ -541,6 +546,146 @@ export class SceneRenderer {
       w: right - GANTT.ORIGIN.x + 120,
       h: bottom - top + 70,
     };
+  }
+
+  /** xychart 外框:座標軸 + 刻度 + 長條 / 折線(資料點本身是節點)。 */
+  private renderXyFrame(scene: EditorScene): void {
+    const meta = scene.meta.type === 'xychart' ? scene.meta.xy : undefined;
+    if (!meta) return;
+    const ink = this.dark ? INK_DARK : INK;
+    const g = this.frameLayer;
+    const n = Math.max(1, meta.categories.length);
+    const pointOf = (si: number, i: number): SceneNode | undefined =>
+      scene.nodes.find((x) => x.data?.kind === 'xy' && x.data.series === si && x.data.index === i);
+
+    // 水平刻度線(5 等分)+ 值標。
+    for (let k = 0; k <= 4; k += 1) {
+      const y = XY_PLOT.y + (XY_PLOT.h * k) / 4;
+      g.appendChild(
+        svgEl('path', {
+          d: `M${XY_PLOT.x},${y} L${XY_PLOT.x + XY_PLOT.w},${y}`,
+          stroke: ink,
+          'stroke-opacity': k === 4 ? 0.4 : 0.12,
+          fill: 'none',
+        }),
+      );
+      const t = svgEl('text', {
+        x: XY_PLOT.x - 10,
+        y,
+        fill: ink,
+        'text-anchor': 'end',
+        'dominant-baseline': 'middle',
+        style: 'font:500 11px var(--rsm-editor-font);opacity:0.65;pointer-events:none;',
+      });
+      t.textContent = String(Math.round((meta.yMax - ((meta.yMax - meta.yMin) * k) / 4) * 100) / 100);
+      g.appendChild(t);
+    }
+    // 類別標籤。
+    meta.categories.forEach((c, i) => {
+      const t = svgEl('text', {
+        x: xyBandX(i, n),
+        y: XY_PLOT.y + XY_PLOT.h + 18,
+        fill: ink,
+        'text-anchor': 'middle',
+        style: 'font:500 11px var(--rsm-editor-font);opacity:0.75;pointer-events:none;',
+      });
+      t.textContent = c;
+      g.appendChild(t);
+    });
+
+    // 系列:bar 畫長條、line 畫折線(都直接吃節點目前的位置,所以拖曳當下就看得到結果)。
+    const barSeries = meta.series.filter((s) => s.kind === 'bar').length;
+    let barSlot = 0;
+    meta.series.forEach((series, si) => {
+      const pal = paletteByIndex(si);
+      if (series.kind === 'bar') {
+        const band = XY_PLOT.w / n;
+        const bw = Math.max(6, (band * 0.62) / Math.max(1, barSeries));
+        const offset = (barSlot - (barSeries - 1) / 2) * bw;
+        barSlot += 1;
+        series.values.forEach((_, i) => {
+          const p = pointOf(si, i);
+          if (!p) return;
+          const cy = p.y + p.h / 2;
+          const base = XY_PLOT.y + XY_PLOT.h;
+          g.appendChild(
+            svgEl('rect', {
+              x: xyBandX(i, n) + offset - bw / 2,
+              y: Math.min(cy, base),
+              width: bw,
+              height: Math.abs(base - cy),
+              rx: 2,
+              fill: pal.stroke,
+              'fill-opacity': 0.75,
+            }),
+          );
+        });
+        return;
+      }
+      const pts = series.values
+        .map((_, i) => pointOf(si, i))
+        .filter((p): p is SceneNode => Boolean(p))
+        .map((p) => `${p.x + p.w / 2},${p.y + p.h / 2}`);
+      if (pts.length > 1) {
+        g.appendChild(
+          svgEl('path', {
+            d: `M${pts.join(' L')}`,
+            stroke: pal.stroke,
+            'stroke-width': 2.4,
+            fill: 'none',
+            'stroke-linejoin': 'round',
+          }),
+        );
+      }
+    });
+
+    if (meta.title) {
+      const t = svgEl('text', {
+        x: XY_PLOT.x + XY_PLOT.w / 2,
+        y: XY_PLOT.y - 26,
+        fill: ink,
+        'text-anchor': 'middle',
+        style: 'font:700 16px var(--rsm-editor-font);pointer-events:none;',
+      });
+      t.textContent = meta.title;
+      g.appendChild(t);
+    }
+    this.seqBounds = {
+      x: XY_PLOT.x - 70,
+      y: XY_PLOT.y - 50,
+      w: XY_PLOT.w + 110,
+      h: XY_PLOT.h + 100,
+    };
+  }
+
+  /** xychart 資料點:小圓點 + 數值(值即位置,拖著就是在改它)。 */
+  private fillXyPoint(g: SVGGElement, node: SceneNode): void {
+    const meta = this.scene?.meta.type === 'xychart' ? this.scene.meta.xy : undefined;
+    const si = node.data?.kind === 'xy' ? node.data.series : 0;
+    const pal = paletteByIndex(si);
+    g.appendChild(
+      svgEl('circle', {
+        cx: node.w / 2,
+        cy: node.h / 2,
+        r: 5.5,
+        fill: pal.stroke,
+        stroke: this.dark ? '#0b1220' : '#ffffff',
+        'stroke-width': 2,
+      }),
+    );
+    if (!meta) return;
+    const value = xyYToValue(node.y + node.h / 2, meta.yMin, meta.yMax);
+    const fo = svgEl('foreignObject', { x: -30 + node.w / 2, y: -16, width: 60, height: 16 });
+    fo.style.pointerEvents = 'none';
+    fo.style.overflow = 'visible';
+    const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    div.textContent = String(value);
+    div.setAttribute(
+      'style',
+      `text-align:center;font:600 11px/16px var(--rsm-editor-font);color:${this.dark ? INK_DARK : INK};white-space:nowrap;`,
+    );
+    fo.appendChild(div as unknown as Node);
+    g.appendChild(fo);
   }
 
   /** 圓餅圖外框:標題 + 各扇形(扇形本身畫在這裡,節點只是它的質心把手)。 */
@@ -1155,6 +1300,7 @@ export class SceneRenderer {
     }
     if (scene.diagramType === 'gantt') this.renderGanttFrame(scene);
     if (scene.diagramType === 'pie') this.renderPieFrame(scene);
+    if (scene.diagramType === 'xychart') this.renderXyFrame(scene);
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {

@@ -65,6 +65,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'ganttBar';
     case 'pie':
       return 'pieSlice';
+    case 'xychart':
+      return 'xyPoint';
     case 'sequence':
       return 'participant';
     default:
@@ -137,6 +139,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'gantt', flags: [], startRaw: '', endRaw: '1d' };
     case 'pie':
       return { kind: 'pie', value: 1 };
+    case 'xychart':
+      return { kind: 'xy', series: 0, index: 0 };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

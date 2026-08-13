@@ -14,6 +14,7 @@ import { registerSankeyAdapter } from '../core/editor/adapters/sankey';
 import { registerJourneyAdapter } from '../core/editor/adapters/journey';
 import { registerGanttAdapter } from '../core/editor/adapters/gantt';
 import { registerPieAdapter } from '../core/editor/adapters/pie';
+import { registerXychartAdapter } from '../core/editor/adapters/xychart';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -34,6 +35,7 @@ registerSankeyAdapter();
 registerJourneyAdapter();
 registerGanttAdapter();
 registerPieAdapter();
+registerXychartAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

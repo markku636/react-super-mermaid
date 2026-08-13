@@ -15,6 +15,7 @@ import type {
 import type { Rect } from './geometry';
 import { anchorPoint, boundingBox, nodeRect, perimeterAnchor, rectCenter, shapeAnchor } from './geometry';
 import { PLOT } from '../round-trip/quadrant/model';
+import { XY as XY_PLOT } from '../round-trip/xychart';
 
 let nodeCounter = 0;
 let edgeCounter = 0;
@@ -156,12 +157,16 @@ export function makeEdge(
 export function moveNodes(scene: EditorScene, ids: Set<string>, dx: number, dy: number): EditorScene {
   // 象限圖的位置就是資料值(0..1),拖出繪圖區的部分序列化時會被夾住 ——
   // 與其讓畫面上的點停在框外、存檔後卻跳回邊界,不如在拖曳當下就夾住。
-  const clamp = scene.diagramType === 'quadrant' ? clampToPlot : null;
+  // xychart 同理,而且它的 x 是分類軸:橫向自由移動沒有意義,所以只放行垂直方向。
+  const clamp =
+    scene.diagramType === 'quadrant' ? clampToPlot : scene.diagramType === 'xychart' ? clampToXyPlot : null;
   return {
     ...scene,
-    nodes: scene.nodes.map((n) =>
-      ids.has(n.id) ? { ...(clamp ? clamp({ ...n, x: n.x + dx, y: n.y + dy }) : { ...n, x: n.x + dx, y: n.y + dy }), pinned: true } : n,
-    ),
+    nodes: scene.nodes.map((n) => {
+      if (!ids.has(n.id)) return n;
+      const moved = { ...n, x: n.x + dx, y: n.y + dy };
+      return { ...(clamp ? clamp(moved, n.x) : moved), pinned: true };
+    }),
   };
 }
 
@@ -170,6 +175,12 @@ function clampToPlot<T extends { x: number; y: number; w: number; h: number }>(n
   const cx = Math.min(PLOT.x + PLOT.w, Math.max(PLOT.x, n.x + n.w / 2));
   const cy = Math.min(PLOT.y + PLOT.h, Math.max(PLOT.y, n.y + n.h / 2));
   return { ...n, x: cx - n.w / 2, y: cy - n.h / 2 };
+}
+
+/** xychart:x 鎖回原本的欄位(分類軸),y 夾在繪圖區內。 */
+function clampToXyPlot<T extends { x: number; y: number; w: number; h: number }>(n: T, origX: number): T {
+  const cy = Math.min(XY_PLOT.y + XY_PLOT.h, Math.max(XY_PLOT.y, n.y + n.h / 2));
+  return { ...n, x: origX, y: cy - n.h / 2 };
 }
 
 export function resizeNode(scene: EditorScene, id: string, rect: { x: number; y: number; w: number; h: number }): EditorScene {
