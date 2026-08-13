@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.22.2 — cards, bars and people
+
+- **kanban / user journey / gantt**: these three draw their own filled box, but the shape layer had
+  already drawn a rough rectangle of exactly the same size underneath — so every card and every bar
+  showed a small torn notch at each corner, where the hand-drawn stroke overshoots. They now skip the
+  shape layer entirely, like the other types that own their fill.
+- **gantt**: the task name is written **inside** the bar when it fits, the way every gantt chart is
+  read, instead of always hanging off the right edge where it collided with the next bar along.
+  Milestone labels clear the diamond rather than touching it.
+- **C4**: a `Person` drew a head circle in the same pastel as the box it sat on, which read as an
+  empty ring floating above the text. It's a filled head and shoulders now, in the node's own colour.
+
 ## 0.22.1 — the chart types read better
 
 Three things that were wrong every time you looked at them, rather than only in edge cases.

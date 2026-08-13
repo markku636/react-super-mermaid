@@ -200,6 +200,16 @@ export class SceneRenderer {
       this.fillGitCommit(g, node);
       return;
     }
+    // 泳道卡片與甘特長條也是自己畫底框的:再讓 rough 畫一次同尺寸的框,四個角就會露出
+    // 手繪筆觸多出來的那一小截,看起來像卡片破角。
+    if (node.data?.kind === 'gantt') {
+      this.fillGanttBar(g, node);
+      return;
+    }
+    if (node.data?.kind === 'kanban' || node.data?.kind === 'journey') {
+      this.fillKanbanCard(g, node);
+      return;
+    }
 
     // 依節點順序循序取色(非 hash),相鄰節點配色和諧。
     const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
@@ -256,14 +266,6 @@ export class SceneRenderer {
     }
     if (node.data?.kind === 'c4') {
       this.fillC4Box(g, node);
-      return;
-    }
-    if (node.data?.kind === 'gantt') {
-      this.fillGanttBar(g, node);
-      return;
-    }
-    if (node.data?.kind === 'kanban' || node.data?.kind === 'journey') {
-      this.fillKanbanCard(g, node);
       return;
     }
 
@@ -1141,16 +1143,28 @@ export class SceneRenderer {
       );
     }
     if (!node.label) return;
-    // 名稱畫在長條右側(條本身可能很短,寫在裡面會被裁掉)。
-    const fo = svgEl('foreignObject', { x: node.w + 6, y: 0, width: 220, height: node.h });
+    // 名稱優先寫在長條**裡面**(甘特圖本來就這樣讀);放不下才靠到右側,
+    // 否則長條一多,右邊那排字就會壓到隔壁的條。里程碑是個小菱形,一律外掛。
+    const milestone = d?.flags.includes('milestone') ?? false;
+    const inside = !milestone && textWidth(node.label, 12) + 18 <= node.w;
+    // 深色實心長條上的字要反白;done 的長條是淺底,維持墨色。
+    const onFill = inside && !done;
+    // 里程碑是菱形,右頂點在 w/2 + h/2 —— 從 w 開始寫字會貼到菱形上。
+    const outsideX = milestone ? node.w / 2 + node.h / 2 + 8 : node.w + 6;
+    const fo = svgEl('foreignObject', {
+      x: inside ? 9 : outsideX,
+      y: 0,
+      width: inside ? Math.max(0, node.w - 18) : 220,
+      height: node.h,
+    });
     fo.style.pointerEvents = 'none';
     fo.style.overflow = 'visible';
     const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     div.textContent = node.label;
     div.setAttribute(
       'style',
-      `display:flex;align-items:center;height:100%;font:12px/1.3 var(--rsm-editor-font);` +
-        `color:${this.dark ? INK_DARK : INK};white-space:nowrap;`,
+      `display:flex;align-items:center;height:100%;font:${onFill ? '600 ' : ''}12px/1.3 var(--rsm-editor-font);` +
+        `color:${onFill ? '#ffffff' : this.dark ? INK_DARK : INK};white-space:nowrap;`,
     );
     fo.appendChild(div as unknown as Node);
     g.appendChild(fo);
@@ -1256,8 +1270,15 @@ export class SceneRenderer {
     if (d.c4Type.includes('person')) {
       const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
       const pal = paletteByIndex(idx >= 0 ? idx : 0);
+      // 頭 + 肩:先前只畫一個和底色同色的空心圓,看起來像框裡飄了個圈,而不是「這是個人」。
+      const cx = node.w / 2;
+      g.appendChild(svgEl('circle', { cx, cy: 11, r: 6, fill: pal.stroke, stroke: 'none' }));
       g.appendChild(
-        svgEl('circle', { cx: node.w / 2, cy: 12, r: 10, fill: pal.fill, stroke: pal.stroke, 'stroke-width': 1.4 }),
+        svgEl('path', {
+          d: `M${cx - 11},${23} a11,9 0 0 1 22,0 Z`,
+          fill: pal.stroke,
+          stroke: 'none',
+        }),
       );
     }
     const top = d.c4Type.includes('person') ? 20 : 0;
