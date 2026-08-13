@@ -599,4 +599,30 @@ svg[id^="rsm-"] text.pieTitleText { font-weight: 700 !important; }
  * 文字完整呈現。代價是放棄 200px 自動換行(行寬交給圖源的 <br> 控制),對檢視器是正確取捨。
  * 與上方字重規則同理 scope 在 svg[id^="rsm-"],量測時暫掛 <body> 下也吃得到,且不污染 host。 */
 svg[id^="rsm-"] foreignObject > div { max-width: none !important; }
+
+/* ── HTML 標籤不吃 host 的閱讀排版(量測階段就生效)──
+ * mermaid 量測 htmlLabels 時,是把一顆暫時的 svg 掛在 <body> 底下量,量完把結果「寫死」進
+ * <foreignObject width/height>。等圖真的掛進 host 容器後,容器自己的排版才開始作用 —— 部落格
+ * 文章、文件網站、Notion 風格頁面幾乎都會對 <p> 下 line-height / letter-spacing(例如
+ * #article p { line-height: 1.9; letter-spacing: .01em }),而 mermaid 11 的節點標籤內層正好
+ * 就是 <p>(div > span.nodeLabel > p)。於是同一段文字在框裡變得又高又寬:量到 96x48 的標籤
+ * 實際畫出來是 96x91(行高 +27%、字距把字推到多折一行),下緣直接被節點框裁掉。
+ * 解法:跟上面兩條同理,把所有「會改變行框尺寸」的可繼承屬性 scope 在 svg[id^="rsm-"] 上釘死。
+ * 量測時(暫掛 <body>)與掛進 host 後吃到的是同一組值 → 量到的框永遠等於畫出來的字。
+ * !important 不可省:host 常用 id 選擇器(如 #single-entry-content p),純 class 打不贏;
+ * 同理 host 端加 .not-prose 也沒用 —— 那只關得掉 tailwind typography,關不掉 host 自己的規則。
+ * 只放行 padding/margin 給 <p>(edge label 的 .labelBkg 靠 padding 撐底色,不能一起清掉)。 */
+svg[id^="rsm-"] foreignObject div,
+svg[id^="rsm-"] foreignObject span,
+svg[id^="rsm-"] foreignObject p {
+  line-height: 1.5 !important;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  text-indent: 0 !important;
+  text-transform: none !important;
+  text-wrap: wrap !important;
+  overflow-wrap: normal !important;
+  word-break: normal !important;
+}
+svg[id^="rsm-"] foreignObject p { margin: 0 !important; padding: 0 !important; }
 `;

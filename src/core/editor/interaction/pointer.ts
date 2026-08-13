@@ -28,6 +28,7 @@ import {
   cmdAddNode,
   cmdMoveNodes,
   cmdReconnectEdge,
+  cmdInsertSeqMessage,
   cmdReorderSeqParticipant,
   cmdResizeNode,
   type Command,
@@ -65,6 +66,8 @@ const MIN_H = 28;
 const SNAP_TOL_SCREEN = 6;
 // 連線錨點命中 / 吸附半徑(螢幕 px;除以 zoom 換算世界座標)。
 const ANCHOR_HIT_SCREEN = 16;
+// sequence 生命線的水平命中寬容(世界 px)。生命線本身只有 1px,不給寬容根本拖不準。
+const SEQ_LIFELINE_HIT = 28;
 
 type Mode =
   | { kind: 'idle' }
@@ -72,6 +75,8 @@ type Mode =
   | { kind: 'move'; startWorld: Point; ids: string[]; bases: Map<string, Rect>; dx: number; dy: number }
   // sequence 專屬:參與者只能左右拖換序(非自由位移)。targetIndex = 移除被拖者後的插入位置。
   | { kind: 'seq-reorder'; id: string; startWorld: Point; base: Rect; targetIndex: number }
+  // sequence 專屬:從生命線拖到另一條 → 插入一則訊息。落點的 Y 決定插在第幾則。
+  | { kind: 'seq-msg-draw'; fromId: string; startWorld: Point }
   | { kind: 'resize'; nodeId: string; dir: ResizeDir; startRect: Rect; startWorld: Point; cur: Rect }
   // fromAnchor:從來源節點哪個固定錨點起拉(null = 從節點本體拉 → 浮動來源錨)。
   | { kind: 'rubber-edge'; sourceId: string; from: Point; fromAnchor: EdgeAnchor | null }
@@ -183,6 +188,54 @@ export class PointerController {
   }
 
   /**
+   * sequence 專用命中:找出游標所在的參與者。
+   *
+   * 不能用 nodeUnder —— 那是矩形命中,只涵蓋頂端(與底端)的參與者方框。使用者拖曳時是沿著
+   * **生命線**走的,游標多半落在兩個方框之間的長條空白區,矩形命中會回 null。這裡改成只比對
+   * X 是否落在該參與者的水平範圍內(生命線就在方框正中央向下延伸),Y 一律接受。
+   */
+  private seqParticipantUnder(clientX: number, clientY: number, exclude?: string): SceneNode | null {
+    const w = this.host.viewport.screenToWorld(clientX, clientY);
+    const scene = this.host.getScene();
+    if (scene.diagramType !== 'sequence') return null;
+    let best: SceneNode | null = null;
+    let bestDist = Infinity;
+    for (const n of scene.nodes) {
+      if (n.id === exclude || n.data?.kind !== 'sequence') continue;
+      // 同一個參與者在頂端與底端各有一個框,取水平距離最近的那個中心。
+      const cx = n.x + n.w / 2;
+      const dist = Math.abs(w.x - cx);
+      if (dist <= n.w / 2 + SEQ_LIFELINE_HIT && dist < bestDist) {
+        bestDist = dist;
+        best = n;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * 由放開時的螢幕 Y 推出要插在第幾則陳述。
+   *
+   * 用已渲染的 `[data-seq-msg]` 元素直接比 client 座標,不做世界座標換算 —— 那些元素身上的
+   * 屬性值就是 statements 的索引,所以「第一個中心點在放開位置下方的訊息」就是插入點;
+   * 都在上方(或圖上還沒有任何訊息)則附加到最後。
+   */
+  private seqInsertIndexAt(clientY: number): number {
+    const total = this.host.getScene().sequence?.statements.length ?? 0;
+    const els = [...this.svg.querySelectorAll('[data-seq-msg]')];
+    let insertAt = total;
+    for (const el of els) {
+      const idx = Number(el.getAttribute('data-seq-msg'));
+      if (!Number.isFinite(idx)) continue;
+      const box = (el as SVGGraphicsElement).getBoundingClientRect();
+      if (box.y + box.height / 2 > clientY) {
+        insertAt = Math.min(insertAt, idx);
+      }
+    }
+    return insertAt;
+  }
+
+  /**
    * 回傳「按壓點靠近其某個固定錨點(8 點:4 邊中點 + 4 角)」的節點與該錨點;優先檢查 hover 的節點。
    * 純幾何判定 → 即使白點凸出到節點外、DOM 命中抓不到,也能起連線。
    */
@@ -270,11 +323,23 @@ export class PointerController {
       return;
     }
 
-    // sequence:參與者只接「左右拖換序」+ 雙擊改名。自由位移 / 縮放 / 連線對序列圖無意義
-    // (拖了不寫回 code、又會弄亂版面),故在此攔截並提早返回,不落入下方 resize / 連線分支。
+    // sequence:自由位移 / 縮放對序列圖無意義(拖了不寫回 code、又會弄亂版面),所以在此攔截,
+    // 不落入下方 resize 分支。但兩件事是有意義的,分別對應兩個工具:
+    //   edge-create → 從生命線拖到另一條生命線 = 插入一則訊息(落點 Y 決定插在第幾則)
+    //   select      → 左右拖曳參與者換序 + 雙擊改名
     {
       const seqScene = this.host.getScene();
       if (seqScene.diagramType === 'sequence') {
+        // 訊息模式的起點用**幾何**命中,不能用 DOM 命中:使用者是沿著生命線拖的,
+        // 起點多半落在兩個參與者方框之間的空白處,那裡沒有 [data-node-id] 元素。
+        if (this.tool === 'edge-create') {
+          const start = this.seqParticipantUnder(e.clientX, e.clientY);
+          if (start) {
+            this.setSelection([start.id]);
+            this.mode = { kind: 'seq-msg-draw', fromId: start.id, startWorld: world };
+            return;
+          }
+        }
         const sid = this.hitNode(target);
         const snode = sid ? getNode(seqScene, sid) : null;
         if (snode && snode.data?.kind === 'sequence') {
@@ -562,6 +627,19 @@ export class PointerController {
       return;
     }
 
+    if (m.kind === 'seq-msg-draw') {
+      // 訊息是水平箭頭:兩端都固定在游標當下的 Y,拖出來的橡皮筋才長得像將要產生的那條訊息。
+      const src = getNode(this.host.getScene(), m.fromId);
+      const tgt = this.seqParticipantUnder(c.x, c.y, m.fromId);
+      if (src) {
+        const fromX = nodeRect(src).x + nodeRect(src).w / 2;
+        const toX = tgt ? nodeRect(tgt).x + nodeRect(tgt).w / 2 : world.x;
+        this.host.overlay.showRubberBand({ x: fromX, y: world.y }, { x: toX, y: world.y }, zoom);
+      }
+      this.host.overlay.showDropTarget(tgt ? nodeRect(tgt) : null, zoom);
+      return;
+    }
+
     if (m.kind === 'reconnect-edge') {
       const tgt = this.nodeUnder(c.x, c.y);
       const snap = tgt ? this.snapAnchor(tgt, world) : null;
@@ -602,6 +680,20 @@ export class PointerController {
         this.host.runCommand(cmdReorderSeqParticipant(m.id, m.targetIndex), 'reorder-participant');
       } else {
         this.host.refreshOverlay(); // 沒換序(或只是點一下)→ 選取框彈回原位。
+      }
+      return;
+    }
+    if (m.kind === 'seq-msg-draw') {
+      this.host.overlay.clearTransient();
+      this.host.overlay.showDropTarget(null, 1);
+      const tgt = this.seqParticipantUnder(e.clientX, e.clientY, m.fromId);
+      if (tgt) {
+        this.host.runCommand(
+          cmdInsertSeqMessage(m.fromId, tgt.id, this.seqInsertIndexAt(e.clientY)),
+          'add-message',
+        );
+      } else {
+        this.host.refreshOverlay(); // 放在空白處 = 取消,不留下半條訊息。
       }
       return;
     }

@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.8.7 — sequence diagrams can be drawn by dragging
+
+- **Feature**: drag from one lifeline to another to insert a message. The drop position's **vertical**
+  coordinate decides where in the order the message lands, so you can insert in the middle instead of
+  only appending at the end. The toolbar now offers `↘ 訊息` for sequence diagrams, where it
+  previously showed only select/pan.
+- Sequence is not a node/edge diagram — `scene.edges` is always empty and the whole diagram lives in
+  the ordered `scene.sequence.statements` array — so it could not reuse the flowchart edge-create
+  flow. Committing through `cmdAddEdge` would have pushed a `SceneEdge` that `renderSequence` never
+  draws and `sceneToSequence` never reads, i.e. the message would silently vanish. Sequence now has
+  its own drag mode with two differences that no other diagram type has: the drop target is a
+  **column** (x-only hit test, any y — the user drags along a lifeline, where there is no node box),
+  and the y coordinate carries semantic meaning (the insertion index).
+- New `cmdInsertSeqMessage(from, to, index, arrow, text)`. The existing `cmdAddSeqMessage` hardcodes
+  `participants[0] → participants[1]` and always appends, so it could not serve drag-to-draw.
+- The insertion index is read off the already-rendered `[data-seq-msg]` elements rather than computed
+  as `(y - ROW0) / ROW_H` — that arithmetic is wrong because `activate`/`deactivate` statements
+  occupy no row while `fragment`/`end` do.
+- Select-mode participant reordering and double-click rename are unchanged.
+
+## 0.8.5 — node labels no longer get clipped by the host page's typography
+
+- **Fix**: node label text was cut off at the bottom (and wrapped an extra line) whenever the
+  diagram was mounted inside a container that styles `<p>` for reading — e.g. a blog article with
+  `#article p { line-height: 1.9; letter-spacing: .01em }`. Mermaid measures `htmlLabels` in a
+  throwaway SVG under `<body>` and then hard-codes the result onto `<foreignObject width/height>`,
+  so any typography the host applies *after* mounting makes the text bigger than the box it was
+  measured for: a label measured at 96×48 rendered at 96×91 and got clipped by the node.
+  All inherited properties that change the line box (`line-height`, `letter-spacing`,
+  `word-spacing`, `text-indent`, `text-transform`, `text-wrap`, `overflow-wrap`, `word-break`,
+  plus `<p>` margins/padding) are now pinned on `svg[id^="rsm-"]`, which matches both the
+  measuring SVG and the mounted one, so measured size and painted size always agree.
+  Hosts no longer need a `foreignObject` CSS override, and `.not-prose` never helped anyway —
+  it only disables tailwind typography, not the host's own rules.
+
 ## 0.8.4 — sequence editor: draggable bottom row, colored lifelines, discoverable hint
 
 - **Fix**: the bottom (duplicate) participant box in a sequence diagram had no `data-node-id`,

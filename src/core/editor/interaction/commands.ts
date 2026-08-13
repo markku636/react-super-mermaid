@@ -223,6 +223,31 @@ export function cmdAddSeqMessage(): Command {
   };
 }
 
+/**
+ * sequence:在指定位置插入一則訊息(拖曳繪製用)。
+ *
+ * 與 cmdAddSeqMessage 的差別在「插在哪」:拖曳是從一條生命線拉到另一條,落點的垂直位置
+ * 就是使用者想插入的時間點,所以必須能插在中間,而不是一律附加到最後。
+ * index 以 statements 陣列為準(含 note / loop / alt 等非訊息陳述),超界會夾到合法區間。
+ */
+export function cmdInsertSeqMessage(
+  from: string,
+  to: string,
+  index: number,
+  arrow = '->>',
+  text = 'message',
+): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const ids = new Set(scene.sequence.participants.map((p) => p.id));
+    if (!ids.has(from) || !ids.has(to)) return { scene, patch: {} };
+    const statements = [...scene.sequence.statements];
+    const i = Math.max(0, Math.min(index, statements.length));
+    statements.splice(i, 0, { kind: 'message' as const, from, to, arrow, text });
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
 /** sequence:新增 note(預設 over 第一位參與者;新增後可直接編輯文字)。 */
 export function cmdAddSeqNote(): Command {
   return (scene) => {

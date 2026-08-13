@@ -184,7 +184,12 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   return (
     <div className="rsm-toolbar rsm-editor-toolbar">
       {!isTimeline && toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
-      {!isSeq && !isTimeline && toolBtn('edge-create', '↘ 連線', '從節點拉出連線（E）')}
+      {!isTimeline &&
+        toolBtn(
+          'edge-create',
+          isSeq ? '↘ 訊息' : '↘ 連線',
+          isSeq ? '從一條生命線拖到另一條，插入一則訊息（E）' : '從節點拉出連線（E）',
+        )}
       {!isTimeline && toolBtn('pan', '✋ 平移', '平移畫布')}
 
       {isTimeline && <span className="rsm-tb-hint">時間軸：在左側表單編輯區段 / 時間點 / 事件</span>}
@@ -230,7 +235,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       )}
 
       {isSeq && (
-        <span className="rsm-tb-hint">拖曳參與者可重新排序 · 右鍵空白處：新增參與者 / 訊息</span>
+        <span className="rsm-tb-hint">
+          訊息模式：從一條生命線拖到另一條 · 選取模式：拖曳參與者可重新排序 · 右鍵空白處：新增參與者 / 訊息
+        </span>
       )}
 
       {/* 連線樣式:線型 + 箭頭。作用於選取的連線;未選取時設為「新連線」的預設。 */}
