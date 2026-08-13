@@ -69,6 +69,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'xyPoint';
     case 'architecture':
       return 'archNode';
+    case 'block':
+      return 'rectangle';
     case 'sequence':
       return 'participant';
     default:
@@ -145,6 +147,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'xy', series: 0, index: 0 };
     case 'architecture':
       return { kind: 'architecture' };
+    case 'block':
+      return { kind: 'block', span: 1 };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

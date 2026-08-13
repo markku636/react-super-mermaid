@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.20.0 — block diagrams are drawable
+
+- **Feature**: new `blockAdapter`. Block diagrams flow into a `columns N` grid, so **the cell a block
+  sits in is its position in the source** — dragging a block to another cell is exactly the edit this
+  diagram type exists for, and 「整理」 snaps everything back onto the grid (honouring column spans,
+  wrapping the way mermaid does). Shapes reuse the flowchart bracket table, since block-beta shares
+  that syntax.
+- Only the subset that can be reproduced exactly is taken on: nested `block:… end`, labelled arrows
+  and `style` lines pass the file through verbatim as read-only, with a warning naming the construct.
+- Block **ids may be CJK**, like flowchart ids — the first cut restricted them to `[A-Za-z0-9_-]`,
+  which would have silently made every Chinese block diagram read-only. Only characters that clash
+  with the syntax itself are excluded now.
+
 ## 0.19.1 — the new diagram types were unreadable in dark mode
 
 Every diagram type added since 0.10 had only ever been looked at on a light canvas. Running the UI

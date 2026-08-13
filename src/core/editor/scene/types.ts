@@ -23,6 +23,7 @@ export type DiagramType =
   | 'pie'
   | 'xychart'
   | 'architecture'
+  | 'block'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -150,6 +151,8 @@ export type NodeData =
   | { kind: 'xy'; series: number; index: number }
   /** architecture 服務:圖示名(cloud/database/disk/server/internet)與是否為 junction。 */
   | { kind: 'architecture'; icon?: string; junction?: boolean }
+  /** block 積木:占幾個欄位(位置決定它在網格的哪一格)。 */
+  | { kind: 'block'; span: number }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -333,6 +336,7 @@ export type SceneMeta =
   | { type: 'pie'; title?: string; showData: boolean }
   | { type: 'xychart'; xy: XyChartMeta }
   | { type: 'architecture' }
+  | { type: 'block'; columns: number }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -400,6 +404,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   pie: { type: 'pie', showData: false },
   xychart: { type: 'xychart', xy: { categories: [], series: [], yMin: 0, yMax: 100 } },
   architecture: { type: 'architecture' },
+  block: { type: 'block', columns: 1 },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };
