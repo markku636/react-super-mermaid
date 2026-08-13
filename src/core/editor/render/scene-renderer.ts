@@ -16,6 +16,7 @@ import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { PIE as PIE_GEO, angleOf as pieAngleOf, sliceAngles as pieSliceAngles } from '../round-trip/pie';
 import { XY as XY_PLOT, bandX as xyBandX, yToValue as xyYToValue } from '../round-trip/xychart';
 import { BIT as PACKET_BIT } from '../round-trip/packet';
+import { CELL as BLOCK_CELL } from '../round-trip/block';
 import { DAY_W as GANTT_DAY_W, ORIGIN as GANTT_ORIGIN, ROW_H as GANTT_ROW_H, formatDay as ganttFormatDay } from '../round-trip/gantt/model';
 
 import { GIT, gitLaneIndexAt, gitgraphLinks } from '../round-trip/gitgraph';
@@ -25,6 +26,39 @@ const GANTT = { DAY_W: GANTT_DAY_W, ROW_H: GANTT_ROW_H, ORIGIN: GANTT_ORIGIN } a
 
 /** 用「泳道」呈現的圖種:容器框要可被點到(改名 / 刪除),其餘圖種維持穿透。 */
 const LANE_DIAGRAMS = new Set(['kanban', 'journey', 'gitgraph']);
+
+/** 中日韓字元(含全形標點)。 */
+const CJK_RE = /[　-鿿豈-﫿＀-￯]/;
+
+/**
+ * 直排的軸標籤。
+ *
+ * 中日韓文字轉 90 度會整排「躺著」—— 直排的正確排法是每個字立著往下疊,所以 CJK 走
+ * writing-mode,西文才維持由下往上轉的慣例。象限圖與 xychart 兩邊共用同一個判斷。
+ */
+function verticalAxisText(
+  s: string,
+  x: number,
+  y: number,
+  ink: string,
+  font: string,
+  anchor: string,
+): SVGElement {
+  const cjk = CJK_RE.test(s);
+  const t = svgEl('text', {
+    x,
+    y,
+    fill: ink,
+    'text-anchor': anchor,
+    'dominant-baseline': 'middle',
+    style:
+      `font:${font} var(--rsm-editor-font);opacity:0.7;pointer-events:none;` +
+      (cjk ? 'writing-mode:vertical-rl;text-orientation:upright;letter-spacing:1px;' : ''),
+    ...(cjk ? {} : { transform: `rotate(-90 ${x} ${y})` }),
+  });
+  t.textContent = s;
+  return t;
+}
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -468,17 +502,7 @@ export class SceneRenderer {
     if (meta?.yAxis) {
       const rot = (s: string, y: number, anchor: string): void => {
         if (!s) return;
-        const t = svgEl('text', {
-          x: PLOT.x - 24,
-          y,
-          fill: ink,
-          'text-anchor': anchor,
-          'dominant-baseline': 'middle',
-          transform: `rotate(-90 ${PLOT.x - 24} ${y})`,
-          style: 'font:500 13px var(--rsm-editor-font);opacity:0.7;pointer-events:none;',
-        });
-        t.textContent = s;
-        g.appendChild(t);
+        g.appendChild(verticalAxisText(s, PLOT.x - 24, y, ink, '500 13px', anchor));
       };
       rot(meta.yAxis.bottom, PLOT.y + PLOT.h - 4, 'start');
       rot(meta.yAxis.top ?? '', PLOT.y + 4, 'end');
@@ -686,20 +710,7 @@ export class SceneRenderer {
     }
     if (meta.yTitle) {
       const cy = XY_PLOT.y + XY_PLOT.h / 2;
-      // 中日韓文字轉 90 度會變成「躺著」,正確排法是直排立著;西文則維持由下往上轉。
-      const cjk = /[　-鿿豈-﫿＀-￯]/.test(meta.yTitle);
-      const t = svgEl('text', {
-        x: XY_PLOT.x - 54,
-        y: cy,
-        fill: ink,
-        'text-anchor': 'middle',
-        style:
-          'font:600 12px var(--rsm-editor-font);opacity:0.72;pointer-events:none;' +
-          (cjk ? 'writing-mode:vertical-rl;text-orientation:upright;letter-spacing:1px;' : ''),
-        ...(cjk ? {} : { transform: `rotate(-90 ${XY_PLOT.x - 54} ${cy})` }),
-      });
-      t.textContent = meta.yTitle;
-      g.appendChild(t);
+      g.appendChild(verticalAxisText(meta.yTitle, XY_PLOT.x - 54, cy, ink, '600 12px', 'middle'));
     }
     this.seqBounds = {
       x: XY_PLOT.x - 80,
@@ -881,6 +892,43 @@ export class SceneRenderer {
       w: totalBits * PACKET_BIT.w + 80,
       h: PACKET_BIT.h + 110,
     };
+  }
+
+  /**
+   * 積木圖的網格底線。
+   *
+   * 積木圖唯一要講的事就是「這塊在哪一格」,可是畫面上原本什麼參考線都沒有 —— 拖動時
+   * 完全看不出自己會落到哪一格。這裡把 `columns N` 的格線畫成極淡的底圖當作對位參考。
+   */
+  private renderBlockFrame(scene: EditorScene): void {
+    const cols = scene.meta.type === 'block' ? Math.max(1, scene.meta.columns) : 1;
+    if (scene.nodes.length === 0) return;
+    const ink = this.dark ? INK_DARK : INK;
+    const g = this.frameLayer;
+    const stepX = BLOCK_CELL.w + BLOCK_CELL.gapX;
+    const stepY = BLOCK_CELL.h + BLOCK_CELL.gapY;
+    const rows = Math.max(
+      1,
+      Math.ceil((Math.max(...scene.nodes.map((n) => n.y + n.h)) - BLOCK_CELL.y0 + 1) / stepY),
+    );
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        g.appendChild(
+          svgEl('rect', {
+            x: BLOCK_CELL.x0 + c * stepX,
+            y: BLOCK_CELL.y0 + r * stepY,
+            width: BLOCK_CELL.w,
+            height: BLOCK_CELL.h,
+            rx: 8,
+            fill: ink,
+            'fill-opacity': 0.035,
+            stroke: ink,
+            'stroke-opacity': 0.12,
+            'stroke-dasharray': '4 4',
+          }),
+        );
+      }
+    }
   }
 
   /**
@@ -1654,6 +1702,7 @@ export class SceneRenderer {
     if (scene.diagramType === 'xychart') this.renderXyFrame(scene);
     if (scene.diagramType === 'packet') this.renderPacketFrame(scene);
     if (scene.diagramType === 'gitgraph') this.renderGitgraphFrame(scene);
+    if (scene.diagramType === 'block') this.renderBlockFrame(scene);
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {

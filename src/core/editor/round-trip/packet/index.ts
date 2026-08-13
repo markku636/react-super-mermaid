@@ -12,7 +12,10 @@ import type { ParseResult, ParseWarning } from '../../adapters/types';
 import type { DataLossWarning, SerializeResult } from '../../adapters/types';
 import type { EditorScene, SceneNode } from '../../scene/types';
 
-export const BIT = { w: 26, h: 62, x0: 60, y0: 90 } as const;
+// 一個 bit 的寬度與整條帶的高度。
+// 26×62 的話,一份 96-bit 的封包會畫成 2496×62 的細長條 —— 符合畫面只好縮到 5 成,
+// 欄名跟著小到看不清楚。壓窄每個 bit、加高整條帶,同一份封包的長寬比從 40:1 降到 12:1。
+export const BIT = { w: 14, h: 104, x0: 60, y0: 90 } as const;
 
 const RANGE_RE = /^(\d+)\s*(?:-\s*(\d+))?\s*:\s*"?(.*?)"?\s*$/;
 const REL_RE = /^\+\s*(\d+)\s*:\s*"?(.*?)"?\s*$/;

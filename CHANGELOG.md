@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.23.1 — the grid-shaped types get their grid back
+
+- **block**: the diagram is *about* which cell a block sits in, and the canvas drew no cell
+  boundaries at all — so while dragging you could not tell which cell you were about to land in. The
+  `columns N` grid is now drawn as a very faint dashed backdrop, and a block spanning two columns
+  reads as spanning two columns.
+- **packet**: a 96-bit packet was drawn 2496×62, so 「符合畫面」 shrank it to about half size and the
+  field names went with it. Narrower bits and a taller strip bring the same packet from 40:1 down to
+  roughly 12:1, and it now fits at ~90%.
+- **quadrant**: the y-axis end labels had the same problem the xychart y-title did — CJK rotated 90°
+  lies on its side. Both now go through one `verticalAxisText()`: CJK stacks upright, Latin keeps the
+  bottom-to-top rotation it's normally set in.
+
 ## 0.23.0 — architecture diagrams get real icons, and "fit" stops cropping groups
 
 - **architecture**: services drew a 56px box in the middle of a 132px node, so every connection
