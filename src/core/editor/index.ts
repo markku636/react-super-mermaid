@@ -27,6 +27,7 @@ export { quadrantAdapter, registerQuadrantAdapter } from './adapters/quadrant';
 export { c4Adapter, registerC4Adapter } from './adapters/c4';
 export { kanbanAdapter, registerKanbanAdapter } from './adapters/kanban';
 export { sankeyAdapter, registerSankeyAdapter } from './adapters/sankey';
+export { journeyAdapter, registerJourneyAdapter } from './adapters/journey';
 export { PLOT as QUADRANT_PLOT, valueToScene, sceneToValue } from './round-trip/quadrant/model';
 
 export type { EditorLook } from './render/scene-renderer';

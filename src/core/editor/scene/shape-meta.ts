@@ -56,6 +56,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   kanbanCard: { glyph: '▤', label: '卡片' },
   // sankey
   sankeyNode: { glyph: '▮', label: '節點' },
+  // journey
+  journeyTask: { glyph: '▤', label: '任務' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

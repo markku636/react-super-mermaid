@@ -225,7 +225,7 @@ export class SceneRenderer {
       this.fillC4Box(g, node);
       return;
     }
-    if (node.data?.kind === 'kanban') {
+    if (node.data?.kind === 'kanban' || node.data?.kind === 'journey') {
       this.fillKanbanCard(g, node);
       return;
     }
@@ -475,9 +475,13 @@ export class SceneRenderer {
     g.appendChild(fo);
   }
 
-  /** 看板卡片:白底卡 + 標題,底下一列 metadata(負責人 / 票號 / 優先序)。 */
+  /**
+   * 卡片式節點:白底卡 + 標題 + 一列附註。看板與旅程圖共用同一張卡
+   * (看板附註是負責人 / 票號 / 優先序;旅程圖是心情臉譜 + 參與角色)。
+   */
   private fillKanbanCard(g: SVGGElement, node: SceneNode): void {
     const d = node.data?.kind === 'kanban' ? node.data : undefined;
+    const j = node.data?.kind === 'journey' ? node.data : undefined;
     const ink = this.dark ? INK_DARK : INK;
     const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
     const pal = paletteByIndex(idx >= 0 ? idx : 0);
@@ -503,6 +507,11 @@ export class SceneRenderer {
     if (d?.assigned) meta.push(`@${d.assigned}`);
     if (d?.ticket) meta.push(d.ticket);
     if (d?.priority) meta.push(d.priority);
+    // 旅程圖:1..5 的心情分數用臉譜呈現(和 mermaid 的旅程圖一樣看得出情緒)。
+    if (j) {
+      meta.push(`${['😞', '🙁', '😐', '🙂', '😀'][Math.max(1, Math.min(5, j.score)) - 1]} ${j.score}`);
+      if (j.actors.length) meta.push(j.actors.join(', '));
+    }
     const fo = svgEl('foreignObject', { x: 8, y: 0, width: Math.max(0, node.w - 14), height: node.h });
     fo.style.pointerEvents = 'none';
     const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;

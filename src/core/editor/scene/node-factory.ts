@@ -59,6 +59,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'kanbanCard';
     case 'sankey':
       return 'sankeyNode';
+    case 'journey':
+      return 'journeyTask';
     case 'sequence':
       return 'participant';
     default:
@@ -97,6 +99,7 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
     case 'c4Queue':
       return c4BoxSize('', { c4Type: C4_SHAPE_DEFAULT_TYPE[shape] ?? 'system' });
     case 'kanbanCard':
+    case 'journeyTask':
       return { w: KANBAN_CARD.w, h: KANBAN_CARD.minH };
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
@@ -124,6 +127,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'kanban' };
     case 'sankey':
       return { kind: 'sankey' };
+    case 'journey':
+      return { kind: 'journey', score: 3, actors: [] };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

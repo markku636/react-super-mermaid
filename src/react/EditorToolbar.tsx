@@ -146,7 +146,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   // 象限圖沒有連線,而且點的位置就是資料 → 自動排版會直接竄改數值,所以「連線 / 整理」都不給。
   const isQuadrant = props.diagramType === 'quadrant';
   // 看板也沒有連線(卡片在哪一欄由位置決定),但「整理」有用:把卡片重新對齊貼齊。
-  const isKanban = props.diagramType === 'kanban';
+  const isKanban = props.diagramType === 'kanban' || props.diagramType === 'journey';
 
   // 連線樣式控制項:依目前圖種能力顯示(只有一種選擇時整組隱藏,因無從選起)。
   const caps = h?.getCapabilities() ?? null;

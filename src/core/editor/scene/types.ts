@@ -18,6 +18,7 @@ export type DiagramType =
   | 'c4'
   | 'kanban'
   | 'sankey'
+  | 'journey'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -64,6 +65,8 @@ export type NodeShape =
   | 'kanbanCard'
   // sankey:一個節點(流量的來源 / 去處)
   | 'sankeyNode'
+  // journey:一個任務(它屬於哪個 section 由位置決定)
+  | 'journeyTask'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -126,6 +129,8 @@ export type NodeData =
   | { kind: 'c4'; c4Type: string; techn?: string; descr?: string }
   | { kind: 'kanban'; assigned?: string; ticket?: string; priority?: string }
   | { kind: 'sankey' }
+  /** 旅程圖任務:心情分數 1..5 與參與角色。 */
+  | { kind: 'journey'; score: number; actors: string[] }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -282,6 +287,7 @@ export type SceneMeta =
   | { type: 'c4'; c4Type: string; title?: string }
   | { type: 'kanban' }
   | { type: 'sankey' }
+  | { type: 'journey'; title?: string }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -344,6 +350,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   c4: { type: 'c4', c4Type: 'C4Context' },
   kanban: { type: 'kanban' },
   sankey: { type: 'sankey' },
+  journey: { type: 'journey' },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

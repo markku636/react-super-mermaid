@@ -2,7 +2,7 @@
 
 import type { DataLossWarning, SerializeResult } from '../../adapters/types';
 import type { EditorScene, SceneNode } from '../../scene/types';
-import { laneIndexAt } from './model';
+import { bucketByLane, sortedLanes } from './model';
 
 const INDENT = '  ';
 
@@ -39,11 +39,9 @@ export function sceneToKanban(scene: EditorScene): SerializeResult {
     if (t.startsWith('%%') && !t.startsWith('%%{')) lines.push(INDENT + t);
   }
 
-  const lanes = [...scene.containers].sort((a, b) => (a.sourceIndex ?? 0) - (b.sourceIndex ?? 0));
   // 幾何是唯一真相:欄由卡片中心落點決定,欄內順序由 y 決定(拖曳因此不需要任何額外同步)。
-  const buckets: SceneNode[][] = lanes.map(() => []);
-  for (const n of scene.nodes) buckets[laneIndexAt(n.x + n.w / 2, lanes.length)].push(n);
-  for (const b of buckets) b.sort((a, c) => a.y - c.y);
+  const lanes = sortedLanes(scene);
+  const buckets = bucketByLane(scene, lanes);
 
   lanes.forEach((lane, i) => {
     lines.push(INDENT + nameFor(lane.id, lane.label));

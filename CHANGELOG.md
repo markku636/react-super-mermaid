@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0 — user journeys are drawable
+
+- **Feature**: new `journeyAdapter`. Sections become lanes and tasks become cards showing the mood
+  score (1–5, as a face) and the actors — so moving a task to another stage is a drag, and reordering
+  within a stage is a drag. Same geometry-is-the-truth rule as kanban.
+- The lane layout that kanban introduced moved to `layout/lanes.ts` and is now shared by both, rather
+  than copied. Kanban's model module re-exports from it, so nothing downstream changed.
+
 ## 0.14.0 — sankey flows are drawable
 
 - **Feature**: new `sankeyAdapter`. Every name in the CSV becomes a draggable node, every row a link
