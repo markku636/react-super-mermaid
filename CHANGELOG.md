@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.15.2 — a quadrant point could not be dragged at all
+
+- **Fix**: quadrant chart points were undraggable. A point's hit box is 26px, and the eight
+  connect-anchor dots that appear on hover blanket a box that small — every press landed on an
+  anchor and started a rubber-band edge instead of a move, so the point silently snapped back and
+  the value never changed. This is precisely the one gesture that type exists for.
+- New `capabilities.supportsEdges` (default true, `false` on quadrant / kanban / journey) states
+  that a diagram type has no edge syntax at all — not merely that this diagram happens to have none.
+  The interaction layer skips anchor handling entirely for those types, and both toolbars now derive
+  the 連線 button from the capability instead of each keeping a hardcoded list of type names.
+- Anchors are also suppressed on any node smaller than the anchor hit radius, whatever the diagram
+  type, so no future small shape can be made undraggable the same way.
+- Found by a new third check group in `verify:roundtrip`: it drives **real mouse events** through
+  headless Chrome and asserts the serialized output changes (kanban card changes column, journey
+  task changes stage, quadrant point changes value) — and, for a flowchart, that it *doesn't*, since
+  a node's position must never leak into the source. Serialization tests could not have caught this;
+  the model was right the whole time, the gesture never reached it.
+
 ## 0.15.1 — starting from blank, and running a board
 
 - **Fix**: a kanban board or user journey could not be built from nothing — a card has to land in a

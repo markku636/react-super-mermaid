@@ -511,6 +511,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     onToolChange: (tool) => emit('toolchange', tool),
     createShape: () => createShape,
     createEdgeStyle: () => createEdge,
+    supportsEdges: () => adapterFor(diagramType)?.capabilities.supportsEdges !== false,
   };
 
   const pointer = new PointerController(svg, pointerHost);

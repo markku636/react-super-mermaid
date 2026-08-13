@@ -143,10 +143,8 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
     props.diagramType === undefined;
   // 需求圖的連線意義由「關係種類」決定(右鍵切換),沒有線型 / 箭頭可調。
   const isReq = props.diagramType === 'requirement';
-  // 象限圖沒有連線,而且點的位置就是資料 → 自動排版會直接竄改數值,所以「連線 / 整理」都不給。
+  // 象限圖的點位置就是資料 → 自動排版會直接竄改數值,所以不給「整理」。
   const isQuadrant = props.diagramType === 'quadrant';
-  // 看板也沒有連線(卡片在哪一欄由位置決定),但「整理」有用:把卡片重新對齊貼齊。
-  const isKanban = props.diagramType === 'kanban' || props.diagramType === 'journey';
 
   // 連線樣式控制項:依目前圖種能力顯示(只有一種選擇時整組隱藏,因無從選起)。
   const caps = h?.getCapabilities() ?? null;
@@ -158,7 +156,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const moreShapes = allShapes.filter((s) => !quickShapes.includes(s));
   // C4 的關係也只有 Rel / BiRel 與方向變體,不吃線型 / 箭頭。
   const isC4 = props.diagramType === 'c4';
-  const showEdgeStyle = !isSeq && !isTimeline && !isReq && !isQuadrant && !isKanban && !isC4 && caps !== null;
+  // 有沒有連線這回事由 adapter 能力決定(而不是在這裡列圖種名單)。
+  const hasEdges = caps?.supportsEdges !== false;
+  const showEdgeStyle = !isSeq && !isTimeline && !isReq && hasEdges && !isC4 && caps !== null;
   const showLineKinds = showEdgeStyle && lineKinds.length > 1;
   const showArrowEnd = showEdgeStyle && arrowHeads.length > 1;
   // 雙向箭頭(`<-->`)目前只在 flowchart 有明確語法。
@@ -169,8 +169,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
     <div className="rsm-toolbar rsm-editor-toolbar">
       {!isTimeline && toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
       {!isTimeline &&
-        !isQuadrant &&
-        !isKanban &&
+        hasEdges &&
         toolBtn(
           'edge-create',
           isSeq ? '↘ 訊息' : '↘ 連線',

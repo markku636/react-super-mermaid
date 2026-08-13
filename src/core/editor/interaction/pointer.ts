@@ -58,6 +58,8 @@ export interface PointerHost {
   createShape(): NodeShape;
   /** 新連線的預設樣式(線型 / 箭頭),由工具列設定。 */
   createEdgeStyle(): { lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead };
+  /** 目前圖種有沒有「連線」這回事(象限圖 / 看板 / 旅程圖沒有)。未提供 = 有。 */
+  supportsEdges?(): boolean;
 }
 
 const DRAG_THRESHOLD = 4; // 螢幕 px
@@ -246,6 +248,8 @@ export class PointerController {
     const tolWorld = ANCHOR_HIT_SCREEN / this.host.viewport.getZoom();
     const scene = this.host.getScene();
     const check = (n: SceneNode): { nodeId: string; anchor: EdgeAnchor } | null => {
+      // 節點比容差還小時不給錨點:白點會蓋滿整個節點,連「按住拖曳」的立足之地都不剩。
+      if (Math.min(n.w, n.h) < tolWorld * 2.2) return null;
       // 已選取節點:4 角是縮放控制點 → 連線只取 4 邊中點(與畫面上顯示的控制點一致)。
       const cands = this.selection.has(n.id) ? SIDE_ANCHORS : undefined;
       const a = nearestAnchor(nodeRect(n), world, tolWorld, cands);
@@ -375,9 +379,12 @@ export class PointerController {
     }
 
     // 連線控制點 / edge-create 工具在節點上 → 橡皮筋。從錨點起拉時記下該錨點(→ sourceAnchor)。
-    const connHit = this.hitConn(target);
+    // 沒有連線語法的圖種(象限圖 / 看板 / 旅程圖)完全跳過這一段:它們的節點小,錨點白點會蓋滿
+    // 整個節點,按下去會被判成「拉線」而不是「拖曳」—— 象限圖的點會因此完全拖不動。
+    const canConnect = this.host.supportsEdges?.() ?? true;
+    const connHit = canConnect ? this.hitConn(target) : null;
     const nodeId = this.hitNode(target);
-    if (connHit || (this.tool === 'edge-create' && nodeId)) {
+    if (connHit || (canConnect && this.tool === 'edge-create' && nodeId)) {
       const srcId = connHit?.nodeId ?? (nodeId as string);
       const src = getNode(this.host.getScene(), srcId);
       if (src) {
@@ -410,7 +417,7 @@ export class PointerController {
     }
 
     // 按在「連線白點」附近(節點 8 個固定錨點)→ 從該位置拉線(像 draw.io)。優先用 hover 中的節點。
-    const connectSrc = this.connectAnchorNode(world, hovered);
+    const connectSrc = canConnect ? this.connectAnchorNode(world, hovered) : null;
     if (connectSrc) {
       const src = getNode(this.host.getScene(), connectSrc.nodeId);
       if (src) {

@@ -14,6 +14,7 @@ export const journeyAdapter: DiagramAdapter = {
     shapes: ['journeyTask'],
     arrowHeads: ['none'],
     lineKinds: ['solid'],
+    supportsEdges: false,
     freeform: true,
     defaults: { nodeShape: 'journeyTask', arrowEnd: 'none' },
   },

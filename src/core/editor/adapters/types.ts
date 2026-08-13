@@ -22,6 +22,14 @@ export interface DiagramCapabilities {
   quickShapes?: NodeShape[];
   arrowHeads: ArrowHead[];
   lineKinds: LineKind[];
+  /**
+   * 這個圖種有沒有「連線」這回事。未指定 = 有。
+   *
+   * false 代表語法裡根本沒有連線(象限圖 / 看板 / 旅程圖),不只是「這張圖剛好沒畫線」。
+   * 影響的不只是工具列少一顆按鈕:互動層會整段跳過連線錨點,否則小節點(象限圖的資料點只有
+   * 26px)會被錨點白點蓋滿,按下去被判成拉線,節點就再也拖不動了。
+   */
+  supportsEdges?: boolean;
   /** 節點可自由拖曳(flowchart=true)?或由引擎排版(sequence=false)? */
   freeform: boolean;
   defaults: { nodeShape: NodeShape; arrowEnd: ArrowHead };

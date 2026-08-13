@@ -15,6 +15,7 @@ export const quadrantAdapter: DiagramAdapter = {
     // 象限圖沒有連線。
     arrowHeads: ['none'],
     lineKinds: ['solid'],
+    supportsEdges: false,
     freeform: true,
     defaults: { nodeShape: 'point', arrowEnd: 'none' },
   },

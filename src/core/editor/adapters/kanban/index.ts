@@ -16,6 +16,7 @@ export const kanbanAdapter: DiagramAdapter = {
     // 看板沒有連線。
     arrowHeads: ['none'],
     lineKinds: ['solid'],
+    supportsEdges: false,
     freeform: true,
     defaults: { nodeShape: 'kanbanCard', arrowEnd: 'none' },
   },
