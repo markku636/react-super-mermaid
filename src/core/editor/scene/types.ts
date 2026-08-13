@@ -19,6 +19,7 @@ export type DiagramType =
   | 'kanban'
   | 'sankey'
   | 'journey'
+  | 'gantt'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -67,6 +68,8 @@ export type NodeShape =
   | 'sankeyNode'
   // journey:一個任務(它屬於哪個 section 由位置決定)
   | 'journeyTask'
+  // gantt:一根時間長條(x=開始日、寬=工期、y=section)
+  | 'ganttBar'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -131,6 +134,8 @@ export type NodeData =
   | { kind: 'sankey' }
   /** 旅程圖任務:心情分數 1..5 與參與角色。 */
   | { kind: 'journey'; score: number; actors: string[] }
+  /** 甘特任務:旗標(done/active/crit/milestone)+ 原始的起訖寫法(保留 after / 工期單位)。 */
+  | { kind: 'gantt'; flags: string[]; startRaw: string; endRaw: string; afterId?: string }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -165,6 +170,15 @@ export interface QuadrantMeta {
   quadrants: [string?, string?, string?, string?];
   /** 未模型化的設定行(%%{init}%% 之外的 `classDef` 等)逐字保留。 */
   extraLines?: string[];
+}
+
+/** 甘特圖的圖表層設定。epoch = 第 0 天(UTC 毫秒),座標換算的原點。 */
+export interface GanttMeta {
+  title?: string;
+  dateFormat?: string;
+  epoch?: number;
+  /** excludes / todayMarker / tickInterval 等 DB 未建模的設定行,逐字保留。 */
+  settings: string[];
 }
 
 export type ReqRelation =
@@ -288,6 +302,7 @@ export type SceneMeta =
   | { type: 'kanban' }
   | { type: 'sankey' }
   | { type: 'journey'; title?: string }
+  | { type: 'gantt'; gantt: GanttMeta }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -351,6 +366,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   kanban: { type: 'kanban' },
   sankey: { type: 'sankey' },
   journey: { type: 'journey' },
+  gantt: { type: 'gantt', gantt: { settings: [] } },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

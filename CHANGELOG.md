@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.16.0 — gantt charts: drag a bar to reschedule it
+
+- **Feature**: new `ganttAdapter`. A task's **x is its start date, its width is its duration, and its
+  row is its section** — so dragging a bar reschedules it, dragging its right edge changes the
+  duration, and dragging it into another band moves it to that section. The canvas draws a real time
+  axis (day gridlines, a dated tick every week), coloured section bands, `done` / `active` / `crit`
+  styling and milestones as diamonds.
+- Round-tripping keeps the *form* the author used, not just the value: a task written as
+  `after a1` keeps its dependency as long as it still starts where `a1` ends, and reverts to an
+  explicit date only once you actually drag it away; a duration written as `2w` comes back as weeks,
+  not `14d`.
+- Parsed through mermaid's DB, which already resolves `after` chains and hands back the original
+  `raw` text for each end — re-parsing that comma-separated argument list by hand is exactly the kind
+  of thing that silently changes meaning (mermaid's rules shift with the number of tokens).
+- **Bails out rather than guessing**: anything beyond `dateFormat YYYY-MM-DD`, or a date it cannot
+  resolve, and the whole file is passed through verbatim with a warning. Half-understanding someone's
+  gantt chart is worse than not editing it.
+- Dates are read and written with **local** date fields throughout — mermaid parses with dayjs in
+  local time, so reading UTC fields off its dates lands a day early in UTC+8, and day arithmetic goes
+  through date fields so a DST boundary can't shift a task by one day.
+
 ## 0.15.2 — a quadrant point could not be dragged at all
 
 - **Fix**: quadrant chart points were undraggable. A point's hit box is 26px, and the eight

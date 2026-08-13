@@ -58,6 +58,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   sankeyNode: { glyph: '▮', label: '節點' },
   // journey
   journeyTask: { glyph: '▤', label: '任務' },
+  // gantt
+  ganttBar: { glyph: '▬', label: '任務' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

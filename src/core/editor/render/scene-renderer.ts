@@ -12,6 +12,10 @@ import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edg
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
 import { c4Lines, requirementKind, requirementRows } from './node-metrics';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
+import { DAY_W as GANTT_DAY_W, ORIGIN as GANTT_ORIGIN, ROW_H as GANTT_ROW_H, formatDay as ganttFormatDay } from '../round-trip/gantt/model';
+
+/** 甘特圖的版面常數(集中成一個物件,渲染這邊讀起來比一串同名 import 清楚)。 */
+const GANTT = { DAY_W: GANTT_DAY_W, ROW_H: GANTT_ROW_H, ORIGIN: GANTT_ORIGIN } as const;
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -223,6 +227,10 @@ export class SceneRenderer {
     }
     if (node.data?.kind === 'c4') {
       this.fillC4Box(g, node);
+      return;
+    }
+    if (node.data?.kind === 'gantt') {
+      this.fillGanttBar(g, node);
       return;
     }
     if (node.data?.kind === 'kanban' || node.data?.kind === 'journey') {
@@ -442,6 +450,138 @@ export class SceneRenderer {
       rot(meta.yAxis.bottom, PLOT.y + PLOT.h - 4, 'start');
       rot(meta.yAxis.top ?? '', PLOT.y + 4, 'end');
     }
+  }
+
+  /** 甘特圖外框:日期刻度 + 每日格線 + section 帶(長條本身是節點)。 */
+  private renderGanttFrame(scene: EditorScene): void {
+    const meta = scene.meta.type === 'gantt' ? scene.meta.gantt : undefined;
+    const epoch = meta?.epoch ?? 0;
+    const ink = this.dark ? INK_DARK : INK;
+    const g = this.frameLayer;
+    if (scene.nodes.length === 0) return;
+
+    const right = Math.max(...scene.nodes.map((n) => n.x + n.w)) + GANTT.DAY_W * 2;
+    const bottom = Math.max(...scene.nodes.map((n) => n.y + n.h)) + GANTT.ROW_H;
+    const days = Math.ceil((right - GANTT.ORIGIN.x) / GANTT.DAY_W);
+    const top = GANTT.ORIGIN.y - 26;
+
+    // 每日格線 + 每 7 天標一次日期(每天都標會擠成一團)。
+    for (let d = 0; d <= days; d += 1) {
+      const x = GANTT.ORIGIN.x + d * GANTT.DAY_W;
+      const week = d % 7 === 0;
+      g.appendChild(
+        svgEl('path', {
+          d: `M${x},${top} L${x},${bottom}`,
+          stroke: ink,
+          'stroke-opacity': week ? 0.22 : 0.08,
+          fill: 'none',
+        }),
+      );
+      if (week) {
+        const t = svgEl('text', {
+          x,
+          y: top - 8,
+          fill: ink,
+          'text-anchor': 'middle',
+          style: 'font:500 11px var(--rsm-editor-font);opacity:0.7;pointer-events:none;',
+        });
+        t.textContent = ganttFormatDay(epoch + d * 86400000);
+        g.appendChild(t);
+      }
+    }
+
+    // section 帶:淡色底 + 左側名稱。
+    [...scene.containers]
+      .sort((a, b) => (a.sourceIndex ?? 0) - (b.sourceIndex ?? 0))
+      .forEach((c, i) => {
+        const pal = clusterByIndex(i);
+        g.appendChild(
+          svgEl('rect', {
+            x: GANTT.ORIGIN.x - 60,
+            y: c.y,
+            width: right - GANTT.ORIGIN.x + 60,
+            height: c.h,
+            fill: pal.fill,
+            stroke: 'none',
+            'data-container-id': c.id,
+          }),
+        );
+        if (!c.label) return;
+        const fo = svgEl('foreignObject', { x: GANTT.ORIGIN.x - 58, y: c.y + 2, width: 56, height: 20 });
+        fo.style.pointerEvents = 'none';
+        const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+        div.textContent = c.label;
+        div.setAttribute(
+          'style',
+          `font:700 11px/20px var(--rsm-editor-font);color:${pal.stroke};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`,
+        );
+        fo.appendChild(div as unknown as Node);
+        g.appendChild(fo);
+      });
+
+    if (meta?.title) {
+      const t = svgEl('text', {
+        x: GANTT.ORIGIN.x,
+        y: top - 34,
+        fill: ink,
+        style: 'font:700 16px var(--rsm-editor-font);pointer-events:none;',
+      });
+      t.textContent = meta.title;
+      g.appendChild(t);
+    }
+    this.seqBounds = {
+      x: GANTT.ORIGIN.x - 80,
+      y: top - 50,
+      w: right - GANTT.ORIGIN.x + 120,
+      h: bottom - top + 70,
+    };
+  }
+
+  /** 甘特長條:實心圓角條 + 條上任務名;milestone 畫成菱形。 */
+  private fillGanttBar(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'gantt' ? node.data : undefined;
+    const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
+    const pal = paletteByIndex(idx >= 0 ? idx : 0);
+    const crit = d?.flags.includes('crit');
+    const done = d?.flags.includes('done');
+    if (d?.flags.includes('milestone')) {
+      const c = node.h / 2;
+      g.appendChild(
+        svgEl('path', {
+          d: `M${node.w / 2},0 L${node.w / 2 + c},${c} L${node.w / 2},${node.h} L${node.w / 2 - c},${c} Z`,
+          fill: crit ? '#EF4444' : pal.stroke,
+          stroke: 'none',
+        }),
+      );
+    } else {
+      g.appendChild(
+        svgEl('rect', {
+          x: 0,
+          y: 0,
+          width: node.w,
+          height: node.h,
+          rx: 4,
+          fill: done ? pal.fill : pal.stroke,
+          'fill-opacity': done ? 1 : 0.85,
+          stroke: crit ? '#EF4444' : pal.stroke,
+          'stroke-width': crit ? 2 : 1,
+        }),
+      );
+    }
+    if (!node.label) return;
+    // 名稱畫在長條右側(條本身可能很短,寫在裡面會被裁掉)。
+    const fo = svgEl('foreignObject', { x: node.w + 6, y: 0, width: 220, height: node.h });
+    fo.style.pointerEvents = 'none';
+    fo.style.overflow = 'visible';
+    const div = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    div.textContent = node.label;
+    div.setAttribute(
+      'style',
+      `display:flex;align-items:center;height:100%;font:12px/1.3 var(--rsm-editor-font);` +
+        `color:${this.dark ? INK_DARK : INK};white-space:nowrap;`,
+    );
+    fo.appendChild(div as unknown as Node);
+    g.appendChild(fo);
   }
 
   /** 象限圖資料點:小圓 + 下方標籤(標籤不吃指標事件,才不會擋住拖曳)。 */
@@ -908,6 +1048,7 @@ export class SceneRenderer {
       this.renderQuadrantFrame(scene);
       this.seqBounds = SceneRenderer.quadrantBounds();
     }
+    if (scene.diagramType === 'gantt') this.renderGanttFrame(scene);
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {

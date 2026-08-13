@@ -61,6 +61,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'sankeyNode';
     case 'journey':
       return 'journeyTask';
+    case 'gantt':
+      return 'ganttBar';
     case 'sequence':
       return 'participant';
     default:
@@ -129,6 +131,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'sankey' };
     case 'journey':
       return { kind: 'journey', score: 3, actors: [] };
+    case 'gantt':
+      return { kind: 'gantt', flags: [], startRaw: '', endRaw: '1d' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

@@ -12,6 +12,7 @@ import { registerC4Adapter } from '../core/editor/adapters/c4';
 import { registerKanbanAdapter } from '../core/editor/adapters/kanban';
 import { registerSankeyAdapter } from '../core/editor/adapters/sankey';
 import { registerJourneyAdapter } from '../core/editor/adapters/journey';
+import { registerGanttAdapter } from '../core/editor/adapters/gantt';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -30,6 +31,7 @@ registerC4Adapter();
 registerKanbanAdapter();
 registerSankeyAdapter();
 registerJourneyAdapter();
+registerGanttAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;
