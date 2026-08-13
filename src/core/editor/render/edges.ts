@@ -4,7 +4,7 @@
 import type { ArrowHead, EditorScene, Point, SceneEdge } from '../scene/types';
 import { getNode, resolveEdgeAnchors } from '../scene/scene-ops';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
-import { INK, INK_DARK } from './palette';
+import { INK, INK_DARK, paletteByIndex } from './palette';
 
 export function markerIdFor(head: ArrowHead, dark: boolean): string | null {
   if (head === 'none' || head === 'open') return null;
@@ -178,6 +178,28 @@ export function edgePoints(scene: EditorScene, edge: SceneEdge): Point[] | null 
 }
 
 /** 建立一條邊的 <g data-edge-id>(可見路徑 + hit path + label)。 */
+/**
+ * sankey 連線的粗細。
+ *
+ * 先前是 `sqrt(value) * 1.6`,結果 30 與 45 兩條流量畫出來只差 2px —— 而「哪一條比較粗」
+ * 正是這種圖唯一要講的事。改成**以整張圖的最大流量為滿刻度**線性換算:比例忠實,而且無論
+ * 資料是幾十還是幾萬,畫出來的粗細範圍都一樣。
+ */
+function sankeyWidth(scene: EditorScene, value: number): number {
+  const max = scene.edges.reduce(
+    (m, e) => (e.data?.kind === 'sankey' ? Math.max(m, Math.abs(e.data.value)) : m),
+    0,
+  );
+  if (max <= 0) return 3;
+  return 3 + (Math.abs(value) / max) * 25;
+}
+
+/** sankey 連線的顏色 = 來源節點的顏色(節點配色是依場景順序循序取的)。 */
+function sankeyInk(scene: EditorScene, edge: SceneEdge): string {
+  const i = scene.nodes.findIndex((n) => n.id === edge.source);
+  return paletteByIndex(i >= 0 ? i : 0).stroke;
+}
+
 export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): SVGGElement {
   const ink = dark ? INK_DARK : INK;
   const g = svgEl('g', { 'data-edge-id': edge.id, class: 'rsm-edge' });
@@ -192,22 +214,22 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
 
   // 可見路徑。linkStyle 自訂色/寬(edge.style)優先於主題墨色與 lineKind 寬度。
   const customStroke = edge.style?.stroke;
-  const strokeColor = customStroke || ink;
+  // sankey 的連線是「流」不是「線」:染上來源節點的顏色,一眼看得出東西從哪裡流出去。
+  const strokeColor = customStroke || (edge.data?.kind === 'sankey' ? sankeyInk(scene, edge) : ink);
   const vis = svgEl('path', { d, fill: 'none', stroke: strokeColor });
   vis.setAttribute('stroke-linecap', 'round');
   vis.setAttribute('stroke-linejoin', 'round');
   vis.setAttribute('vector-effect', 'non-scaling-stroke');
   vis.style.pointerEvents = 'none';
   // sankey:線寬**就是**流量,這正是這種圖的重點(看得出哪一條比較粗)。
-  // 用開根號壓縮,否則一條 2000 的流量會把整張圖畫成一片黑。
   const widthByKind =
     edge.data?.kind === 'sankey'
-      ? Math.max(2, Math.min(26, Math.sqrt(Math.abs(edge.data.value)) * 1.6))
+      ? sankeyWidth(scene, edge.data.value)
       : edge.lineKind === 'thick'
         ? 3.4
         : 1.8;
   vis.setAttribute('stroke-width', String(edge.style?.strokeWidth ?? widthByKind));
-  if (edge.data?.kind === 'sankey') vis.setAttribute('stroke-opacity', '0.45');
+  if (edge.data?.kind === 'sankey') vis.setAttribute('stroke-opacity', '0.5');
   if (edge.style?.strokeDasharray) vis.setAttribute('stroke-dasharray', edge.style.strokeDasharray);
   else if (edge.lineKind === 'dotted') vis.setAttribute('stroke-dasharray', '3 5');
   if (edge.lineKind === 'invisible') vis.setAttribute('stroke-opacity', '0');

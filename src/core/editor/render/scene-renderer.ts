@@ -669,11 +669,40 @@ export class SceneRenderer {
       t.textContent = meta.title;
       g.appendChild(t);
     }
+    // 兩軸的名稱原本解析進來就擱著沒畫 —— 少了它,「80」是萬元還是件數只能用猜的。
+    if (meta.xTitle) {
+      const t = svgEl('text', {
+        x: XY_PLOT.x + XY_PLOT.w / 2,
+        y: XY_PLOT.y + XY_PLOT.h + 46,
+        fill: ink,
+        'text-anchor': 'middle',
+        style: 'font:600 12px var(--rsm-editor-font);opacity:0.72;pointer-events:none;',
+      });
+      t.textContent = meta.xTitle;
+      g.appendChild(t);
+    }
+    if (meta.yTitle) {
+      const cy = XY_PLOT.y + XY_PLOT.h / 2;
+      // 中日韓文字轉 90 度會變成「躺著」,正確排法是直排立著;西文則維持由下往上轉。
+      const cjk = /[　-鿿豈-﫿＀-￯]/.test(meta.yTitle);
+      const t = svgEl('text', {
+        x: XY_PLOT.x - 54,
+        y: cy,
+        fill: ink,
+        'text-anchor': 'middle',
+        style:
+          'font:600 12px var(--rsm-editor-font);opacity:0.72;pointer-events:none;' +
+          (cjk ? 'writing-mode:vertical-rl;text-orientation:upright;letter-spacing:1px;' : ''),
+        ...(cjk ? {} : { transform: `rotate(-90 ${XY_PLOT.x - 54} ${cy})` }),
+      });
+      t.textContent = meta.yTitle;
+      g.appendChild(t);
+    }
     this.seqBounds = {
-      x: XY_PLOT.x - 70,
+      x: XY_PLOT.x - 80,
       y: XY_PLOT.y - 50,
-      w: XY_PLOT.w + 110,
-      h: XY_PLOT.h + 100,
+      w: XY_PLOT.w + 120,
+      h: XY_PLOT.h + 116,
     };
   }
 
@@ -756,25 +785,9 @@ export class SceneRenderer {
       t.textContent = meta.title;
       g.appendChild(t);
     }
-    // 百分比只有在總和有意義時才標。
-    if (total > 0) {
-      ordered.forEach((n, i) => {
-        const share = Math.round((Math.max(0, values[i]) / total) * 1000) / 10;
-        if (share < 3) return; // 太窄的扇形標了只會疊在一起
-        const mid = (angles[i].from + angles[i].to) / 2;
-        const t = svgEl('text', {
-          x: PIE_GEO.cx + Math.cos(mid) * PIE_GEO.r * 0.86,
-          y: PIE_GEO.cy + Math.sin(mid) * PIE_GEO.r * 0.86,
-          // 百分比寫在淺色扇形上 → 墨色固定深色(跟著主題走會在深色模式消失)。
-          fill: INK,
-          'text-anchor': 'middle',
-          'dominant-baseline': 'middle',
-          style: 'font:600 11px var(--rsm-editor-font);opacity:0.75;pointer-events:none;',
-        });
-        t.textContent = `${share}%`;
-        g.appendChild(t);
-      });
-    }
+    // 百分比曾經另外標在扇形上,結果和把手上的「名稱 + 數值」幾乎疊在同一點。
+    // 現在一律併進把手那一塊(見 fillPieSlice),一個扇形只有一處文字。
+    void total;
     this.seqBounds = {
       x: PIE_GEO.cx - PIE_GEO.r - 60,
       y: PIE_GEO.cy - PIE_GEO.r - 60,
@@ -783,28 +796,39 @@ export class SceneRenderer {
     };
   }
 
-  /** 圓餅扇形的把手:標籤 + 數值(扇形本身畫在外框層)。 */
+  /** 圓餅扇形的把手:名稱 + 數值 + 佔比,收在一枚白色小牌上(扇形本身畫在外框層)。 */
   private fillPieSlice(g: SVGGElement, node: SceneNode): void {
     const d = node.data?.kind === 'pie' ? node.data : undefined;
+    const value = d?.value ?? 0;
+    const total = (this.scene?.nodes ?? []).reduce(
+      (s, n) => s + (n.data?.kind === 'pie' ? Math.max(0, n.data.value) : 0),
+      0,
+    );
+    const share = total > 0 ? Math.round((Math.max(0, value) / total) * 1000) / 10 : null;
     const fo = svgEl('foreignObject', { x: -20, y: 0, width: node.w + 40, height: node.h });
     fo.style.pointerEvents = 'none';
     fo.style.overflow = 'visible';
+    const wrap = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    wrap.setAttribute('style', 'display:flex;align-items:center;justify-content:center;height:100%;');
     const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     root.setAttribute(
       'style',
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:1px;' +
-        // 把手文字壓在淺色扇形上 → 墨色固定深色。
-        `text-align:center;color:${INK};`,
+      // 牌子貼著文字大小(而不是撐滿節點框),小扇形上才不會蓋掉半塊派。
+      'display:inline-flex;flex-direction:column;align-items:center;gap:1px;' +
+        // 牌子壓在彩色扇形上 → 底色與墨色都固定,不跟著主題翻面。
+        `text-align:center;color:${INK};background:rgba(255,255,255,0.88);border-radius:8px;` +
+        'padding:4px 10px;box-shadow:0 1px 3px rgba(15,23,42,0.18);',
     );
     const name = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
     name.textContent = node.label;
     name.setAttribute('style', 'font:700 12px/1.3 var(--rsm-editor-font);word-break:break-word;');
     root.appendChild(name as unknown as Node);
     const val = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
-    val.textContent = String(d?.value ?? 0);
-    val.setAttribute('style', 'font:11px/1.2 var(--rsm-editor-font);opacity:0.75;');
+    val.textContent = share === null ? String(value) : `${value} · ${share}%`;
+    val.setAttribute('style', 'font:11px/1.2 var(--rsm-editor-font);opacity:0.7;white-space:nowrap;');
     root.appendChild(val as unknown as Node);
-    fo.appendChild(root as unknown as Node);
+    wrap.appendChild(root as unknown as Node);
+    fo.appendChild(wrap as unknown as Node);
     g.appendChild(fo);
   }
 

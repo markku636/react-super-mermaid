@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.22.1 — the chart types read better
+
+Three things that were wrong every time you looked at them, rather than only in edge cases.
+
+- **pie**: the slice percentage was drawn twice — once on the slice by the frame layer and once on
+  the drag handle — landing within a few pixels of each other, so `TypeScript / 55` and `55%`
+  overlapped. There is now one label per slice, `name / value · share%`, on a small white card that
+  hugs its text so it reads as the grabbable thing it is.
+- **sankey**: link width was `sqrt(value) * 1.6`, which drew a flow of 30 and a flow of 45 two pixels
+  apart — and "which one is bigger" is the entire point of the diagram. Width is now linear against
+  the largest flow in the chart, so the proportions are honest whatever the scale of the numbers, and
+  each link takes the colour of the node it flows out of.
+- **xychart**: the axis titles were parsed and then never drawn, so `80` could have been anything.
+  Both are drawn now, and a CJK y-axis title stacks upright rather than lying on its side — rotating
+  「萬元」 by 90° is not how that text is written.
+
 ## 0.22.0 — gitGraph is drawable (every diagram type is now covered)
 
 - **Feature**: new `gitgraphAdapter`. In gitGraph, a commit's parents are never written down — they
