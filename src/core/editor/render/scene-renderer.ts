@@ -1201,8 +1201,10 @@ export class SceneRenderer {
     // 否則長條一多,右邊那排字就會壓到隔壁的條。里程碑是個小菱形,一律外掛。
     const milestone = d?.flags.includes('milestone') ?? false;
     const inside = !milestone && textWidth(node.label, 12) + 18 <= node.w;
-    // 深色實心長條上的字要反白;done 的長條是淺底,維持墨色。
-    const onFill = inside && !done;
+    // 寫在長條**裡面**的字是壓在節點配色上,而節點配色是固定的淺色盤 —— 不能跟著主題翻面,
+    // 否則深色模式下 done 的淺底長條會變成淺字寫在淺底上(整條字直接消失)。
+    // done = 淺色填滿 → 深墨;其餘 = 飽和色填滿 → 反白。寫在外面的才用主題墨色(那是畫布底)。
+    const insideInk = done ? INK : '#ffffff';
     // 里程碑是菱形,右頂點在 w/2 + h/2 —— 從 w 開始寫字會貼到菱形上。
     const outsideX = milestone ? node.w / 2 + node.h / 2 + 8 : node.w + 6;
     const fo = svgEl('foreignObject', {
@@ -1217,8 +1219,8 @@ export class SceneRenderer {
     div.textContent = node.label;
     div.setAttribute(
       'style',
-      `display:flex;align-items:center;height:100%;font:${onFill ? '600 ' : ''}12px/1.3 var(--rsm-editor-font);` +
-        `color:${onFill ? '#ffffff' : this.dark ? INK_DARK : INK};white-space:nowrap;`,
+      `display:flex;align-items:center;height:100%;font:${inside ? '600 ' : ''}12px/1.3 var(--rsm-editor-font);` +
+        `color:${inside ? insideInk : this.dark ? INK_DARK : INK};white-space:nowrap;`,
     );
     fo.appendChild(div as unknown as Node);
     g.appendChild(fo);

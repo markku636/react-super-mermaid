@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.23.3 — a gantt `done` bar's label was invisible on a dark canvas
+
+The label moved inside the bar in 0.22.2, and it took the theme's ink with it. Node fills come from
+a fixed **light** palette and never follow the theme, so on a dark canvas a `done` task — light
+pastel fill — got light-grey text on a light fill and vanished. Text written on a bar is now pinned:
+dark ink on the pale `done` fill, white on the saturated ones. Only the label written **outside** the
+bar follows the theme, because that one sits on the canvas.
+
+This is the same mistake 0.19.1 fixed for C4 / requirement / pie boxes, reintroduced by a new label.
+
 ## 0.23.2 — mindmap branches curve
 
 - **mindmap**: branches were straight polylines, which read as flowchart arrows rather than as
