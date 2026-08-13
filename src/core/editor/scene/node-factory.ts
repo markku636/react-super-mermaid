@@ -57,6 +57,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'c4Box';
     case 'kanban':
       return 'kanbanCard';
+    case 'sankey':
+      return 'sankeyNode';
     case 'sequence':
       return 'participant';
     default:
@@ -120,6 +122,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'c4', c4Type: C4_SHAPE_DEFAULT_TYPE[shape] ?? 'system' };
     case 'kanban':
       return { kind: 'kanban' };
+    case 'sankey':
+      return { kind: 'sankey' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

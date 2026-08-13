@@ -10,6 +10,7 @@ import { registerRequirementAdapter } from '../core/editor/adapters/requirement'
 import { registerQuadrantAdapter } from '../core/editor/adapters/quadrant';
 import { registerC4Adapter } from '../core/editor/adapters/c4';
 import { registerKanbanAdapter } from '../core/editor/adapters/kanban';
+import { registerSankeyAdapter } from '../core/editor/adapters/sankey';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -26,6 +27,7 @@ registerRequirementAdapter();
 registerQuadrantAdapter();
 registerC4Adapter();
 registerKanbanAdapter();
+registerSankeyAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

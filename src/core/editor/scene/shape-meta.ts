@@ -54,6 +54,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   c4Queue: { glyph: '▤', label: '佇列' },
   // kanban
   kanbanCard: { glyph: '▤', label: '卡片' },
+  // sankey
+  sankeyNode: { glyph: '▮', label: '節點' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

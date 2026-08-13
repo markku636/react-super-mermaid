@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.14.0 — sankey flows are drawable
+
+- **Feature**: new `sankeyAdapter`. Every name in the CSV becomes a draggable node, every row a link
+  whose **stroke width is its value** (square-rooted, so one 2000-wide flow doesn't paint the canvas
+  black) with the number on the line; double-clicking a link edits that number. Nodes are auto-placed
+  into layers by flow direction on load, then stay wherever you drag them — sankey has no positional
+  syntax, so position is presentation only and never affects the output.
+- Parsed as CSV directly rather than via mermaid's DB, which only exposes already-rasterized drawing
+  geometry.
+- Known mermaid limitation, surfaced as a warning instead of silently mangling: `sankey-beta` cannot
+  represent non-ASCII names — quoted or not, CJK is a parse error
+  (`Expecting 'DQUOTE', got 'ESCAPED_TEXT'`), and there is no alias syntax to hold display text.
+  Names are written out exactly as typed (rewriting them to `n1`/`n2` would leave a meaningless
+  diagram) together with a warning saying the diagram will not render.
+- Isolated nodes also warn: every line of sankey source *is* a link, so a node with no links has no
+  syntax to be written into.
+
 ## 0.13.0 — kanban boards: drag a card to another column
 
 - **Feature**: new `kanbanAdapter`. Columns are fixed lanes, cards are scene nodes with their

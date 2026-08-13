@@ -566,12 +566,14 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   function openEdgeEditor(edgeId: string): void {
     const edge = scene.edges.find((e) => e.id === edgeId);
     if (!edge) return;
+    // sankey 的連線沒有自由文字,它的「標籤」就是流量數值 → 編輯的是數字。
+    const isFlow = edge.data?.kind === 'sankey';
     const pts = edgePoints(scene, edge);
     if (!pts || pts.length === 0) return;
     const i = Math.floor((pts.length - 1) / 2);
     const mid = { x: (pts[i].x + pts[Math.min(i + 1, pts.length - 1)].x) / 2, y: (pts[i].y + pts[Math.min(i + 1, pts.length - 1)].y) / 2 };
     const s = viewport.worldToScreen(mid);
-    const initial = edge.label ?? '';
+    const initial = isFlow && edge.data?.kind === 'sankey' ? String(edge.data.value) : (edge.label ?? '');
     cancelTextEdit?.();
     const timer = setTimeout(() => {
       cancelTextEdit = openTextEditor(
@@ -581,7 +583,16 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         (value) => {
           cancelTextEdit = null;
           const cur = scene.edges.find((e) => e.id === edgeId);
-          if (cur && value !== (cur.label ?? '')) {
+          if (!cur) return;
+          if (isFlow) {
+            const num = Number(value.trim());
+            // 打了不是數字的東西就當作沒改(而不是把流量變成 NaN 讓整張圖壞掉)。
+            if (Number.isFinite(num) && cur.data?.kind === 'sankey' && num !== cur.data.value) {
+              pointerHost.runCommand(cmdSetEdgeData(edgeId, { kind: 'sankey', value: num }), 'flow');
+            }
+            return;
+          }
+          if (value !== (cur.label ?? '')) {
             pointerHost.runCommand(cmdSetLabel(edgeId, value), 'edge-label');
           }
         },

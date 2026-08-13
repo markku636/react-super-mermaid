@@ -17,6 +17,7 @@ export type DiagramType =
   | 'quadrant'
   | 'c4'
   | 'kanban'
+  | 'sankey'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -61,6 +62,8 @@ export type NodeShape =
   | 'c4Queue'
   // kanban:一張卡片(它在哪一欄由位置決定)
   | 'kanbanCard'
+  // sankey:一個節點(流量的來源 / 去處)
+  | 'sankeyNode'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -122,6 +125,7 @@ export type NodeData =
   | { kind: 'quadrant'; radius?: number; color?: string; strokeColor?: string; strokeWidth?: string }
   | { kind: 'c4'; c4Type: string; techn?: string; descr?: string }
   | { kind: 'kanban'; assigned?: string; ticket?: string; priority?: string }
+  | { kind: 'sankey' }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -214,7 +218,9 @@ export type EdgeData =
     }
   | { kind: 'er'; identifying: boolean; cardStart?: ErCardinality; cardEnd?: ErCardinality }
   | { kind: 'requirement'; relation: ReqRelation }
-  | { kind: 'c4'; relType: string; techn?: string; descr?: string };
+  | { kind: 'c4'; relType: string; techn?: string; descr?: string }
+  /** sankey 的連線帶「流量」;線寬也依它決定。 */
+  | { kind: 'sankey'; value: number };
 
 /** ER 連線端的基數(crow's foot)。 */
 export type ErCardinality = 'zeroOrOne' | 'onlyOne' | 'zeroOrMore' | 'oneOrMore';
@@ -275,6 +281,7 @@ export type SceneMeta =
   /** c4Type = C4Context / C4Container / C4Component / C4Dynamic / C4Deployment(決定標頭關鍵字)。 */
   | { type: 'c4'; c4Type: string; title?: string }
   | { type: 'kanban' }
+  | { type: 'sankey' }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -336,6 +343,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   quadrant: { type: 'quadrant', quadrant: { quadrants: [] } },
   c4: { type: 'c4', c4Type: 'C4Context' },
   kanban: { type: 'kanban' },
+  sankey: { type: 'sankey' },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

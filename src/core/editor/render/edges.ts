@@ -198,8 +198,16 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
   vis.setAttribute('stroke-linejoin', 'round');
   vis.setAttribute('vector-effect', 'non-scaling-stroke');
   vis.style.pointerEvents = 'none';
-  const widthByKind = edge.lineKind === 'thick' ? 3.4 : 1.8;
+  // sankey:線寬**就是**流量,這正是這種圖的重點(看得出哪一條比較粗)。
+  // 用開根號壓縮,否則一條 2000 的流量會把整張圖畫成一片黑。
+  const widthByKind =
+    edge.data?.kind === 'sankey'
+      ? Math.max(2, Math.min(26, Math.sqrt(Math.abs(edge.data.value)) * 1.6))
+      : edge.lineKind === 'thick'
+        ? 3.4
+        : 1.8;
   vis.setAttribute('stroke-width', String(edge.style?.strokeWidth ?? widthByKind));
+  if (edge.data?.kind === 'sankey') vis.setAttribute('stroke-opacity', '0.45');
   if (edge.style?.strokeDasharray) vis.setAttribute('stroke-dasharray', edge.style.strokeDasharray);
   else if (edge.lineKind === 'dotted') vis.setAttribute('stroke-dasharray', '3 5');
   if (edge.lineKind === 'invisible') vis.setAttribute('stroke-opacity', '0');
@@ -234,8 +242,14 @@ export function renderEdge(scene: EditorScene, edge: SceneEdge, dark: boolean): 
     if (edge.data.cardEnd) drawErCardinality(g, e, unit(e, pts[pts.length - 2]), edge.data.cardEnd, ink, dark);
   }
 
-  // label。需求圖沒有自由文字標籤,線上顯示的就是關係種類(mermaid 也是這樣畫)。
-  const labelText = edge.data?.kind === 'requirement' ? edge.data.relation : edge.label;
+  // label。需求圖沒有自由文字標籤,線上顯示的就是關係種類(mermaid 也是這樣畫);
+  // sankey 的連線本身就是「流量」,線上顯示數值。
+  const labelText =
+    edge.data?.kind === 'requirement'
+      ? edge.data.relation
+      : edge.data?.kind === 'sankey'
+        ? String(edge.data.value)
+        : edge.label;
   if (labelText && pts) {
     const mid = midpoint(pts);
     const fo = svgEl('foreignObject', { x: mid.x - 60, y: mid.y - 14, width: 120, height: 28, class: 'rsm-edge-label' });
