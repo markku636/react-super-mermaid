@@ -225,6 +225,10 @@ export class SceneRenderer {
       this.fillC4Box(g, node);
       return;
     }
+    if (node.data?.kind === 'kanban') {
+      this.fillKanbanCard(g, node);
+      return;
+    }
 
     // label foreignObject(置中):預設深色墨字(節點底色多為淺色);classDef/style 指定 color 時尊重之
     // (例如深底 fill + color:#fff)。
@@ -468,6 +472,56 @@ export class SceneRenderer {
         'white-space:nowrap;overflow:visible;',
     );
     fo.appendChild(div as unknown as Node);
+    g.appendChild(fo);
+  }
+
+  /** 看板卡片:白底卡 + 標題,底下一列 metadata(負責人 / 票號 / 優先序)。 */
+  private fillKanbanCard(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'kanban' ? node.data : undefined;
+    const ink = this.dark ? INK_DARK : INK;
+    const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
+    const pal = paletteByIndex(idx >= 0 ? idx : 0);
+    const card = svgEl('rect', {
+      x: 0,
+      y: 0,
+      width: node.w,
+      height: node.h,
+      rx: 6,
+      fill: this.dark ? '#1e222b' : '#ffffff',
+      stroke: pal.stroke,
+      'stroke-width': 1.3,
+    });
+    if (this.look === 'clean') card.style.filter = `url(#${NODE_SHADOW_ID})`;
+    card.style.pointerEvents = 'none';
+    g.appendChild(card);
+    // 左緣色條:一眼看出卡片彼此不同,也讓「拖到另一欄」有視覺連續性。
+    const bar = svgEl('rect', { x: 0, y: 0, width: 4, height: node.h, rx: 2, fill: pal.stroke });
+    bar.style.pointerEvents = 'none';
+    g.appendChild(bar);
+
+    const meta: string[] = [];
+    if (d?.assigned) meta.push(`@${d.assigned}`);
+    if (d?.ticket) meta.push(d.ticket);
+    if (d?.priority) meta.push(d.priority);
+    const fo = svgEl('foreignObject', { x: 8, y: 0, width: Math.max(0, node.w - 14), height: node.h });
+    fo.style.pointerEvents = 'none';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;justify-content:center;gap:3px;height:100%;padding:6px 2px;' +
+        `box-sizing:border-box;overflow:hidden;color:${ink};`,
+    );
+    const title = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    title.textContent = node.label;
+    title.setAttribute('style', 'font:600 12.5px/1.4 var(--rsm-editor-font);word-break:break-word;');
+    root.appendChild(title as unknown as Node);
+    if (meta.length) {
+      const m = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+      m.textContent = meta.join(' · ');
+      m.setAttribute('style', 'font:10.5px/1.3 var(--rsm-editor-font);opacity:0.65;white-space:nowrap;');
+      root.appendChild(m as unknown as Node);
+    }
+    fo.appendChild(root as unknown as Node);
     g.appendChild(fo);
   }
 
@@ -906,6 +960,9 @@ export class SceneRenderer {
     // 容器外框需「遞迴」涵蓋子節點 + 子容器(巢狀 subgraph 才會外層包住內層,而非並排)。
     const childContainers = (cid: string) => scene.containers.filter((k) => k.parentId === cid);
     const effRect = (c: SceneContainer): { x: number; y: number; w: number; h: number } | null => {
+      // 看板的欄是**固定泳道**,不是「包住小孩的框」:空的欄也必須畫出來(不然拖不進去),
+      // 而且欄寬不能隨卡片長短變。所以直接用容器自己的幾何。
+      if (scene.diagramType === 'kanban') return { x: c.x, y: c.y, w: c.w, h: c.h };
       const rects = c.childNodeIds
         .map((id) => byId.get(id))
         .filter((n): n is SceneNode => Boolean(n))

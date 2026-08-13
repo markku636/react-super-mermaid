@@ -21,6 +21,7 @@ import type {
 import { c4BoxSize, classBoxSize, erEntitySize, requirementBoxSize } from '../render/node-metrics';
 import { POINT_BOX } from '../round-trip/quadrant/model';
 import { C4_SHAPE_DEFAULT_TYPE } from '../round-trip/c4/shapes';
+import { CARD as KANBAN_CARD } from '../round-trip/kanban/model';
 
 /**
  * 新拖出來的需求 / 元素預填的內容。
@@ -54,6 +55,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'point';
     case 'c4':
       return 'c4Box';
+    case 'kanban':
+      return 'kanbanCard';
     case 'sequence':
       return 'participant';
     default:
@@ -91,6 +94,8 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
     case 'c4Db':
     case 'c4Queue':
       return c4BoxSize('', { c4Type: C4_SHAPE_DEFAULT_TYPE[shape] ?? 'system' });
+    case 'kanbanCard':
+      return { w: KANBAN_CARD.w, h: KANBAN_CARD.minH };
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
   }
@@ -113,6 +118,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'quadrant' };
     case 'c4':
       return { kind: 'c4', c4Type: C4_SHAPE_DEFAULT_TYPE[shape] ?? 'system' };
+    case 'kanban':
+      return { kind: 'kanban' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

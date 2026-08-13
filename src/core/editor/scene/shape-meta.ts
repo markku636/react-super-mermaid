@@ -52,6 +52,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   c4Box: { glyph: '▭', label: '系統' },
   c4Db: { glyph: '⛁', label: '資料庫' },
   c4Queue: { glyph: '▤', label: '佇列' },
+  // kanban
+  kanbanCard: { glyph: '▤', label: '卡片' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

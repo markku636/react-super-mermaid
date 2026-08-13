@@ -84,6 +84,8 @@ function body(shape: NodeShape): string {
       return `<path d="M4 5v6a8 2.2 0 0 0 16 0V5" ${S}/><ellipse cx="12" cy="5" rx="8" ry="2.2" ${S}/>`;
     case 'c4Queue':
       return `<rect x="3" y="4" width="18" height="8" rx="4" ${S}/><path d="M9 4v8M15 4v8" stroke="currentColor" stroke-width="1.1" opacity="0.6"/>`;
+    case 'kanbanCard':
+      return `<rect x="3" y="3" width="18" height="10" rx="2" ${S}/><rect x="3" y="3" width="2.6" height="10" rx="1" ${FILL}/><path d="M9 6.5h9M9 9.5h6" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" opacity="0.6"/>`;
     case 'rectangle':
     default:
       return `<rect x="2" y="3" width="20" height="10" ${S}/>`;

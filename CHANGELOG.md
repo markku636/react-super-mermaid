@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.13.0 — kanban boards: drag a card to another column
+
+- **Feature**: new `kanbanAdapter`. Columns are fixed lanes, cards are scene nodes with their
+  assignee / ticket / priority shown on the card. Which column a card belongs to, and its order
+  inside that column, are **derived from its position** — the scene deliberately does not carry a
+  second copy in `parentId`. Dragging a card therefore needs no bookkeeping at all: serialization
+  reads the geometry and always agrees with what's on screen. 「整理」 re-packs the cards into tidy
+  stacks without moving them between columns.
+- Container rendering learned that a kanban lane is a *fixed lane*, not a box drawn around whatever
+  is inside it — otherwise an empty column would vanish (leaving nowhere to drop a card) and the
+  lane width would jitter with the longest card.
+
 ## 0.12.0 — C4 diagrams are drawable
 
 - **Feature**: new `c4Adapter`, covering C4Context / C4Container / C4Component / C4Dynamic /

@@ -16,6 +16,7 @@ export type DiagramType =
   | 'requirement'
   | 'quadrant'
   | 'c4'
+  | 'kanban'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -58,6 +59,8 @@ export type NodeShape =
   | 'c4Box'
   | 'c4Db'
   | 'c4Queue'
+  // kanban:一張卡片(它在哪一欄由位置決定)
+  | 'kanbanCard'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -118,6 +121,7 @@ export type NodeData =
   // 象限圖的點:值就是它在圖上的位置,所以這裡只放樣式類的附加設定。
   | { kind: 'quadrant'; radius?: number; color?: string; strokeColor?: string; strokeWidth?: string }
   | { kind: 'c4'; c4Type: string; techn?: string; descr?: string }
+  | { kind: 'kanban'; assigned?: string; ticket?: string; priority?: string }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -270,6 +274,7 @@ export type SceneMeta =
   | { type: 'quadrant'; quadrant: QuadrantMeta }
   /** c4Type = C4Context / C4Container / C4Component / C4Dynamic / C4Deployment(決定標頭關鍵字)。 */
   | { type: 'c4'; c4Type: string; title?: string }
+  | { type: 'kanban' }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -330,6 +335,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   requirement: { type: 'requirement' },
   quadrant: { type: 'quadrant', quadrant: { quadrants: [] } },
   c4: { type: 'c4', c4Type: 'C4Context' },
+  kanban: { type: 'kanban' },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

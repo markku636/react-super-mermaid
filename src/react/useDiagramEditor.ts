@@ -9,6 +9,7 @@ import { registerSequenceAdapter } from '../core/editor/adapters/sequence';
 import { registerRequirementAdapter } from '../core/editor/adapters/requirement';
 import { registerQuadrantAdapter } from '../core/editor/adapters/quadrant';
 import { registerC4Adapter } from '../core/editor/adapters/c4';
+import { registerKanbanAdapter } from '../core/editor/adapters/kanban';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -24,6 +25,7 @@ registerSequenceAdapter();
 registerRequirementAdapter();
 registerQuadrantAdapter();
 registerC4Adapter();
+registerKanbanAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;
