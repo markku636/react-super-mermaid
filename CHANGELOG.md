@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.22.0 — gitGraph is drawable (every diagram type is now covered)
+
+- **Feature**: new `gitgraphAdapter`. In gitGraph, a commit's parents are never written down — they
+  are derived from the order of the commands. That means **the whole diagram is recoverable from
+  (which branch lane a commit is on, where it sits left-to-right)**, which is precisely what dragging
+  changes: drag sideways to reorder commits, drag onto another lane to move a commit to that branch.
+  The command stream is rebuilt from scratch on save, emitting `branch`/`checkout` wherever the
+  active branch changes, so it can never drift out of step with the picture.
+- Branch lanes are drawn as tinted bands with the branch name, and the parent links are re-derived
+  and redrawn on every change. Merge commits keep their source branch and stay dashed; if a drag
+  puts a merge before its source branch exists, it degrades to a plain commit **and says so** rather
+  than emitting something mermaid rejects.
+- `cherry-pick` cannot yet be reproduced faithfully, so a source containing one is passed through
+  verbatim as read-only with a warning.
+- Commit right-click: rename, switch between normal / highlight / reverse, add or remove a tag.
+  Lane right-click: rename, delete, or add a branch. Tags render as a small chip instead of the 🏷
+  emoji, which most system UI fonts cannot draw.
+
 ## 0.21.0 — packet diagrams are drawable
 
 - **Feature**: new `packetAdapter`. A field's **width is how many bits it occupies** and its

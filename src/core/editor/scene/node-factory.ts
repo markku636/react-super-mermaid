@@ -22,6 +22,7 @@ import { c4BoxSize, classBoxSize, erEntitySize, requirementBoxSize } from '../re
 import { POINT_BOX } from '../round-trip/quadrant/model';
 import { C4_SHAPE_DEFAULT_TYPE } from '../round-trip/c4/shapes';
 import { CARD as KANBAN_CARD } from '../round-trip/kanban/model';
+import { GIT } from '../round-trip/gitgraph';
 
 /**
  * 新拖出來的需求 / 元素預填的內容。
@@ -39,45 +40,29 @@ const NEW_REQUIREMENT = {
 const NEW_ELEMENT = { element: true as const, elementType: 'simulation' };
 
 /** 各圖種新節點的預設外形(adapter capabilities.defaults.nodeShape 的 core 版對照)。 */
+const DEFAULT_SHAPE: Partial<Record<DiagramType, NodeShape>> = {
+  state: 'state',
+  class: 'classBox',
+  er: 'entity',
+  mindmap: 'rounded',
+  requirement: 'requirementBox',
+  quadrant: 'point',
+  c4: 'c4Box',
+  kanban: 'kanbanCard',
+  sankey: 'sankeyNode',
+  journey: 'journeyTask',
+  gantt: 'ganttBar',
+  pie: 'pieSlice',
+  xychart: 'xyPoint',
+  architecture: 'archNode',
+  block: 'rectangle',
+  packet: 'packetField',
+  gitgraph: 'gitCommit',
+  sequence: 'participant',
+};
+
 export function defaultShapeFor(type: DiagramType): NodeShape {
-  switch (type) {
-    case 'state':
-      return 'state';
-    case 'class':
-      return 'classBox';
-    case 'er':
-      return 'entity';
-    case 'mindmap':
-      return 'rounded';
-    case 'requirement':
-      return 'requirementBox';
-    case 'quadrant':
-      return 'point';
-    case 'c4':
-      return 'c4Box';
-    case 'kanban':
-      return 'kanbanCard';
-    case 'sankey':
-      return 'sankeyNode';
-    case 'journey':
-      return 'journeyTask';
-    case 'gantt':
-      return 'ganttBar';
-    case 'pie':
-      return 'pieSlice';
-    case 'xychart':
-      return 'xyPoint';
-    case 'architecture':
-      return 'archNode';
-    case 'block':
-      return 'rectangle';
-    case 'packet':
-      return 'packetField';
-    case 'sequence':
-      return 'participant';
-    default:
-      return 'rectangle';
-  }
+  return DEFAULT_SHAPE[type] ?? 'rectangle';
 }
 
 /** 外形決定初始尺寸:偽狀態是小圓點、fork 是細長條、class/er 要放得下標題列。 */
@@ -113,6 +98,8 @@ export function defaultSizeFor(type: DiagramType, shape: NodeShape): { w: number
     case 'kanbanCard':
     case 'journeyTask':
       return { w: KANBAN_CARD.w, h: KANBAN_CARD.minH };
+    case 'gitCommit':
+      return { w: GIT.node, h: GIT.node };
     default:
       return type === 'mindmap' ? { w: 110, h: 46 } : { w: 120, h: 56 };
   }
@@ -153,6 +140,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'block', span: 1 };
     case 'packet':
       return { kind: 'packet' };
+    case 'gitgraph':
+      return { kind: 'gitgraph', commitType: 0, tags: [] };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

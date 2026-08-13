@@ -54,6 +54,7 @@ import { classBoxSize, erEntitySize, requirementBoxSize, requirementRows } from 
 import { containerRect, nextEdgeId, nextNodeId } from './scene/scene-ops';
 import { defaultShapeFor, makeEdgeFor, makeNodeFor } from './scene/node-factory';
 import { laneRect } from './layout/lanes';
+import { GIT_COMMIT_TYPES, gitLaneRect } from './round-trip/gitgraph';
 import { shapeMeta } from './scene/shape-meta';
 import { PointerController, type PointerHost, type Tool } from './interaction/pointer';
 import { openTextEditor } from './interaction/text-edit';
@@ -361,6 +362,13 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   }, 600);
   // 空白畫布的起手範本(對標付費工具的範本庫)。每個可拖拉繪製的圖種都要有一個入口 ——
   // 否則使用者在空白畫布上根本無從得知這個編輯器還會畫看板 / 象限圖 / C4。
+  // 空白畫布上的一行引導:操作方式與別的圖種明顯不同的才需要自己的說法。
+  const EMPTY_HINT: Partial<Record<DiagramType, string>> = {
+    sequence: '空白序列圖 — 在空白處按右鍵：新增參與者 / 訊息',
+    mindmap: '空白心智圖 — 點上方外形按鈕放下主題，再從節點拉線長出分支',
+    quadrant: '空白象限圖 — 雙擊格線上任一處放一個資料點，拖曳它就是在改它的值',
+    gitgraph: '空白 Git 線圖 — 在空白處按右鍵：新增分支 / 提交；左右拖改順序、上下拖換分支',
+  };
   const STARTERS: Array<[string, string]> = [
     ['流程圖', 'flowchart TD\n  A[開始] --> B{判斷}\n  B -->|是| C[處理]\n  B -->|否| D[結束]'],
     ['序列圖', 'sequenceDiagram\n  使用者->>系統: 請求\n  系統-->>使用者: 回應'],
@@ -404,6 +412,11 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     ],
     ['積木圖', 'block-beta\n  columns 3\n  a["前端"] b["後端"] c[("資料庫")]\n  a --> b'],
     ['封包圖', 'packet-beta\ntitle 封包\n0-15: "來源埠"\n16-31: "目的埠"'],
+    [
+      'Git 線圖',
+      'gitGraph\n   commit id: "初始"\n   branch feature\n   commit id: "開發"\n' +
+        '   checkout main\n   commit id: "修正"\n   merge feature tag: "v1.0"',
+    ],
     ['時間軸', 'timeline\n  title 時間軸標題\n  section 區段一\n    時間點 : 事件'],
   ];
   function updateEmptyHint(): void {
@@ -421,13 +434,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     const hintText = document.createElement('div');
     hintText.className = 'rsm-empty-text';
     hintText.textContent =
-      scene.diagramType === 'sequence'
-        ? '空白序列圖 — 在空白處按右鍵：新增參與者 / 訊息'
-        : scene.diagramType === 'mindmap'
-          ? '空白心智圖 — 點上方外形按鈕放下主題，再從節點拉線長出分支'
-          : scene.diagramType === 'quadrant'
-            ? '空白象限圖 — 雙擊格線上任一處放一個資料點，拖曳它就是在改它的值'
-            : '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
+      EMPTY_HINT[scene.diagramType] ?? '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
     emptyHint.appendChild(hintText);
     const sub = document.createElement('div');
     sub.className = 'rsm-empty-sub';
@@ -623,6 +630,38 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
           cancelTextEdit = null;
           const cur = scene.containers.find((c) => c.id === containerId);
           if (cur && value !== cur.label) pointerHost.runCommand(cmdSetContainerLabel(containerId, value), 'lane-name');
+        },
+        () => {
+          cancelTextEdit = null;
+        },
+      );
+    }, 0);
+    cancelTextEdit = () => clearTimeout(timer);
+  }
+
+  /** git 提交的標籤(tag)就地編輯 —— 標籤畫在圓點正上方,編輯框就開在那裡。 */
+  function openGitTagEditor(nodeId: string): void {
+    const node = scene.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const d = node.data?.kind === 'gitgraph' ? node.data : undefined;
+    const s = viewport.worldToScreen({ x: node.x + node.w / 2, y: node.y - 12 });
+    cancelTextEdit?.();
+    const timer = setTimeout(() => {
+      cancelTextEdit = openTextEditor(
+        host,
+        { left: s.x - 60, top: s.y - 14, width: 120, height: 28 },
+        d?.tags?.[0] ?? '',
+        (value) => {
+          cancelTextEdit = null;
+          const cur = scene.nodes.find((n) => n.id === nodeId);
+          const cd = cur?.data?.kind === 'gitgraph' ? cur.data : undefined;
+          if (!cd) return;
+          const tag = value.trim();
+          if (tag === (cd.tags[0] ?? '')) return;
+          pointerHost.runCommand(
+            cmdSetNodeData(nodeId, { data: { ...cd, tags: tag ? [tag] : [] } }),
+            'git-tag',
+          );
         },
         () => {
           cancelTextEdit = null;
@@ -913,6 +952,36 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       addItem('改名', () => openEditor(id));
       addSep();
       addItem('刪除參與者', () => pointerHost.runCommand(cmdDeleteSeqParticipant(id), 'del-participant'));
+    } else if (
+      nodeEl &&
+      scene.nodes.find((n) => n.id === nodeEl.getAttribute('data-node-id'))?.data?.kind === 'gitgraph'
+    ) {
+      // git 提交右鍵:改 id / 換記號 / 掛標籤。分支與順序靠拖曳,不放進選單。
+      const id = nodeEl.getAttribute('data-node-id') as string;
+      pointer.setSelection([id]);
+      const cur = scene.nodes.find((n) => n.id === id);
+      const d = cur?.data?.kind === 'gitgraph' ? cur.data : undefined;
+      addItem('改提交 id', () => openEditor(id));
+      addSep();
+      for (const [t, label] of GIT_COMMIT_TYPES) {
+        // 合併節點的記號由「它是不是 merge」決定,不讓使用者切成一般提交(會失去來源分支)。
+        if (d?.commitType === 3 || t === 3) continue;
+        addItem(`${d?.commitType === t ? '● ' : '　'}${label}`, () =>
+          pointerHost.runCommand(
+            cmdSetNodeData(id, { data: { ...(d ?? { kind: 'gitgraph', tags: [] }), commitType: t } }),
+            'git-type',
+          ),
+        );
+      }
+      addSep();
+      addItem(d?.tags?.length ? '改標籤' : '加標籤', () => openGitTagEditor(id));
+      if (d?.tags?.length) {
+        addItem('移除標籤', () =>
+          pointerHost.runCommand(cmdSetNodeData(id, { data: { ...d, tags: [] } }), 'git-untag'),
+        );
+      }
+      addSep();
+      addItem('刪除這個提交', () => handle.deleteSelection());
     } else if (nodeEl) {
       const id = nodeEl.getAttribute('data-node-id') as string;
       // 右鍵已選取的節點 → 保留多選(才能用對齊/群組);否則改選此節點。
@@ -1040,6 +1109,53 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         pointerHost.runCommand(cmdAddSeqNote(), 'add-note');
         setTimeout(() => openSeqMessageEditor(idx), 0);
       });
+      addSep();
+      addItem('整理排版', () => void handle.tidy());
+    } else if (scene.diagramType === 'gitgraph') {
+      // git 線圖:泳道 = 分支。改名 / 刪分支 / 新增分支 / 在最右端接一個提交。
+      const cid = laneEl?.getAttribute('data-container-id') ?? undefined;
+      if (cid) {
+        const lane = scene.containers.find((c) => c.id === cid);
+        addItem('改分支名稱', () => openLaneEditor(cid));
+        // 第一條泳道是所有提交的起點,刪掉整份圖就沒有根了。
+        if ((lane?.sourceIndex ?? 0) > 0) {
+          addSep();
+          addItem('刪除這條分支', () => {
+            pointerHost.runCommand(cmdDeleteContainer(cid, lane?.childNodeIds ?? []), 'del-branch');
+            void handle.tidy();
+          });
+        }
+        addSep();
+      }
+      addItem('新增分支', () => {
+        const taken = new Set(scene.containers.map((c) => c.id));
+        let k = scene.containers.length;
+        while (taken.has(`branch${k}`)) k += 1;
+        const id = `branch${k}`;
+        pointerHost.runCommand(
+          cmdAddContainer({
+            id,
+            label: id,
+            ...gitLaneRect(scene.containers.length, scene.nodes.length),
+            parentId: null,
+            childNodeIds: [],
+            sourceIndex: scene.containers.length,
+          }),
+          'add-branch',
+        );
+      });
+      if (scene.containers.length > 0) {
+        addItem('新增提交', () => {
+          const nid = nextNodeId(scene);
+          const world2 = viewport.screenToWorld(e.clientX, e.clientY);
+          pointerHost.runCommand(
+            cmdAddNode(makeNodeFor(scene, nid, world2, { label: nid })),
+            'add-commit',
+          );
+          pointer.setSelection([nid]);
+          void handle.tidy();
+        });
+      }
       addSep();
       addItem('整理排版', () => void handle.tidy());
     } else if (laneEl && (scene.diagramType === 'kanban' || scene.diagramType === 'journey')) {

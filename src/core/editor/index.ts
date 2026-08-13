@@ -34,6 +34,7 @@ export { xychartAdapter, registerXychartAdapter } from './adapters/xychart';
 export { architectureAdapter, registerArchitectureAdapter } from './adapters/architecture';
 export { blockAdapter, registerBlockAdapter } from './adapters/block';
 export { packetAdapter, registerPacketAdapter } from './adapters/packet';
+export { gitgraphAdapter, registerGitgraphAdapter } from './adapters/gitgraph';
 export { PLOT as QUADRANT_PLOT, valueToScene, sceneToValue } from './round-trip/quadrant/model';
 
 export type { EditorLook } from './render/scene-renderer';

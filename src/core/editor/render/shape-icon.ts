@@ -88,6 +88,8 @@ function body(shape: NodeShape): string {
       return `<rect x="3" y="2" width="4" height="12" rx="1" ${FILL}/><path d="M8 6h9" stroke="currentColor" stroke-width="3.4" opacity="0.5" stroke-linecap="round"/><path d="M8 11h6" stroke="currentColor" stroke-width="1.8" opacity="0.5" stroke-linecap="round"/><rect x="18" y="2" width="3" height="12" rx="1" ${FILL}/>`;
     case 'packetField':
       return `<rect x="2" y="4" width="9" height="8" rx="1" ${S}/><rect x="11" y="4" width="5" height="8" rx="1" ${S}/><rect x="16" y="4" width="6" height="8" rx="1" ${S}/>`;
+    case 'gitCommit':
+      return `<path d="M2 8h20" stroke="currentColor" stroke-width="1.6" opacity="0.45"/><circle cx="6" cy="8" r="2.6" ${FILL}/><circle cx="13" cy="8" r="2.6" ${FILL}/><circle cx="20" cy="8" r="2.6" ${FILL}/>`;
     case 'archNode':
       return `<rect x="4" y="2" width="16" height="12" rx="2" ${S}/><rect x="7.5" y="5" width="9" height="6" rx="1" ${FILL}/>`;
     case 'xyPoint':

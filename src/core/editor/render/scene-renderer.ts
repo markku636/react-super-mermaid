@@ -10,15 +10,20 @@ import type { EditorScene, SceneContainer, SceneNode } from '../scene/types';
 import { appendInlineMarkdown, svgEl, XHTML_NS } from './dom';
 import { renderEdge, buildMarkers, markerIdFor, updateEdgeGeometry } from './edges';
 import { INK, INK_DARK, clusterByIndex, paletteByIndex, seedFor } from './palette';
-import { c4Lines, requirementKind, requirementRows } from './node-metrics';
+import { c4Lines, requirementKind, requirementRows, textWidth } from './node-metrics';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { PIE as PIE_GEO, angleOf as pieAngleOf, sliceAngles as pieSliceAngles } from '../round-trip/pie';
 import { XY as XY_PLOT, bandX as xyBandX, yToValue as xyYToValue } from '../round-trip/xychart';
 import { BIT as PACKET_BIT } from '../round-trip/packet';
 import { DAY_W as GANTT_DAY_W, ORIGIN as GANTT_ORIGIN, ROW_H as GANTT_ROW_H, formatDay as ganttFormatDay } from '../round-trip/gantt/model';
 
+import { GIT, gitLaneIndexAt, gitgraphLinks } from '../round-trip/gitgraph';
+
 /** 甘特圖的版面常數(集中成一個物件,渲染這邊讀起來比一串同名 import 清楚)。 */
 const GANTT = { DAY_W: GANTT_DAY_W, ROW_H: GANTT_ROW_H, ORIGIN: GANTT_ORIGIN } as const;
+
+/** 用「泳道」呈現的圖種:容器框要可被點到(改名 / 刪除),其餘圖種維持穿透。 */
+const LANE_DIAGRAMS = new Set(['kanban', 'journey', 'gitgraph']);
 import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
@@ -189,6 +194,10 @@ export class SceneRenderer {
     }
     if (node.data?.kind === 'packet') {
       this.fillPacketField(g, node);
+      return;
+    }
+    if (node.data?.kind === 'gitgraph') {
+      this.fillGitCommit(g, node);
       return;
     }
 
@@ -847,6 +856,145 @@ export class SceneRenderer {
     };
   }
 
+  /**
+   * gitGraph 的骨架:每條分支一條水平軸線,加上「從順序推導出來的」父子連線。
+   * 連線畫在背景層而非 edges 層 —— 它們是衍生值(拖動就會重算),不是使用者畫的邊。
+   */
+  private renderGitgraphFrame(scene: EditorScene): void {
+    const g = this.frameLayer;
+    const laneY = new Map<string, number>();
+    const laneColor = new Map<string, string>();
+    const lanes = [...scene.containers].sort((a, b) => (a.sourceIndex ?? 0) - (b.sourceIndex ?? 0));
+    lanes.forEach((c, i) => {
+      laneY.set(c.id, c.y + c.h / 2);
+      laneColor.set(c.id, clusterByIndex(i).stroke);
+    });
+    const right = Math.max(GIT.x0, ...scene.nodes.map((n) => n.x + n.w)) + GIT.dx / 2;
+    for (const c of lanes) {
+      const y = laneY.get(c.id) as number;
+      g.appendChild(
+        svgEl('path', {
+          d: `M${c.x + 12},${y} L${right},${y}`,
+          stroke: laneColor.get(c.id) as string,
+          'stroke-opacity': 0.35,
+          'stroke-width': 2,
+          fill: 'none',
+        }),
+      );
+    }
+    const center = (id: string): { x: number; y: number } | undefined => {
+      const n = scene.nodes.find((v) => v.id === id);
+      return n ? { x: n.x + n.w / 2, y: n.y + n.h / 2 } : undefined;
+    };
+    // 讓「符合畫面」把泳道整條算進去 —— 只框節點的話,左端的分支名稱會被切在畫面外。
+    if (lanes.length) {
+      const x = Math.min(...lanes.map((c) => c.x));
+      const y = Math.min(...lanes.map((c) => c.y));
+      this.seqBounds = {
+        x: x - 12,
+        y: y - 12,
+        w: Math.max(...lanes.map((c) => c.x + c.w), right) - x + 24,
+        h: Math.max(...lanes.map((c) => c.y + c.h)) - y + 24,
+      };
+    }
+    for (const link of gitgraphLinks(scene)) {
+      const a = center(link.from);
+      const b = center(link.to);
+      if (!a || !b) continue;
+      // 同一條泳道就是直線;跨泳道(分支 / 合併)走 S 形貝茲,和 mermaid 畫的一樣。
+      const d =
+        Math.abs(a.y - b.y) < 1
+          ? `M${a.x},${a.y} L${b.x},${b.y}`
+          : `M${a.x},${a.y} C${(a.x + b.x) / 2},${a.y} ${(a.x + b.x) / 2},${b.y} ${b.x},${b.y}`;
+      g.appendChild(
+        svgEl('path', {
+          d,
+          stroke: this.dark ? INK_DARK : INK,
+          'stroke-opacity': link.merge ? 0.4 : 0.55,
+          'stroke-width': 2,
+          'stroke-dasharray': link.merge ? '5 3' : '',
+          fill: 'none',
+        }),
+      );
+    }
+  }
+
+  /** git 提交:實心圓點 + 下方 id;合併是雙環,tag 掛成小旗標。 */
+  private fillGitCommit(g: SVGGElement, node: SceneNode): void {
+    const d = node.data?.kind === 'gitgraph' ? node.data : undefined;
+    const ink = this.dark ? INK_DARK : INK;
+    // 顏色跟著「它現在落在哪一條泳道」走,而不是 parentId —— 拖到別條分支時顏色要立刻跟上,
+    // 而 parentId 要等「整理排版」才會回填。
+    const lane = gitLaneIndexAt(node.y, this.scene?.containers.length ?? 1);
+    const pal = clusterByIndex(lane);
+    const cx = node.w / 2;
+    const cy = node.h / 2;
+    const merge = d?.commitType === 3;
+    const highlight = d?.commitType === 2;
+    const reverse = d?.commitType === 1;
+    g.appendChild(
+      svgEl('circle', {
+        cx,
+        cy,
+        r: merge ? 11 : 9,
+        fill: highlight ? pal.stroke : this.dark ? '#1e222b' : '#ffffff',
+        stroke: pal.stroke,
+        'stroke-width': highlight ? 2.4 : 2,
+      }),
+    );
+    // 合併=雙環(和 mermaid 的 merge 記號一致);REVERSE=打叉。
+    if (merge) {
+      g.appendChild(
+        svgEl('circle', { cx, cy, r: 5, fill: pal.stroke, stroke: 'none' }),
+      );
+    } else if (reverse) {
+      g.appendChild(
+        svgEl('path', {
+          d: `M${cx - 4},${cy - 4} L${cx + 4},${cy + 4} M${cx + 4},${cy - 4} L${cx - 4},${cy + 4}`,
+          stroke: pal.stroke,
+          'stroke-width': 2,
+          fill: 'none',
+        }),
+      );
+    }
+    // 標籤畫成一枚小色片(而不是 🏷 emoji —— 系統 UI 字型不一定畫得出來)。
+    const tag = d?.tags?.[0];
+    if (tag) {
+      const w = Math.max(24, textWidth(tag, 10.5) + 12);
+      g.appendChild(
+        svgEl('rect', {
+          x: cx - w / 2,
+          y: cy - 34,
+          width: w,
+          height: 17,
+          rx: 4,
+          fill: pal.stroke,
+          stroke: 'none',
+        }),
+      );
+      const t = svgEl('text', {
+        x: cx,
+        y: cy - 22,
+        fill: '#ffffff',
+        'text-anchor': 'middle',
+        style: 'font:600 10.5px var(--rsm-editor-font);pointer-events:none;',
+      });
+      t.textContent = tag;
+      g.appendChild(t);
+    }
+    if (node.label) {
+      const t = svgEl('text', {
+        x: cx,
+        y: node.h + 13,
+        fill: ink,
+        'text-anchor': 'middle',
+        style: 'font:11.5px var(--rsm-editor-font);opacity:0.85;pointer-events:none;',
+      });
+      t.textContent = node.label;
+      g.appendChild(t);
+    }
+  }
+
   /** 封包欄位:實心格 + 欄名 + 位元範圍。 */
   private fillPacketField(g: SVGGElement, node: SceneNode): void {
     const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
@@ -1454,6 +1602,7 @@ export class SceneRenderer {
     if (scene.diagramType === 'pie') this.renderPieFrame(scene);
     if (scene.diagramType === 'xychart') this.renderXyFrame(scene);
     if (scene.diagramType === 'packet') this.renderPacketFrame(scene);
+    if (scene.diagramType === 'gitgraph') this.renderGitgraphFrame(scene);
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {
@@ -1517,7 +1666,10 @@ export class SceneRenderer {
     const effRect = (c: SceneContainer): { x: number; y: number; w: number; h: number } | null => {
       // 看板的欄是**固定泳道**,不是「包住小孩的框」:空的欄也必須畫出來(不然拖不進去),
       // 而且欄寬不能隨卡片長短變。所以直接用容器自己的幾何。
-      if (scene.diagramType === 'kanban') return { x: c.x, y: c.y, w: c.w, h: c.h };
+      // git 線圖的分支泳道同理:空分支也要看得見才拖得進去,寬度也不該隨提交多寡忽長忽短。
+      if (scene.diagramType === 'kanban' || scene.diagramType === 'gitgraph') {
+        return { x: c.x, y: c.y, w: c.w, h: c.h };
+      }
       const rects = c.childNodeIds
         .map((id) => byId.get(id))
         .filter((n): n is SceneNode => Boolean(n))
@@ -1548,9 +1700,11 @@ export class SceneRenderer {
         'stroke-width': 1.5,
         'data-container-id': c.id,
       });
+      // git 的分支泳道是整條橫貫畫面的長條;同樣的粉彩鋪滿那麼大一片會蓋過提交本身,壓淡一些。
+      if (scene.diagramType === 'gitgraph') box.setAttribute('fill-opacity', '0.4');
       // 泳道圖的欄要可以被右鍵點到(改名 / 刪欄);其他圖種的容器框維持穿透,
       // 免得擋住框內節點的點擊。
-      box.style.pointerEvents = scene.diagramType === 'kanban' || scene.diagramType === 'journey' ? 'auto' : 'none';
+      box.style.pointerEvents = LANE_DIAGRAMS.has(scene.diagramType) ? 'auto' : 'none';
       this.containersLayer.appendChild(box);
       if (c.label) {
         const fo = svgEl('foreignObject', { x, y: y + 2, width: w, height: LABEL_H });

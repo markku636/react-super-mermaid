@@ -18,6 +18,7 @@ import { registerXychartAdapter } from '../core/editor/adapters/xychart';
 import { registerArchitectureAdapter } from '../core/editor/adapters/architecture';
 import { registerBlockAdapter } from '../core/editor/adapters/block';
 import { registerPacketAdapter } from '../core/editor/adapters/packet';
+import { registerGitgraphAdapter } from '../core/editor/adapters/gitgraph';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -42,6 +43,7 @@ registerXychartAdapter();
 registerArchitectureAdapter();
 registerBlockAdapter();
 registerPacketAdapter();
+registerGitgraphAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

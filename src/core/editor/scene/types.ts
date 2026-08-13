@@ -25,6 +25,7 @@ export type DiagramType =
   | 'architecture'
   | 'block'
   | 'packet'
+  | 'gitgraph'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -83,6 +84,8 @@ export type NodeShape =
   | 'archNode'
   // packet:一個位元欄位(寬度就是它佔幾個 bit)
   | 'packetField'
+  // gitGraph:一次提交(橫向位置=先後順序、縱向泳道=分支)
+  | 'gitCommit'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -157,6 +160,9 @@ export type NodeData =
   /** block 積木:占幾個欄位(位置決定它在網格的哪一格)。 */
   | { kind: 'block'; span: number }
   | { kind: 'packet' }
+  /** git 提交:type 沿用 mermaid 代碼(0 一般 / 1 REVERSE / 2 HIGHLIGHT / 3 MERGE);
+   *  合併節點另記來源分支(父子關係由指令順序推導,不必存)。 */
+  | { kind: 'gitgraph'; commitType: number; tags: string[]; mergeFrom?: string }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -343,6 +349,7 @@ export type SceneMeta =
   | { type: 'block'; columns: number }
   /** relative = 原始碼用的是 +N 相對寬度而非絕對位元範圍;沿用作者的寫法。 */
   | { type: 'packet'; title?: string; relative: boolean }
+  | { type: 'gitgraph' }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -412,6 +419,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   architecture: { type: 'architecture' },
   block: { type: 'block', columns: 1 },
   packet: { type: 'packet', relative: false },
+  gitgraph: { type: 'gitgraph' },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };

@@ -68,6 +68,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   archNode: { glyph: '▣', label: '服務' },
   // packet
   packetField: { glyph: '▭', label: '欄位' },
+  // gitgraph
+  gitCommit: { glyph: '●', label: '提交' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };
