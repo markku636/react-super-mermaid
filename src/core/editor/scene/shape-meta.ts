@@ -66,6 +66,8 @@ const META: Record<NodeShape, ShapeMeta> = {
   xyPoint: { glyph: '●', label: '資料點' },
   // architecture
   archNode: { glyph: '▣', label: '服務' },
+  // packet
+  packetField: { glyph: '▭', label: '欄位' },
   // 未模型化
   passthrough: { glyph: '▭', label: '原樣保留' },
 };

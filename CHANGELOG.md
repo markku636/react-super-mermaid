@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.21.0 — packet diagrams are drawable
+
+- **Feature**: new `packetAdapter`. A field's **width is how many bits it occupies** and its
+  left-to-right order is its order in the source, so dragging the right edge resizes the field and
+  dragging sideways reorders — and the bit numbers are re-derived by accumulation on save, so they
+  can never drift out of sync the way hand-edited ranges do.
+- The editing canvas draws the packet as one continuous strip with a byte ruler, where mermaid wraps
+  every 32 bits. Wrapping splits a field into two rectangles, which leaves nothing coherent to grab;
+  a single strip keeps every field one draggable box.
+- Whether the source used absolute ranges (`0-15:`) or relative widths (`+16:`) is remembered and
+  reproduced, so the file keeps the author's style.
+
 ## 0.20.0 — block diagrams are drawable
 
 - **Feature**: new `blockAdapter`. Block diagrams flow into a `columns N` grid, so **the cell a block

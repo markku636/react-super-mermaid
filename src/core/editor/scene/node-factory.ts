@@ -71,6 +71,8 @@ export function defaultShapeFor(type: DiagramType): NodeShape {
       return 'archNode';
     case 'block':
       return 'rectangle';
+    case 'packet':
+      return 'packetField';
     case 'sequence':
       return 'participant';
     default:
@@ -149,6 +151,8 @@ function defaultDataFor(type: DiagramType, shape: NodeShape): NodeData {
       return { kind: 'architecture' };
     case 'block':
       return { kind: 'block', span: 1 };
+    case 'packet':
+      return { kind: 'packet' };
     case 'sequence':
       return { kind: 'sequence', actor: shape === 'actor' };
     default:

@@ -86,6 +86,8 @@ function body(shape: NodeShape): string {
       return `<rect x="3" y="4" width="18" height="8" rx="4" ${S}/><path d="M9 4v8M15 4v8" stroke="currentColor" stroke-width="1.1" opacity="0.6"/>`;
     case 'sankeyNode':
       return `<rect x="3" y="2" width="4" height="12" rx="1" ${FILL}/><path d="M8 6h9" stroke="currentColor" stroke-width="3.4" opacity="0.5" stroke-linecap="round"/><path d="M8 11h6" stroke="currentColor" stroke-width="1.8" opacity="0.5" stroke-linecap="round"/><rect x="18" y="2" width="3" height="12" rx="1" ${FILL}/>`;
+    case 'packetField':
+      return `<rect x="2" y="4" width="9" height="8" rx="1" ${S}/><rect x="11" y="4" width="5" height="8" rx="1" ${S}/><rect x="16" y="4" width="6" height="8" rx="1" ${S}/>`;
     case 'archNode':
       return `<rect x="4" y="2" width="16" height="12" rx="2" ${S}/><rect x="7.5" y="5" width="9" height="6" rx="1" ${FILL}/>`;
     case 'xyPoint':

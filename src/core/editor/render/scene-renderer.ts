@@ -14,6 +14,7 @@ import { c4Lines, requirementKind, requirementRows } from './node-metrics';
 import { PLOT, quadrantRects } from '../round-trip/quadrant/model';
 import { PIE as PIE_GEO, angleOf as pieAngleOf, sliceAngles as pieSliceAngles } from '../round-trip/pie';
 import { XY as XY_PLOT, bandX as xyBandX, yToValue as xyYToValue } from '../round-trip/xychart';
+import { BIT as PACKET_BIT } from '../round-trip/packet';
 import { DAY_W as GANTT_DAY_W, ORIGIN as GANTT_ORIGIN, ROW_H as GANTT_ROW_H, formatDay as ganttFormatDay } from '../round-trip/gantt/model';
 
 /** 甘特圖的版面常數(集中成一個物件,渲染這邊讀起來比一串同名 import 清楚)。 */
@@ -184,6 +185,10 @@ export class SceneRenderer {
     }
     if (node.data?.kind === 'architecture') {
       this.fillArchNode(g, node);
+      return;
+    }
+    if (node.data?.kind === 'packet') {
+      this.fillPacketField(g, node);
       return;
     }
 
@@ -794,6 +799,93 @@ export class SceneRenderer {
     g.appendChild(fo);
   }
 
+  /** 封包位元帶:位元刻度尺 + 標題(欄位本身是節點)。 */
+  private renderPacketFrame(scene: EditorScene): void {
+    const meta = scene.meta.type === 'packet' ? scene.meta : undefined;
+    const ink = this.dark ? INK_DARK : INK;
+    const g = this.frameLayer;
+    if (scene.nodes.length === 0) return;
+    const totalBits = Math.max(
+      ...scene.nodes.map((n) => Math.round((n.x - PACKET_BIT.x0 + n.w) / PACKET_BIT.w)),
+    );
+    // 每 8 bit 一個刻度(位元組界線),讀起來才有依據。
+    for (let b = 0; b <= totalBits; b += 8) {
+      const x = PACKET_BIT.x0 + b * PACKET_BIT.w;
+      g.appendChild(
+        svgEl('path', {
+          d: `M${x},${PACKET_BIT.y0 - 18} L${x},${PACKET_BIT.y0 + PACKET_BIT.h + 8}`,
+          stroke: ink,
+          'stroke-opacity': 0.25,
+          fill: 'none',
+        }),
+      );
+      const t = svgEl('text', {
+        x,
+        y: PACKET_BIT.y0 - 24,
+        fill: ink,
+        'text-anchor': 'middle',
+        style: 'font:500 11px var(--rsm-editor-font);opacity:0.7;pointer-events:none;',
+      });
+      t.textContent = String(b);
+      g.appendChild(t);
+    }
+    if (meta?.title) {
+      const t = svgEl('text', {
+        x: PACKET_BIT.x0,
+        y: PACKET_BIT.y0 - 48,
+        fill: ink,
+        style: 'font:700 16px var(--rsm-editor-font);pointer-events:none;',
+      });
+      t.textContent = meta.title;
+      g.appendChild(t);
+    }
+    this.seqBounds = {
+      x: PACKET_BIT.x0 - 40,
+      y: PACKET_BIT.y0 - 70,
+      w: totalBits * PACKET_BIT.w + 80,
+      h: PACKET_BIT.h + 110,
+    };
+  }
+
+  /** 封包欄位:實心格 + 欄名 + 位元範圍。 */
+  private fillPacketField(g: SVGGElement, node: SceneNode): void {
+    const idx = this.scene ? this.scene.nodes.findIndex((n) => n.id === node.id) : 0;
+    const pal = paletteByIndex(idx >= 0 ? idx : 0);
+    g.appendChild(
+      svgEl('rect', {
+        x: 0,
+        y: 0,
+        width: node.w,
+        height: node.h,
+        rx: 3,
+        fill: pal.fill,
+        stroke: pal.stroke,
+        'stroke-width': 1.4,
+      }),
+    );
+    const startBit = Math.round((node.x - PACKET_BIT.x0) / PACKET_BIT.w);
+    const bits = Math.max(1, Math.round(node.w / PACKET_BIT.w));
+    const fo = svgEl('foreignObject', { x: 2, y: 0, width: Math.max(0, node.w - 4), height: node.h });
+    fo.style.pointerEvents = 'none';
+    const root = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    root.setAttribute(
+      'style',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:100%;' +
+        // 文字壓在淺色欄位底上 → 墨色固定深色。
+        `overflow:hidden;text-align:center;color:${INK};`,
+    );
+    const name = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    name.textContent = node.label;
+    name.setAttribute('style', 'font:600 12px/1.25 var(--rsm-editor-font);word-break:break-word;');
+    root.appendChild(name as unknown as Node);
+    const range = document.createElementNS(XHTML_NS, 'div') as unknown as HTMLDivElement;
+    range.textContent = bits === 1 ? `${startBit}` : `${startBit}–${startBit + bits - 1}`;
+    range.setAttribute('style', 'font:10.5px/1.2 var(--rsm-editor-font);opacity:0.7;');
+    root.appendChild(range as unknown as Node);
+    fo.appendChild(root as unknown as Node);
+    g.appendChild(fo);
+  }
+
   /** architecture 服務:圖示方塊 + 下方名稱;junction 只畫一個小點。 */
   private fillArchNode(g: SVGGElement, node: SceneNode): void {
     const d = node.data?.kind === 'architecture' ? node.data : undefined;
@@ -1361,6 +1453,7 @@ export class SceneRenderer {
     if (scene.diagramType === 'gantt') this.renderGanttFrame(scene);
     if (scene.diagramType === 'pie') this.renderPieFrame(scene);
     if (scene.diagramType === 'xychart') this.renderXyFrame(scene);
+    if (scene.diagramType === 'packet') this.renderPacketFrame(scene);
     // 上一次是 sequence 渲染(內容直接寫入 layers、未進 nodeCache)→ diff 渲染清不掉,
     // 先把全部 layers + 快取硬清空,避免上一張 sequence 圖殘留疊在新圖底下。
     if (this.renderedSequence) {

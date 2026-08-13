@@ -17,6 +17,7 @@ import { registerPieAdapter } from '../core/editor/adapters/pie';
 import { registerXychartAdapter } from '../core/editor/adapters/xychart';
 import { registerArchitectureAdapter } from '../core/editor/adapters/architecture';
 import { registerBlockAdapter } from '../core/editor/adapters/block';
+import { registerPacketAdapter } from '../core/editor/adapters/packet';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { EditorScene } from '../core/editor/scene/types';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
@@ -40,6 +41,7 @@ registerPieAdapter();
 registerXychartAdapter();
 registerArchitectureAdapter();
 registerBlockAdapter();
+registerPacketAdapter();
 
 export interface UseDiagramEditorOptions {
   source?: string;

@@ -24,6 +24,7 @@ export type DiagramType =
   | 'xychart'
   | 'architecture'
   | 'block'
+  | 'packet'
   | 'timeline';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
@@ -80,6 +81,8 @@ export type NodeShape =
   | 'xyPoint'
   // architecture:一個服務 / junction
   | 'archNode'
+  // packet:一個位元欄位(寬度就是它佔幾個 bit)
+  | 'packetField'
   // 無法對映的新語法 → 原樣保留
   | 'passthrough';
 
@@ -153,6 +156,7 @@ export type NodeData =
   | { kind: 'architecture'; icon?: string; junction?: boolean }
   /** block 積木:占幾個欄位(位置決定它在網格的哪一格)。 */
   | { kind: 'block'; span: number }
+  | { kind: 'packet' }
   | { kind: 'note'; text: string };
 
 /** requirementDiagram 的節點:需求(有 id/text/風險/驗證方式)或元素(有型別/文件連結)。 */
@@ -337,6 +341,8 @@ export type SceneMeta =
   | { type: 'xychart'; xy: XyChartMeta }
   | { type: 'architecture' }
   | { type: 'block'; columns: number }
+  /** relative = 原始碼用的是 +N 相對寬度而非絕對位元範圍;沿用作者的寫法。 */
+  | { type: 'packet'; title?: string; relative: boolean }
   // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
   | { type: 'timeline' };
 
@@ -405,6 +411,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   xychart: { type: 'xychart', xy: { categories: [], series: [], yMin: 0, yMax: 100 } },
   architecture: { type: 'architecture' },
   block: { type: 'block', columns: 1 },
+  packet: { type: 'packet', relative: false },
   timeline: { type: 'timeline' },
   er: { type: 'er' },
 };
