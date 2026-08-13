@@ -29,6 +29,7 @@ export const flowchartAdapter: DiagramAdapter = {
       'parallelogramAlt',
       'ellipse',
     ],
+    quickShapes: ['rectangle', 'rounded', 'stadium', 'diamond', 'circle', 'hexagon', 'cylinder'],
     arrowHeads: ['none', 'arrow', 'open', 'dot', 'cross'],
     lineKinds: ['solid', 'dotted', 'thick', 'invisible'],
     freeform: true,

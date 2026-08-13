@@ -48,7 +48,10 @@ export function sceneToMindmap(scene: EditorScene): SerializeResult {
 
   const emit = (n: SceneNode, depth: number): void => {
     const shapeType = n.data?.kind === 'mindmap' ? n.data.shapeType : 0;
-    lines.push(`${INDENT.repeat(depth + 1)}${wrap(shapeType, n.label)}`);
+    // 括號裡不能是空的:`()` / `[]` / `(())` 都會讓 mermaid 直接語法錯誤。剛拖出來還沒命名的
+    // 節點 label 就是空字串,所以退回節點 id 當暫時文字(使用者一改名就會被蓋掉)。
+    const descr = n.label && n.label.trim().length > 0 ? n.label : n.id;
+    lines.push(`${INDENT.repeat(depth + 1)}${wrap(shapeType, descr)}`);
     for (const c of childrenOf.get(n.id) ?? []) emit(c, depth + 1);
   };
 

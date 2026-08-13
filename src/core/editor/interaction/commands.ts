@@ -433,8 +433,39 @@ export function cmdDistributeNodes(ids: string[], axis: 'h' | 'v'): Command {
 
 export function cmdSetDirection(direction: 'TB' | 'TD' | 'BT' | 'LR' | 'RL'): Command {
   return (scene) => {
-    if (scene.meta.type !== 'flowchart') return { scene, patch: {} };
-    return { scene: { ...scene, meta: { ...scene.meta, direction } }, patch: { structural: true } };
+    // flowchart / state / class / er 的序列化都會輸出 `direction`(flowchart 是寫在標頭)。
+    // 先前只放行 flowchart,於是狀態圖 / 類別圖 / ER 圖的方向下拉是顆死按鈕。
+    const m = scene.meta;
+    if (m.type !== 'flowchart' && m.type !== 'state' && m.type !== 'class' && m.type !== 'er') {
+      return { scene, patch: {} };
+    }
+    return { scene: { ...scene, meta: { ...m, direction } }, patch: { structural: true } };
+  };
+}
+
+/**
+ * 把節點掛到新的父節點底下(或解除,parentId=undefined)。
+ *
+ * mindmap 沒有連線語法,階層完全由 parentId 決定 → 在心智圖上「拉一條線」語意上就是改父子關係。
+ * 會擋掉會造成循環的接法(把節點掛到自己的後代之下),否則序列化會無窮遞迴。
+ */
+export function cmdSetParent(nodeId: string, parentId: string | undefined): Command {
+  return (scene) => {
+    const node = scene.nodes.find((n) => n.id === nodeId);
+    if (!node || nodeId === parentId) return { scene, patch: {} };
+    // 循環偵測:沿著 parentId 往上爬,若遇到 nodeId 代表 parent 是它的後代。
+    let cur = parentId;
+    const seen = new Set<string>();
+    while (cur) {
+      if (cur === nodeId) return { scene, patch: {} };
+      if (seen.has(cur)) break;
+      seen.add(cur);
+      cur = scene.nodes.find((n) => n.id === cur)?.parentId ?? undefined;
+    }
+    return {
+      scene: { ...scene, nodes: scene.nodes.map((n) => (n.id === nodeId ? { ...n, parentId } : n)) },
+      patch: { structural: true },
+    };
   };
 }
 

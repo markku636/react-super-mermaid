@@ -66,3 +66,16 @@ export type {
 } from './scene/types';
 export * as sceneOps from './scene/scene-ops';
 export * as geometry from './scene/geometry';
+
+// 建立元素的單一真相(依圖種給對的外形 / data / 父節點)+ 外形顯示中繼資料(工具列共用)。
+export {
+  makeNodeFor,
+  makeEdgeFor,
+  defaultShapeFor,
+  defaultSizeFor,
+  mindmapParent,
+  mindmapShapeType,
+} from './scene/node-factory';
+export type { MakeNodeOptions, MakeEdgeOptions } from './scene/node-factory';
+export { shapeMeta } from './scene/shape-meta';
+export type { ShapeMeta } from './scene/shape-meta';

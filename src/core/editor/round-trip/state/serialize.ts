@@ -61,6 +61,14 @@ export function sceneToState(scene: EditorScene): SerializeResult {
     inEdge.add(e.target);
   }
 
+  // 解析既有圖時,`state X <<fork>>` 這類宣告被逐字收進 raw.styleLines(見 parse.prescan)。
+  // 這裡記下已經有宣告的 id,避免對這些節點又補一行造成重複宣告。
+  const declaredStereotype = new Set<string>();
+  for (const s of scene.raw?.styleLines ?? []) {
+    const m = /^state\s+([A-Za-z_]\w*)\s*<</.exec(s.trim());
+    if (m) declaredStereotype.add(m[1]);
+  }
+
   const emitScope = (scopeId: string | null, depth: number): void => {
     const pad = INDENT.repeat(depth + 1);
 
@@ -69,6 +77,13 @@ export function sceneToState(scene: EditorScene): SerializeResult {
       .filter((n) => (n.parentId ?? null) === scopeId && !isPseudo(n))
       .sort(bySourceIndex);
     for (const n of scopeNodes) {
+      // 在編輯器新拖出來的 fork / choice 節點沒有對應的原始宣告行 —— 少了 `<<fork>>` / `<<choice>>`,
+      // 重新載入時它就退化成普通狀態方框。這裡補上,外形才真的能 round-trip。
+      if ((n.shape === 'fork' || n.shape === 'choice') && !declaredStereotype.has(n.id)) {
+        lines.push(`${pad}state ${n.id} <<${n.shape}>>`);
+        declaredStereotype.add(n.id);
+        continue;
+      }
       const label = n.label ?? '';
       if (label.length > 0 && label !== n.id) {
         lines.push(`${pad}state ${quoteLabel(label)} as ${n.id}`);

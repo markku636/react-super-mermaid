@@ -104,7 +104,10 @@ export function sceneToClass(scene: EditorScene): SerializeResult {
     if (inNamespace.has(n.id)) continue;
     const data = n.data?.kind === 'class' ? n.data : undefined;
     const hasBody = (data?.members?.length || data?.methods?.length || data?.stereotype) as unknown as boolean;
-    if (hasBody || !inEdge.has(n.id)) emitClass(n, INDENT);
+    // 有自訂顯示名(或泛型)時也必須宣告 —— 否則被關係「順帶宣告」的類別會只剩 id,
+    // 在編輯器改的名字寫不回檔案。
+    const named = (n.label && n.label !== n.id) || Boolean(data?.generic);
+    if (hasBody || named || !inEdge.has(n.id)) emitClass(n, INDENT);
   }
 
   // 2. 關係(穩定排序)。

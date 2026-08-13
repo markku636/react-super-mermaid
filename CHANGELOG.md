@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.9.0 — every diagram type gets its own shapes, not the flowchart's
+
+- **Fix**: the shape toolbar and the right-click shape strip were hardcoded to the *flowchart* shape
+  list, so a class diagram offered you 「菱形 / 圓柱 / 梯形」 and a state diagram offered 「膠囊 / 六角」 —
+  shapes those adapters cannot serialize. Both are now driven by `adapter.capabilities.shapes`
+  (with a new optional `quickShapes` marking which ones get their own button; the rest fall into the
+  「更多外形」 dropdown). `capabilities.defaults.nodeShape` also resets on every `loadSource`, so the
+  菱形 you picked on a flowchart no longer follows you into a class diagram.
+- **Fix**: every drag-to-create path went through `makeNode()`, which hardcodes
+  `data: { kind: 'flowchart' }`. On a class / ER / state / mindmap diagram the resulting node carried
+  the wrong discriminant, so the renderer drew a plain box instead of a compartment table and the
+  serializer degraded the output. New `makeNodeFor(scene, …)` / `makeEdgeFor(scene, …)` derive shape,
+  `data`, size and parent from `scene.diagramType`; all six creation paths (toolbar button,
+  node-create tool, double-click empty, Tab, right-click 「在此新增」, drag-to-empty) share them.
+- **Fix**: a mindmap node created by dragging became a **second root**, which mermaid rejects
+  outright (`There can be only one root`). New nodes now attach under the selected node, falling back
+  to the existing root. Dragging a connection on a mindmap re-parents instead of adding an edge —
+  mindmap has no edge syntax, so the edge used to be dropped silently on save. Added
+  「新增子節點」/「升為上一層」 to the node context menu.
+- **Fix**: an empty (just-created, not yet named) mindmap node serialized to `()` / `[]` / `(())`,
+  which is a mermaid syntax error. Falls back to the node id until the user types a label.
+- **Fix**: renaming an ER entity was silently discarded — `sceneToEr` emitted the internal id, never
+  the label. mermaid ER has no alias syntax (`X["label"]` is a parse error in 11.x); the entity name
+  *is* the display text, so serialization now emits the label, quoted when it contains spaces.
+- **Fix**: a class that had a custom label but no members was emitted as a bare relation, losing the
+  label. It is now declared as `class id["label"]` whenever the label differs from the id.
+- **Fix**: `fork` / `choice` state nodes created in the editor lost their shape on reload — the
+  `<<fork>>` / `<<choice>>` declaration was only preserved for nodes that came from parsed source.
+- **Fix**: the 流程方向 dropdown was a dead control on state / class / ER diagrams (`cmdSetDirection`
+  bailed out on anything that wasn't a flowchart) even though all three serializers emit `direction`.
+- New: `shapeMeta()` in core — one shared glyph/label table so the React toolbar and the VS Code
+  webview toolbar stop keeping their own divergent copies.
+
 ## 0.8.7 — sequence diagrams can be drawn by dragging
 
 - **Feature**: drag from one lifeline to another to insert a message. The drop position's **vertical**

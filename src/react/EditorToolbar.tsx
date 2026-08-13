@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { DiagramEditorHandle } from '../core/editor/controller';
 import type { Tool } from '../core/editor/interaction/pointer';
 import type { ArrowHead, LineKind, NodeShape } from '../core/editor/scene/types';
+import { shapeMeta } from '../core/editor/scene/shape-meta';
 import type { EditorLook } from '../core/editor/render/scene-renderer';
 
 export interface EditorToolbarProps {
@@ -21,38 +22,7 @@ export interface EditorToolbarProps {
   look?: EditorLook;
 }
 
-// 全部 flowchart 外形的字形 + 名稱(serialize / parse / renderer 皆可雙向 round-trip)。
-const SHAPE_META: Record<string, { glyph: string; label: string }> = {
-  rectangle: { glyph: '▭', label: '方框' },
-  rounded: { glyph: '⬭', label: '圓角' },
-  stadium: { glyph: '⬮', label: '膠囊' },
-  diamond: { glyph: '◇', label: '菱形' },
-  circle: { glyph: '◯', label: '圓形' },
-  hexagon: { glyph: '⬡', label: '六角' },
-  cylinder: { glyph: '⛁', label: '資料庫' },
-  subroutine: { glyph: '⧈', label: '子流程' },
-  doubleCircle: { glyph: '◎', label: '雙圈' },
-  ellipse: { glyph: '⬭', label: '橢圓' },
-  parallelogram: { glyph: '▱', label: '平行四邊形' },
-  parallelogramAlt: { glyph: '▰', label: '平行四邊形(左)' },
-  trapezoid: { glyph: '⏢', label: '梯形' },
-  trapezoidAlt: { glyph: '⏏', label: '梯形(倒)' },
-  odd: { glyph: '⬠', label: '旗標' },
-};
-
-// 常用外形:直接顯示成按鈕,點一下就在畫布中央放一個節點(免下拉選單、免再點畫布)。
-const QUICK_SHAPES: NodeShape[] = ['rectangle', 'rounded', 'stadium', 'diamond', 'circle', 'hexagon', 'cylinder'];
-// 其餘外形收進「更多外形」下拉,維持工具列精簡又完整。
-const MORE_SHAPES: NodeShape[] = [
-  'subroutine',
-  'doubleCircle',
-  'ellipse',
-  'parallelogram',
-  'parallelogramAlt',
-  'trapezoid',
-  'trapezoidAlt',
-  'odd',
-];
+// 外形字形 / 名稱來自 core 的 shapeMeta(與 VS Code webview 工具列共用同一份)。
 
 // 箭頭端的友善名稱(下拉選單用)。flowchart 用前 5 種;class/er 的三角 / 菱形 / 鳥足為後續圖種。
 const ARROW_LABEL: Record<ArrowHead, string> = {
@@ -174,6 +144,10 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const caps = h?.getCapabilities() ?? null;
   const lineKinds = caps?.lineKinds ?? [];
   const arrowHeads = caps?.arrowHeads ?? [];
+  // 外形按鈕同樣由 adapter 能力決定:類別圖只該看到「類別」、狀態圖只該看到狀態 / 起訖 / 選擇 / 分岔。
+  const allShapes = caps?.shapes ?? [];
+  const quickShapes = caps?.quickShapes ?? allShapes;
+  const moreShapes = allShapes.filter((s) => !quickShapes.includes(s));
   const showEdgeStyle = !isSeq && !isTimeline && caps !== null;
   const showLineKinds = showEdgeStyle && lineKinds.length > 1;
   const showArrowEnd = showEdgeStyle && arrowHeads.length > 1;
@@ -199,8 +173,8 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       {/* 一鍵新增節點(常用外形直接攤開 + 「更多外形」下拉);sequence/timeline 不適用 */}
       {!isSeq &&
         !isTimeline &&
-        QUICK_SHAPES.map((shape) => {
-          const m = SHAPE_META[shape];
+        quickShapes.map((shape) => {
+          const m = shapeMeta(shape);
           return (
             <button
               key={shape}
@@ -214,7 +188,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
             </button>
           );
         })}
-      {!isSeq && !isTimeline && (
+      {!isSeq && !isTimeline && moreShapes.length > 0 && (
         <select
           className="rsm-btn"
           title="更多外形（新增節點）"
@@ -226,9 +200,9 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
           }}
         >
           <option value="">＋ 更多外形…</option>
-          {MORE_SHAPES.map((shape) => (
+          {moreShapes.map((shape) => (
             <option key={shape} value={shape}>
-              {SHAPE_META[shape].glyph} {SHAPE_META[shape].label}
+              {shapeMeta(shape).glyph} {shapeMeta(shape).label}
             </option>
           ))}
         </select>

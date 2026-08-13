@@ -15,12 +15,11 @@ import {
 } from '../scene/geometry';
 import {
   getNode,
-  makeEdge,
-  makeNode,
   nextEdgeId,
   nextNodeId,
   resolveEdgeAnchors,
 } from '../scene/scene-ops';
+import { makeEdgeFor, makeNodeFor } from '../scene/node-factory';
 import type { ArrowHead, EdgeAnchor, EditorScene, LineKind, NodeShape, Point, SceneNode } from '../scene/types';
 import {
   cmdAddConnectedNode,
@@ -31,6 +30,7 @@ import {
   cmdInsertSeqMessage,
   cmdReorderSeqParticipant,
   cmdResizeNode,
+  cmdSetParent,
   type Command,
 } from './commands';
 import { computeSnap } from './snap';
@@ -308,7 +308,10 @@ export class PointerController {
     if (this.tool === 'node-create') {
       const scene = this.host.getScene();
       const id = nextNodeId(scene);
-      const node = makeNode(id, world, { shape: this.host.createShape() });
+      const node = makeNodeFor(scene, id, world, {
+        shape: this.host.createShape(),
+        preferParentId: this.getSelection()[0],
+      });
       this.host.runCommand(cmdAddNode(node), 'add-node');
       this.setSelection([id]);
       this.setTool('select');
@@ -489,7 +492,10 @@ export class PointerController {
       this.mode = { kind: 'idle' };
       const scene = this.host.getScene();
       const id = nextNodeId(scene);
-      const node = makeNode(id, world, { shape: this.host.createShape() });
+      const node = makeNodeFor(scene, id, world, {
+        shape: this.host.createShape(),
+        preferParentId: this.getSelection()[0],
+      });
       this.host.runCommand(cmdAddNode(node), 'add-node');
       this.setSelection([id]);
       this.host.requestTextEdit(id);
@@ -710,9 +716,16 @@ export class PointerController {
       const scene = this.host.getScene();
       const sourceAnchor = m.fromAnchor ?? undefined;
       if (target && target.id !== m.sourceId) {
+        // mindmap 沒有連線語法,階層由 parentId 決定 → 拉線 = 把目標改掛到來源之下。
+        if (scene.diagramType === 'mindmap') {
+          this.host.runCommand(cmdSetParent(target.id, m.sourceId), 'reparent');
+          this.setSelection([target.id]);
+          this.host.refreshOverlay();
+          return;
+        }
         // 放在另一個節點上 → 連到它;吸附到目標錨點則一併設 targetAnchor(白點拉線的主要用途)。
         const targetAnchor = this.snapAnchor(target, world) ?? undefined;
-        const edge = makeEdge(nextEdgeId(scene), m.sourceId, target.id, {
+        const edge = makeEdgeFor(scene, nextEdgeId(scene), m.sourceId, target.id, {
           ...this.host.createEdgeStyle(),
           sourceAnchor,
           targetAnchor,
@@ -721,8 +734,20 @@ export class PointerController {
       } else if (!target && this.tool === 'edge-create') {
         // 只有「明確使用連線工具」拖到空白,才一步建立新節點並連上(draw.io 招牌)。
         const id = nextNodeId(scene);
-        const node = makeNode(id, world, {});
-        const edge = makeEdge(nextEdgeId(scene), m.sourceId, id, { ...this.host.createEdgeStyle(), sourceAnchor });
+        // mindmap:新節點直接掛在來源之下(它本來就沒有邊可以畫)。
+        if (scene.diagramType === 'mindmap') {
+          const child = makeNodeFor(scene, id, world, { parentId: m.sourceId });
+          this.host.runCommand(cmdAddNode(child), 'add-node');
+          this.setSelection([id]);
+          this.host.requestTextEdit(id);
+          this.host.refreshOverlay();
+          return;
+        }
+        const node = makeNodeFor(scene, id, world, {});
+        const edge = makeEdgeFor(scene, nextEdgeId(scene), m.sourceId, id, {
+          ...this.host.createEdgeStyle(),
+          sourceAnchor,
+        });
         this.host.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
         this.setSelection([id]);
         this.host.requestTextEdit(id);

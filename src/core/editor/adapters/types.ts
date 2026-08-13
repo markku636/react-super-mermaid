@@ -15,6 +15,11 @@ export interface DiagramCapabilities {
   type: DiagramType;
   /** 此圖種支援的節點外形(供工具列 shape 選單)。 */
   shapes: NodeShape[];
+  /**
+   * 工具列直接攤開成按鈕的常用外形(必須是 shapes 的子集)。其餘收進「更多外形」下拉。
+   * 未指定 = 全部攤開(外形少的圖種如 class / er 就該全部看得到)。
+   */
+  quickShapes?: NodeShape[];
   arrowHeads: ArrowHead[];
   lineKinds: LineKind[];
   /** 節點可自由拖曳(flowchart=true)?或由引擎排版(sequence=false)? */

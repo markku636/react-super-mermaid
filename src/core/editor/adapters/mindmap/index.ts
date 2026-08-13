@@ -51,7 +51,8 @@ function treeLayout(scene: EditorScene): EditorScene {
 export const mindmapAdapter: DiagramAdapter = {
   capabilities: {
     type: 'mindmap',
-    shapes: ['rounded', 'rectangle', 'circle', 'hexagon', 'ellipse'],
+    // 對映 mermaid mindmap 的括號語法:(圓角) [方框] ((圓)) ))雲((  {{六角}}
+    shapes: ['rounded', 'rectangle', 'circle', 'ellipse', 'hexagon'],
     arrowHeads: ['none'],
     lineKinds: ['solid'],
     freeform: true,

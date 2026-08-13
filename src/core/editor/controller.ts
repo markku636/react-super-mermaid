@@ -40,12 +40,15 @@ import {
   cmdSetLabel,
   cmdSetNodeData,
   cmdSetNodeStyle,
+  cmdSetParent,
   cmdSetShape,
   type AlignAxis,
   type Command,
 } from './interaction/commands';
 import { NODE_PALETTE } from './render/palette';
-import { containerRect, makeEdge, makeNode, nextEdgeId, nextNodeId } from './scene/scene-ops';
+import { containerRect, nextEdgeId, nextNodeId } from './scene/scene-ops';
+import { defaultShapeFor, makeEdgeFor, makeNodeFor } from './scene/node-factory';
+import { shapeMeta } from './scene/shape-meta';
 import { PointerController, type PointerHost, type Tool } from './interaction/pointer';
 import { openTextEditor } from './interaction/text-edit';
 import { Viewport } from './interaction/viewport';
@@ -167,20 +170,10 @@ export interface DiagramEditorHandle {
 // 走 form 子編輯器(而非畫布)的圖種關鍵字。timeline 是資料圖表,內容為 section/period/event。
 const FORM_KEYWORDS = new Set(['timeline']);
 
-// 右鍵選單可快速切換的外形(涵蓋 renderer 支援的全部 flowchart 外形)。
-const CTX_SHAPES: Array<[NodeShape, string, string]> = [
-  ['rectangle', '▭', '矩形'],
-  ['rounded', '⬭', '圓角矩形'],
-  ['stadium', '⬮', '體育場形'],
-  ['subroutine', '◫', '子流程'],
-  ['diamond', '◇', '菱形(判斷)'],
-  ['circle', '◯', '圓形'],
-  ['doubleCircle', '◎', '雙圈'],
-  ['hexagon', '⬡', '六邊形'],
-  ['cylinder', '⛁', '圓柱(資料庫)'],
-  ['parallelogram', '▱', '平行四邊形'],
-  ['trapezoid', '⏢', '梯形'],
-];
+// 右鍵可快速切換的外形 = 目前圖種 adapter 宣告支援的外形。
+// (先前寫死 flowchart 那 11 種,於是在狀態圖 / 類別圖 / ER 圖上按右鍵會看到一排「圓柱、梯形」,
+//  按下去就把節點改成該圖種序列化不出來的外形。)
+const ctxShapesFor = (caps: DiagramCapabilities | null): NodeShape[] => caps?.shapes ?? [];
 
 /** ER 實體 / class 節點 → 可編輯多行文字(第一行=名稱,其餘=屬性 / 成員)。 */
 function nodeToEditText(node: SceneNode): string {
@@ -314,7 +307,7 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       scene.diagramType === 'sequence'
         ? '空白序列圖 — 在空白處按右鍵：新增參與者 / 訊息'
         : scene.diagramType === 'mindmap'
-          ? '空白心智圖 — 在空白處按右鍵新增節點'
+          ? '空白心智圖 — 點上方外形按鈕放下主題，再從節點拉線長出分支'
           : '空白畫布 — 點上方外形按鈕新增節點，從節點邊緣白點拉出連線';
     emptyHint.appendChild(hintText);
     const sub = document.createElement('div');
@@ -352,10 +345,12 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
 
   const adapterFor = (type: DiagramType) => getAdapter(type) ?? getAdapter('flowchart');
 
-  // 載入新圖時把「新連線」預設重設成該圖種的合宜值(避免上一張圖選的箭頭帶到不支援的圖種)。
+  // 載入新圖時把「新節點外形 / 新連線樣式」重設成該圖種的合宜值
+  // (避免上一張流程圖選的菱形、箭頭被帶到類別圖那種根本畫不出來的圖種)。
   const resetEdgeDefault = (): void => {
     const caps = adapterFor(diagramType)?.capabilities;
     createEdge = { lineKind: 'solid', arrowStart: 'none', arrowEnd: caps?.defaults.arrowEnd ?? 'arrow' };
+    createShape = caps?.defaults.nodeShape ?? defaultShapeFor(diagramType);
   };
 
   const emitMermaidDebounced = (): void => {
@@ -677,9 +672,20 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         e.preventDefault();
         const id = nextNodeId(scene);
         const pos = { x: src.x + src.w + 80, y: src.y };
-        const node = { ...makeNode(id, pos, { shape: src.shape }), x: pos.x, y: pos.y, w: src.w, h: src.h };
-        const edge = makeEdge(nextEdgeId(scene), src.id, id, createEdge);
-        pointerHost.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
+        const node = {
+          ...makeNodeFor(scene, id, pos, { shape: src.shape, parentId: src.parentId }),
+          x: pos.x,
+          y: pos.y,
+          w: src.w,
+          h: src.h,
+        };
+        // mindmap 沒有邊,Tab 的「接續一個節點」= 在來源底下長一個子節點。
+        if (scene.diagramType === 'mindmap') {
+          pointerHost.runCommand(cmdAddNode({ ...node, parentId: src.id }), 'add-node');
+        } else {
+          const edge = makeEdgeFor(scene, nextEdgeId(scene), src.id, id, createEdge);
+          pointerHost.runCommand(cmdAddConnectedNode(node, edge), 'add-connected');
+        }
         pointer.setSelection([id]);
         openEditor(id);
       }
@@ -753,20 +759,24 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       const id = nodeEl.getAttribute('data-node-id') as string;
       // 右鍵已選取的節點 → 保留多選(才能用對齊/群組);否則改選此節點。
       if (!pointer.getSelection().includes(id)) pointer.setSelection([id]);
-      const strip = document.createElement('div');
-      strip.className = 'rsm-ctx-shapes';
-      for (const [shape, glyph, name] of CTX_SHAPES) {
-        const sb = document.createElement('button');
-        sb.type = 'button';
-        sb.textContent = glyph;
-        sb.title = name;
-        sb.addEventListener('click', () => {
-          closeContextMenu();
-          handle.setNodeShape(id, shape);
-        });
-        strip.appendChild(sb);
+      const ctxShapes = ctxShapesFor(handle.getCapabilities());
+      if (ctxShapes.length > 1) {
+        const strip = document.createElement('div');
+        strip.className = 'rsm-ctx-shapes';
+        for (const shape of ctxShapes) {
+          const m = shapeMeta(shape);
+          const sb = document.createElement('button');
+          sb.type = 'button';
+          sb.textContent = m.glyph;
+          sb.title = m.label;
+          sb.addEventListener('click', () => {
+            closeContextMenu();
+            handle.setNodeShape(id, shape);
+          });
+          strip.appendChild(sb);
+        }
+        menu.appendChild(strip);
       }
-      menu.appendChild(strip);
       // 顏色色票列。
       const colors = document.createElement('div');
       colors.className = 'rsm-ctx-shapes';
@@ -785,6 +795,26 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       menu.appendChild(colors);
       addSep();
       addItem('改名', () => openEditor(id));
+      if (scene.diagramType === 'mindmap') {
+        // 心智圖的「連線」就是父子關係,所以建子節點是這裡最常用的動作。
+        addItem('新增子節點', () => {
+          const src = scene.nodes.find((n) => n.id === id);
+          if (!src) return;
+          const nid = nextNodeId(scene);
+          const at = { x: src.x + src.w + 90, y: src.y + src.h / 2 };
+          pointerHost.runCommand(cmdAddNode(makeNodeFor(scene, nid, at, { parentId: id })), 'add-node');
+          pointer.setSelection([nid]);
+          openEditor(nid);
+        });
+        if (scene.nodes.find((n) => n.id === id)?.parentId) {
+          addItem('升為上一層', () => {
+            const cur = scene.nodes.find((n) => n.id === id);
+            const grand = scene.nodes.find((n) => n.id === cur?.parentId)?.parentId ?? undefined;
+            // 沒有祖父 = 目前父節點就是根 → 保持掛在根下(mindmap 只能有一個根)。
+            if (grand) pointerHost.runCommand(cmdSetParent(id, grand), 'reparent');
+          });
+        }
+      }
       addItem('複製', () => handle.duplicateSelection());
       if (scene.nodes.find((n) => n.id === id)?.parentId) {
         addItem('解除群組', () => handle.ungroupNode(id));
@@ -845,7 +875,10 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       const world = viewport.screenToWorld(e.clientX, e.clientY);
       addItem('在此新增節點', () => {
         const nid = nextNodeId(scene);
-        const n = makeNode(nid, world, { shape: createShape });
+        const n = makeNodeFor(scene, nid, world, {
+          shape: createShape,
+          preferParentId: pointer.getSelection()[0],
+        });
         pointerHost.runCommand(cmdAddNode(n), 'add-node');
         pointer.setSelection([nid]);
         openEditor(nid);
@@ -997,7 +1030,12 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       const center = viewport.screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
       const off = (scene.nodes.length % 8) * 18;
       const id = nextNodeId(scene);
-      const node = makeNode(id, { x: center.x + off, y: center.y + off }, { shape: shape ?? createShape });
+      const node = makeNodeFor(
+        scene,
+        id,
+        { x: center.x + off, y: center.y + off },
+        { shape: shape ?? createShape, preferParentId: pointer.getSelection()[0] },
+      );
       pointerHost.runCommand(cmdAddNode(node), 'add-node');
       pointer.setTool('select'); // 新增後回到選取,讓使用者可立即拖曳/選取(預設就是選取)。
       pointer.setSelection([id]);
