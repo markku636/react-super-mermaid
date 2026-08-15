@@ -73,6 +73,8 @@ const ANCHOR_HIT_SCREEN = 16;
 const SEQ_LIFELINE_HIT = 28;
 // select 工具抓生命線換序的容差(世界 px)。刻意比 SEQ_LIFELINE_HIT 小很多,理由見 seqLifelineUnder。
 const SEQ_LIFELINE_GRAB = 10;
+// 訊息兩端的「端點區」最小寬度(世界 px):按在這裡拖 = 只換這一端接到哪條水道。
+const SEQ_END_GRAB = 26;
 
 type Mode =
   | { kind: 'idle' }
@@ -82,8 +84,22 @@ type Mode =
   | { kind: 'seq-reorder'; id: string; startWorld: Point; base: Rect; targetIndex: number }
   // sequence 專屬:從生命線拖到另一條 → 插入一則訊息。落點的 Y 決定插在第幾則。
   | { kind: 'seq-msg-draw'; fromId: string; startWorld: Point }
-  // sequence 專屬:抓著訊息 / note 上下拖 → 改時間順序。targetIndex = 放手時要插進去的位置。
-  | { kind: 'seq-msg-move'; idx: number; startClient: Point; targetIndex: number }
+  // sequence 專屬:抓著訊息 / note 拖 —— 上下改時間順序,左右跨水道換收發雙方。
+  // grab 決定左右拖的意思:抓箭尾只動寄件方、抓箭頭只動收件方、抓中段整條平移(跨度不變)。
+  | {
+      kind: 'seq-msg-move';
+      idx: number;
+      startClient: Point;
+      targetIndex: number;
+      grab: 'from' | 'to' | 'both';
+      /** 原本的收發雙方;非訊息(筆記 / 片段)為空字串 = 不支援跨水道。 */
+      fromId: string;
+      toId: string;
+      /** 按下當時指標所在的水道序號,'both' 用它算位移了幾條。 */
+      grabLane: number;
+      /** 目前指到的收發雙方;null = 還沒跨過水道。 */
+      retarget: { from: string; to: string } | null;
+    }
   | { kind: 'resize'; nodeId: string; dir: ResizeDir; startRect: Rect; startWorld: Point; cur: Rect }
   // fromAnchor:從來源節點哪個固定錨點起拉(null = 從節點本體拉 → 浮動來源錨)。
   | { kind: 'rubber-edge'; sourceId: string; from: Point; fromAnchor: EdgeAnchor | null }
@@ -267,6 +283,34 @@ export class PointerController {
   }
 
   /**
+   * 指標落在第幾條水道。
+   *
+   * 與 seqLifelineUnder 的差別:那個要判斷「有沒有抓到線」,所以給容差;這個是拖曳中的落點判斷,
+   * 整片水平空間都必須歸屬於某一條水道,不然指標飄到兩條線中間時回饋就斷掉了。
+   */
+  private seqLaneAt(clientX: number): { id: string; index: number } | null {
+    const w = this.host.viewport.screenToWorld(clientX, 0);
+    const cols = this.host.getScene().nodes.filter((n) => n.data?.kind === 'sequence');
+    if (cols.length === 0) return null;
+    let best = 0;
+    let bestDist = Infinity;
+    cols.forEach((n, i) => {
+      const d = Math.abs(w.x - (n.x + n.w / 2));
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    return { id: cols[best].id, index: best };
+  }
+
+  /** 某位參與者的水道中心 X(世界座標);找不到回 null。 */
+  private seqLaneCenterX(id: string): number | null {
+    const n = this.host.getScene().nodes.find((x) => x.id === id && x.data?.kind === 'sequence');
+    return n ? n.x + n.w / 2 : null;
+  }
+
+  /**
    * 拖曳訊息換序時的插入指示線:一條橫跨所有生命線、畫在「放手後會落在哪」的高度的線。
    *
    * Y 同樣用已渲染的 `[data-seq-msg]` client 座標推(與 seqInsertIndexAt 同一套依據,
@@ -367,11 +411,35 @@ export class PointerController {
       // mermaid 的參與者 alias 不可能含冒號,不會跟真的 node id 撞名。
       // 有了它,選取框畫得出來、Delete 也知道要刪誰。
       this.setSelection([key]);
-      // 單擊不只是「等第二下」:按住往上下拖 = 改這則訊息在時間軸上的位置。
+      // 單擊不只是「等第二下」:按住拖 = 上下改時間順序、左右跨水道換收發雙方。
       // 之前這裡直接 mode=idle 然後 return,等於在圖上最顯眼的箭頭身上開了一塊死區 ——
       // 拖曳不但不換序,連「拖空白處平移畫布」都被這個 return 一起吃掉,體感就是整張圖卡住。
       // 有沒有真的要搬,交給 processMove 的位移門檻判斷;沒過門檻就還原成單純的一次點擊。
-      this.mode = { kind: 'seq-msg-move', idx: i, startClient: { x: e.clientX, y: e.clientY }, targetIndex: -1 };
+      const st = this.host.getScene().sequence?.statements[i];
+      const msg = st?.kind === 'message' ? st : null;
+      const fromX = msg ? this.seqLaneCenterX(msg.from) : null;
+      const toX = msg ? this.seqLaneCenterX(msg.to) : null;
+      // 抓在哪一段決定左右拖的語意。端點區取跨度的 30%,但至少 SEQ_END_GRAB —— 兩條相鄰生命線
+      // 之間的訊息很短,按比例算會小到抓不到;跨很多條的長訊息則不該讓端點區吃掉整條。
+      let grab: 'from' | 'to' | 'both' = 'both';
+      if (fromX != null && toX != null) {
+        const wx = world.x;
+        const span = Math.abs(toX - fromX);
+        const zone = Math.max(SEQ_END_GRAB, span * 0.3);
+        if (Math.abs(wx - fromX) <= zone) grab = 'from';
+        else if (Math.abs(wx - toX) <= zone) grab = 'to';
+      }
+      this.mode = {
+        kind: 'seq-msg-move',
+        idx: i,
+        startClient: { x: e.clientX, y: e.clientY },
+        targetIndex: -1,
+        grab,
+        fromId: msg?.from ?? '',
+        toId: msg?.to ?? '',
+        grabLane: this.seqLaneAt(e.clientX)?.index ?? 0,
+        retarget: null,
+      };
       return;
     }
 
@@ -739,7 +807,8 @@ export class PointerController {
 
     if (m.kind === 'seq-msg-move') {
       // 還在點擊容差內就別動:這一下很可能只是雙擊改字的第一擊,提早畫線會像誤觸。
-      if (Math.abs(c.y - m.startClient.y) < DRAG_THRESHOLD) return;
+      // 用直線距離而不是只看垂直位移 —— 純左右的跨水道拖曳也必須過得了門檻。
+      if (Math.hypot(c.x - m.startClient.x, c.y - m.startClient.y) < DRAG_THRESHOLD) return;
       m.targetIndex = this.seqInsertIndexAt(c.y);
       const guide = this.seqInsertGuide(m.targetIndex);
       if (guide) this.host.overlay.showInsertLine(guide.x1, guide.x2, guide.y1, zoom);
@@ -747,6 +816,40 @@ export class PointerController {
       // previewMove 對它無效,所以只移動框、不動真正的圖元,放手才重排。
       const rect = this.host.renderer.getSeqMsgRect(m.idx);
       if (rect) this.host.overlay.showSelection([{ id: `seq:${m.idx}`, rect }], zoom, { handles: false });
+
+      // ── 跨水道 ── 指標橫向落到哪條水道,就把抓住的那一端接過去。
+      if (m.fromId && m.toId) {
+        const lane = this.seqLaneAt(c.x);
+        const cols = this.host.getScene().nodes.filter((n) => n.data?.kind === 'sequence');
+        if (lane) {
+          let from = m.fromId;
+          let to = m.toId;
+          if (m.grab === 'from') from = lane.id;
+          else if (m.grab === 'to') to = lane.id;
+          else {
+            // 抓中段 = 整條平移:兩端各移動同樣的水道數,跨度不變。任一端會被推出邊界就整個不動,
+            // 免得訊息在畫布邊緣被壓扁成「同一條水道發給自己」。
+            const shift = lane.index - m.grabLane;
+            const fi = cols.findIndex((n) => n.id === m.fromId) + shift;
+            const ti = cols.findIndex((n) => n.id === m.toId) + shift;
+            if (fi >= 0 && ti >= 0 && fi < cols.length && ti < cols.length) {
+              from = cols[fi].id;
+              to = cols[ti].id;
+            }
+          }
+          // 同一條水道發給自己不是合法的目的地,維持上一個有效落點。
+          if (from !== to) m.retarget = { from, to };
+        }
+        const r = m.retarget;
+        const fx = r ? this.seqLaneCenterX(r.from) : null;
+        const tx = r ? this.seqLaneCenterX(r.to) : null;
+        if (fx != null && tx != null) {
+          // 橡皮筋畫在指標當下的高度,長得就像放手後會生出來的那條訊息。
+          this.host.overlay.showRubberBand({ x: fx, y: world.y }, { x: tx, y: world.y }, zoom);
+          const tgt = cols.find((n) => n.id === r!.to);
+          this.host.overlay.showDropTarget(tgt ? nodeRect(tgt) : null, zoom);
+        }
+      }
       return;
     }
 
@@ -798,10 +901,18 @@ export class PointerController {
     if (m.kind === 'seq-msg-move') {
       this.host.overlay.clearGuides();
       this.host.overlay.clearTransient();
+      this.host.overlay.showDropTarget(null, 1);
       // targetIndex 還是 -1 = 從頭到尾沒超過位移門檻 → 這就是一次單純的點擊(可能是雙擊的第一下),
       // 什麼都不做,也不留 undo 紀錄。
-      if (m.targetIndex >= 0) this.host.runCommand(cmdMoveSeqStatement(m.idx, m.targetIndex), 'move-statement');
-      else this.host.refreshOverlay();
+      if (m.targetIndex >= 0) {
+        // 位置與水道包在同一個指令裡:一次拖曳改了兩件事,undo 也該一次退回去。
+        this.host.runCommand(
+          cmdMoveSeqStatement(m.idx, m.targetIndex, m.retarget ?? undefined),
+          'move-statement',
+        );
+      } else {
+        this.host.refreshOverlay();
+      }
       return;
     }
     if (m.kind === 'seq-msg-draw') {

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.27.0 — drag a message across lifelines
+
+Dragging a message could change *when* it happens but never *who it is between*. Changing that meant
+editing the source by hand, on the one diagram type where the whole point is who talks to whom.
+
+- **Feature**: dragging a message sideways moves it across lifelines. Where you grab it decides what
+  moves: the tail end re-points the sender, the arrow end re-points the recipient, and the middle
+  carries the whole message to another pair of lanes with its span intact. A rubber band between the
+  two candidate lifelines and an outline on the target participant show the result before you commit
+  to it.
+- The drop lane is the *nearest* lifeline with no tolerance band, so the pointer is always over some
+  lane and the feedback never blinks out between two of them. A drop that would leave a message
+  talking to itself, or push either end past the edge of the diagram, keeps the last valid pair.
+- Reordering and re-targeting land in one command, so a drag that changed both is one undo, not two.
+- The drag threshold now measures straight-line distance rather than vertical distance alone —
+  a purely sideways drag is a drag.
+
 ## 0.26.0 — a sequence message is a thing you can select
 
 Everything on a sequence diagram was draggable and none of it was *selectable*. Clicking a message

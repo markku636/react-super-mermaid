@@ -315,14 +315,21 @@ function seqBlockLength(statements: readonly SeqStatement[], start: number): num
 }
 
 /**
- * sequence:把某條陳述搬到新的時間位置(上下拖曳改順序)。
+ * sequence:把某條陳述搬到新的時間位置,並(可選)換到另外兩條生命線之間。
  *
  * to 是「插入點」而非目的索引:與 cmdInsertSeqMessage 一致,指的是搬移前陣列中要插在誰前面。
  * 拖的若是 loop/alt/opt 這類片段開頭,單獨搬走會把配對的 end 留在原地、整段縮排爛掉,
  * 所以連同整個區塊一起搬;反過來抓著 end 拖則不動作 —— 要搬區塊請抓開頭,
  * 否則使用者一拖就能把 end 丟到自己的開頭前面,產生一份 mermaid 根本不吃的原始碼。
+ *
+ * retarget 是「跨水道」:一次拖曳同時改了時間位置與收發雙方時,兩件事必須在同一個指令裡完成,
+ * 否則 undo 一次只退一半,使用者得按兩次才回得到原狀。
  */
-export function cmdMoveSeqStatement(from: number, to: number): Command {
+export function cmdMoveSeqStatement(
+  from: number,
+  to: number,
+  retarget?: { from: string; to: string },
+): Command {
   return (scene) => {
     if (!scene.sequence) return { scene, patch: {} };
     const statements = scene.sequence.statements;
@@ -331,12 +338,26 @@ export function cmdMoveSeqStatement(from: number, to: number): Command {
     if (src.kind === 'end') return { scene, patch: {} };
     const len = src.kind === 'fragment' && SEQ_BLOCK_OPENERS.has(src.keyword) ? seqBlockLength(statements, from) : 1;
     const target = Math.max(0, Math.min(to, statements.length));
-    // 落點就在自己身上(含整個區塊)→ 沒有實際位移,不留 undo 紀錄。
-    if (target >= from && target <= from + len) return { scene, patch: {} };
-    const next = [...statements];
-    const moved = next.splice(from, len);
-    // 往下搬時,前面被抽走的 len 條會讓插入點整體上移。
-    next.splice(target > from ? target - len : target, 0, ...moved);
+    // 換水道只對訊息有意義(筆記綁的是 actors 欄位、片段根本沒有收發方),且兩端不能是同一位。
+    const ids = new Set(scene.sequence.participants.map((p) => p.id));
+    const canRetarget =
+      Boolean(retarget) &&
+      src.kind === 'message' &&
+      retarget!.from !== retarget!.to &&
+      ids.has(retarget!.from) &&
+      ids.has(retarget!.to) &&
+      (retarget!.from !== src.from || retarget!.to !== src.to);
+    const moved = !(target >= from && target <= from + len);
+    // 位置沒動、水道也沒換 → 這次拖曳什麼都沒發生,不留 undo 紀錄。
+    if (!moved && !canRetarget) return { scene, patch: {} };
+
+    let next = [...statements];
+    if (canRetarget) next[from] = { ...src, from: retarget!.from, to: retarget!.to };
+    if (moved) {
+      const cut = next.splice(from, len);
+      // 往下搬時,前面被抽走的 len 條會讓插入點整體上移。
+      next.splice(target > from ? target - len : target, 0, ...cut);
+    }
     return { scene: { ...scene, sequence: { ...scene.sequence, statements: next } }, patch: { structural: true } };
   };
 }
