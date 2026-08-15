@@ -78,6 +78,51 @@ export class Overlay {
   }
 
   /**
+   * 滑過「可以拖、但不是 node」的東西時的外框(目前用於 sequence 的訊息 / 筆記)。
+   *
+   * 沒有這層回饋,那些箭頭看起來就只是圖上的線 —— 使用者不會想到它抓得起來。
+   * 畫在 hoverLayer,選取框在它上層,兩者同時出現也不打架。
+   */
+  showHoverRect(r: Rect, zoom: number): void {
+    clearChildren(this.hoverLayer);
+    const pad = 3 / zoom;
+    const box = svgEl('rect', {
+      x: r.x - pad,
+      y: r.y - pad,
+      width: r.w + pad * 2,
+      height: r.h + pad * 2,
+      fill: `${ACCENT}14`,
+      stroke: ACCENT,
+      'stroke-width': 1 / zoom,
+      'stroke-dasharray': `${3 / zoom} ${2 / zoom}`,
+      rx: 3 / zoom,
+    });
+    box.style.pointerEvents = 'none';
+    this.hoverLayer.appendChild(box);
+  }
+
+  /**
+   * 拖曳換序時的落點指示線。
+   *
+   * 刻意跟吸附導引線(showGuides 的細虛線)長得不一樣:那條是「你對齊到什麼」的參考,
+   * 這條是「放手會發生什麼」的承諾 —— 是整個手勢裡最需要被看見的東西。實線、粗一點,
+   * 兩端加短豎線把範圍圈出來,才不會在滿是箭頭的序列圖裡被看漏。
+   */
+  showInsertLine(x1: number, x2: number, y: number, zoom: number): void {
+    clearChildren(this.guideLayer);
+    const w = 2 / zoom;
+    const cap = 5 / zoom;
+    const add = (attrs: Record<string, string | number>): void => {
+      const el = svgEl('line', { stroke: ACCENT, 'stroke-width': w, 'stroke-linecap': 'round', ...attrs });
+      el.style.pointerEvents = 'none';
+      this.guideLayer.appendChild(el);
+    };
+    add({ x1, y1: y, x2, y2: y });
+    add({ x1, y1: y - cap, x2: x1, y2: y + cap });
+    add({ x1: x2, y1: y - cap, x2, y2: y + cap });
+  }
+
+  /**
    * 滑過節點時顯示 8 個固定連線錨點(藍點:4 邊中點 + 4 角)→ 從某點拖出即可從該位置拉線
    * (draw.io 式,免先選取,直覺好發現)。每點帶 fx/fy 供拉線時記成 edge.sourceAnchor。
    */

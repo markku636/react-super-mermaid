@@ -133,6 +133,8 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   // sequence 不吃自由拖曳建點/連線(改右鍵新增參與者/訊息);mindmap/sequence 無流程方向。
   // timeline 走結構化表單(非畫布),所有畫布工具(選取/連線/縮放/整理)都隱藏。
   const isSeq = props.diagramType === 'sequence';
+  // 訊息 / 筆記不是 node,以 `seq:{index}` 這個假 id 進選取集合(見 controller 的 refreshOverlay)。
+  const seqStatementSelected = (props.selection ?? []).some((id) => id.startsWith('seq:'));
   const isTimeline = props.diagramType === 'timeline';
   const hasDirection =
     props.diagramType === 'flowchart' ||
@@ -220,9 +222,38 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
         </select>
       )}
 
+      {/* sequence 的建立動作。以前只掛在右鍵選單上,等於沒右鍵就發現不了 ——
+          序列圖的工具列因此是所有圖種裡最空的一個。 */}
+      {isSeq && (
+        <>
+          <span className="rsm-tb-sep" aria-hidden="true" />
+          <button type="button" className="rsm-btn" onClick={() => h?.addSeqParticipant()} title="新增一位參與者（新增後直接改名）">
+            ＋ 參與者
+          </button>
+          <button type="button" className="rsm-btn" onClick={() => h?.addSeqMessage()} title="附加一則訊息（新增後直接編輯文字）">
+            ＋ 訊息
+          </button>
+          <button type="button" className="rsm-btn" onClick={() => h?.addSeqNote()} title="附加一則筆記（新增後直接編輯文字）">
+            ＋ 筆記
+          </button>
+          {/* 下面兩顆作用在「選到的那則訊息」上,沒選就不出現 —— 按不動的按鈕比沒有更擾人。 */}
+          {seqStatementSelected && (
+            <>
+              <span className="rsm-tb-sep" aria-hidden="true" />
+              <button type="button" className="rsm-btn" onClick={() => h?.editSelection()} title="編輯這則的文字（也可以直接雙擊）">
+                ✎ 文字
+              </button>
+              <button type="button" className="rsm-btn" onClick={() => h?.toggleSeqArrow()} title="切換實線 / 虛線箭頭">
+                ⇢ 實／虛
+              </button>
+            </>
+          )}
+        </>
+      )}
+
       {isSeq && (
         <span className="rsm-tb-hint">
-          訊息模式：從一條生命線拖到另一條 · 選取模式：左右拖參與者換序、上下拖訊息改順序 · 右鍵空白處：新增參與者 / 訊息
+          訊息模式：從一條生命線拖到另一條 · 選取模式：左右拖參與者換序、上下拖訊息改順序 · Delete 刪除選取
         </span>
       )}
 

@@ -363,6 +363,10 @@ export class PointerController {
       }
       this.lastEdgeClickTime = tnow;
       this.lastClickEdgeId = key;
+      // 選起來 —— 訊息不是 node 也不是 edge,以 `seq:{index}` 這個假 id 進選取集合。
+      // mermaid 的參與者 alias 不可能含冒號,不會跟真的 node id 撞名。
+      // 有了它,選取框畫得出來、Delete 也知道要刪誰。
+      this.setSelection([key]);
       // 單擊不只是「等第二下」:按住往上下拖 = 改這則訊息在時間軸上的位置。
       // 之前這裡直接 mode=idle 然後 return,等於在圖上最顯眼的箭頭身上開了一塊死區 ——
       // 拖曳不但不換序,連「拖空白處平移畫布」都被這個 return 一起吃掉,體感就是整張圖卡住。
@@ -586,9 +590,24 @@ export class PointerController {
   };
 
   /** 閒置時:滑過節點顯示連線控制點(讓「點到節點就能拉線」直覺可發現)。 */
-  private updateHover(clientX: number, clientY: number): void {
-    // sequence 不支援自由拉線(訊息由右鍵選單新增),不顯示連線控制點以免誤導。
-    if (this.host.getScene().diagramType === 'sequence') return;
+  private updateHover(clientX: number, clientY: number, target?: Element | null): void {
+    // sequence 不支援自由拉線,不顯示連線控制點以免誤導 —— 但它的訊息可以上下拖換序,
+    // 完全不給 hover 回饋就沒人猜得到,所以改成「滑過訊息就把它框起來」。
+    if (this.host.getScene().diagramType === 'sequence') {
+      const el = target?.closest('[data-seq-msg]') ?? null;
+      const idx = el ? Number(el.getAttribute('data-seq-msg')) : NaN;
+      const rect = Number.isFinite(idx) ? this.host.renderer.getSeqMsgRect(idx) : undefined;
+      const key = rect ? `seq:${idx}` : null;
+      if (key === this.hoverNodeId) return;
+      this.hoverNodeId = key;
+      // 已經選起來的那條不用再畫 hover —— 選取框已經在同一個位置了,疊起來只是變髒。
+      if (rect && key && !this.selection.has(key)) {
+        this.host.overlay.showHoverRect(rect, this.host.viewport.getZoom());
+      } else {
+        this.host.overlay.clearHover();
+      }
+      return;
+    }
     const n = this.nodeUnder(clientX, clientY);
     const id = n?.id ?? null;
     if (id === this.hoverNodeId) return;
@@ -607,7 +626,7 @@ export class PointerController {
 
   private onPointerMove = (e: PointerEvent): void => {
     if (this.mode.kind === 'idle') {
-      if (this.tool === 'select') this.updateHover(e.clientX, e.clientY);
+      if (this.tool === 'select') this.updateHover(e.clientX, e.clientY, e.target as Element | null);
       return;
     }
     this.pendingClient = { x: e.clientX, y: e.clientY };
@@ -723,7 +742,7 @@ export class PointerController {
       if (Math.abs(c.y - m.startClient.y) < DRAG_THRESHOLD) return;
       m.targetIndex = this.seqInsertIndexAt(c.y);
       const guide = this.seqInsertGuide(m.targetIndex);
-      if (guide) this.host.overlay.showGuides([guide], zoom);
+      if (guide) this.host.overlay.showInsertLine(guide.x1, guide.x2, guide.y1, zoom);
       // 被拖的那則本身給個選取框當「我抓到的是這條」的回饋 —— 訊息不是 node,
       // previewMove 對它無效,所以只移動框、不動真正的圖元,放手才重排。
       const rect = this.host.renderer.getSeqMsgRect(m.idx);

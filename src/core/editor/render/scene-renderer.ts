@@ -1629,7 +1629,9 @@ export class SceneRenderer {
           fill: 'transparent',
           'data-seq-msg': String(d.idx),
         });
-        hit.style.cursor = 'text';
+        // 游標講的是「按下去主要會發生什麼」= 上下拖改順序。改文字是雙擊,不是主要手勢,
+        // 掛 text 游標會讓人以為這裡只能編輯,反而藏住了拖曳。
+        hit.style.cursor = 'ns-resize';
         g.appendChild(hit);
       } else if (d.kind === 'note' && d.s.kind === 'note') {
         const s = d.s;
@@ -1648,7 +1650,7 @@ export class SceneRenderer {
         const nrect = { x: nx, y: d.y - 12, w, h: 26 };
         this.seqMsgRects.set(d.idx, nrect);
         const nhit = svgEl('rect', { x: nrect.x, y: nrect.y, width: nrect.w, height: nrect.h, fill: 'transparent', 'data-seq-msg': String(d.idx) });
-        nhit.style.cursor = 'text';
+        nhit.style.cursor = 'ns-resize'; // 筆記與訊息同一套手勢(見上方訊息命中區的說明)
         g.appendChild(nhit);
       }
     }

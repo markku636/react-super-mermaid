@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.26.0 — a sequence message is a thing you can select
+
+Everything on a sequence diagram was draggable and none of it was *selectable*. Clicking a message
+did nothing you could see, and Delete had nothing to act on, because messages and notes are not nodes
+and never entered the selection at all. They do now, under a `seq:{index}` id — mermaid aliases
+cannot contain a colon, so it cannot collide with a real participant.
+
+- **Feature**: clicking a message or a note selects it and draws the selection box. Delete removes
+  the selected one; deleting several at once works from the highest index down, so the earlier
+  deletions do not shift the later indices out from under themselves.
+- **Feature**: hovering a message outlines it, and its cursor is `ns-resize` rather than the text
+  caret it used to show. Nothing on the canvas previously suggested the arrows could be picked up —
+  the cursor actively suggested the opposite.
+- The insertion line during a drag is now its own thing rather than a reused snap guide: solid,
+  thicker, with end caps. A snap guide answers "what are you aligned to"; this one answers "what
+  happens when you let go", which is the more important question and was the fainter line.
+- **API**: `addSeqParticipant()`, `addSeqMessage()`, `addSeqNote()`, `toggleSeqArrow(index?)` and
+  `editSelection()` are now on the handle. These actions existed only inside the context menu, which
+  made the sequence toolbar the emptiest of any diagram type — a host had no way to offer them. The
+  built-in React toolbar now does, including two buttons that appear only when a message is selected.
+
 ## 0.25.1 — you can see what you are dragging again
 
 **Fix**: rendering a sequence diagram wiped the overlay layer. Its seven groups are built once when

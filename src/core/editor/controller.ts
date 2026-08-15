@@ -163,6 +163,19 @@ export interface DiagramEditorHandle {
   /** 解除節點所屬的 subgraph 群組(若有)。 */
   ungroupNode(nodeId: string): void;
 
+  // ── sequence 專屬 ── 這些動作以前只存在於右鍵選單,等於「不右鍵就發現不了」。
+  // 開成 public API,host 的工具列(React 版與 VS Code webview 版)才能各自擺按鈕。
+  /** 新增一位參與者,並直接進入改名。 */
+  addSeqParticipant(): void;
+  /** 在最後附加一則訊息,並直接進入編輯文字。 */
+  addSeqMessage(): void;
+  /** 在最後附加一則筆記,並直接進入編輯文字。 */
+  addSeqNote(): void;
+  /** 切換某則訊息的實線 / 虛線箭頭;省略 index 時作用於目前選取的那則。 */
+  toggleSeqArrow(index?: number): void;
+  /** 編輯目前選取對象的文字(參與者改名 / 訊息與筆記改內容)。 */
+  editSelection(): void;
+
   setDark(dark: boolean): void;
 
   getSvg(): SVGSVGElement;
@@ -490,6 +503,15 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     }, opts.debounceMs ?? 250);
   };
 
+  /** 目前選到的是哪一則 sequence 陳述(訊息 / 筆記)。它們不是 node,以 `seq:{index}` 進選取集合。 */
+  const selectedSeqStatement = (): number | null => {
+    for (const id of pointer.getSelection()) {
+      const m = /^seq:(\d+)$/.exec(id);
+      if (m) return Number(m[1]);
+    }
+    return null;
+  };
+
   const refreshOverlay = (): void => {
     const ids = pointer.getSelection();
     const idSet = new Set(ids);
@@ -498,6 +520,13 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       .map((id) => scene.nodes.find((n) => n.id === id))
       .filter((n): n is NonNullable<typeof n> => Boolean(n))
       .map((n) => ({ id: n.id, rect: nodeRect(n) }));
+    // sequence 的訊息 / 筆記不是 node 也不是 edge,以 `seq:{index}` 假 id 進選取集合;矩形跟
+    // 渲染器要(它畫的時候順手記下來了)。沒有這一段,點到訊息就完全沒有「我選到東西了」的回饋。
+    for (const id of ids) {
+      const seq = /^seq:(\d+)$/.exec(id);
+      const rect = seq ? renderer.getSeqMsgRect(Number(seq[1])) : undefined;
+      if (rect) nodeRects.push({ id, rect });
+    }
     // sequence 參與者不可自由縮放(寬度由標籤決定、放手不寫回 code)→ 不顯示縮放控制點。
     overlay.showSelection(nodeRects, zoom, { handles: nodeRects.length === 1 && scene.diagramType !== 'sequence' });
     // 選取的連線高亮(點到線即可選取並看到回饋)。
@@ -1391,6 +1420,14 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
       if (ids.size === 0) return;
       // sequence:刪除參與者要同步清 scene.sequence(否則 node 沒了但 mermaid 還留著 → 脫鉤)。
       if (scene.diagramType === 'sequence') {
+        // 訊息 / 筆記(假 id `seq:{index}`)由大到小刪:每刪一條後面的索引都會往前挪,
+        // 由小到大刪會刪錯人。
+        const stmtIdx = [...ids]
+          .map((id) => /^seq:(\d+)$/.exec(id))
+          .filter((m): m is RegExpExecArray => Boolean(m))
+          .map((m) => Number(m[1]))
+          .sort((a, b) => b - a);
+        for (const i of stmtIdx) pointerHost.runCommand(cmdDeleteSeqStatement(i), 'del-seq-msg');
         const partIds = scene.nodes.filter((n) => ids.has(n.id) && n.data?.kind === 'sequence').map((n) => n.id);
         for (const pid of partIds) pointerHost.runCommand(cmdDeleteSeqParticipant(pid), 'del-participant');
         pointer.clearSelection();
@@ -1467,6 +1504,44 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     ungroupNode: (nodeId) => {
       const node = scene.nodes.find((n) => n.id === nodeId);
       if (node?.parentId) pointerHost.runCommand(cmdUngroup(node.parentId), 'ungroup');
+    },
+
+    // ── sequence 專屬 ── 新增後都直接開編輯器:剛長出來的東西叫 P3 / message,
+    // 使用者百分之百要改字,少一次「還要自己找到它再雙擊」。
+    addSeqParticipant: () => {
+      // 新 id 用與 cmdAddSeqParticipant 相同的規則推出來(P1、P2…第一個沒被占用的),
+      // 指令本身不回傳 id,而開編輯器需要它。
+      const ids = new Set(scene.sequence?.participants.map((p) => p.id) ?? []);
+      let n = 1;
+      while (ids.has(`P${n}`)) n += 1;
+      const newId = `P${n}`;
+      pointerHost.runCommand(cmdAddSeqParticipant(), 'add-participant');
+      setTimeout(() => openEditor(newId), 0);
+    },
+    addSeqMessage: () => {
+      const idx = scene.sequence?.statements.length ?? 0;
+      pointerHost.runCommand(cmdAddSeqMessage(), 'add-message');
+      setTimeout(() => openSeqMessageEditor(idx), 0);
+    },
+    addSeqNote: () => {
+      const idx = scene.sequence?.statements.length ?? 0;
+      pointerHost.runCommand(cmdAddSeqNote(), 'add-note');
+      setTimeout(() => openSeqMessageEditor(idx), 0);
+    },
+    toggleSeqArrow: (index) => {
+      const idx = index ?? selectedSeqStatement();
+      if (idx == null) return;
+      if (scene.sequence?.statements[idx]?.kind !== 'message') return; // 筆記沒有箭頭
+      pointerHost.runCommand(cmdToggleSeqArrow(idx), 'seq-arrow');
+    },
+    editSelection: () => {
+      const idx = selectedSeqStatement();
+      if (idx != null) {
+        openSeqMessageEditor(idx);
+        return;
+      }
+      const nodeId = pointer.getSelection().find((id) => scene.nodes.some((n) => n.id === id));
+      if (nodeId) openEditor(nodeId);
     },
 
     setDark: (d) => {
