@@ -222,7 +222,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
 
       {isSeq && (
         <span className="rsm-tb-hint">
-          訊息模式：從一條生命線拖到另一條 · 選取模式：拖曳參與者可重新排序 · 右鍵空白處：新增參與者 / 訊息
+          訊息模式：從一條生命線拖到另一條 · 選取模式：左右拖參與者換序、上下拖訊息改順序 · 右鍵空白處：新增參與者 / 訊息
         </span>
       )}
 

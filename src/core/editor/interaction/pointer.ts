@@ -28,6 +28,7 @@ import {
   cmdMoveNodes,
   cmdReconnectEdge,
   cmdInsertSeqMessage,
+  cmdMoveSeqStatement,
   cmdReorderSeqParticipant,
   cmdResizeNode,
   cmdSetParent,
@@ -70,6 +71,8 @@ const SNAP_TOL_SCREEN = 6;
 const ANCHOR_HIT_SCREEN = 16;
 // sequence 生命線的水平命中寬容(世界 px)。生命線本身只有 1px,不給寬容根本拖不準。
 const SEQ_LIFELINE_HIT = 28;
+// select 工具抓生命線換序的容差(世界 px)。刻意比 SEQ_LIFELINE_HIT 小很多,理由見 seqLifelineUnder。
+const SEQ_LIFELINE_GRAB = 10;
 
 type Mode =
   | { kind: 'idle' }
@@ -79,6 +82,8 @@ type Mode =
   | { kind: 'seq-reorder'; id: string; startWorld: Point; base: Rect; targetIndex: number }
   // sequence 專屬:從生命線拖到另一條 → 插入一則訊息。落點的 Y 決定插在第幾則。
   | { kind: 'seq-msg-draw'; fromId: string; startWorld: Point }
+  // sequence 專屬:抓著訊息 / note 上下拖 → 改時間順序。targetIndex = 放手時要插進去的位置。
+  | { kind: 'seq-msg-move'; idx: number; startClient: Point; targetIndex: number }
   | { kind: 'resize'; nodeId: string; dir: ResizeDir; startRect: Rect; startWorld: Point; cur: Rect }
   // fromAnchor:從來源節點哪個固定錨點起拉(null = 從節點本體拉 → 浮動來源錨)。
   | { kind: 'rubber-edge'; sourceId: string; from: Point; fromAnchor: EdgeAnchor | null }
@@ -216,6 +221,30 @@ export class PointerController {
   }
 
   /**
+   * 按壓點是不是落在某條「生命線」上(select 工具拖曳換序用)。
+   *
+   * 與 seqParticipantUnder 的差別在容差要多貪:那個是給訊息工具的,吃掉整個欄位寬度 + 28 是對的
+   * (使用者只是想從這根柱子拉一條線出去);select 這裡若照抄,參與者間 56 的間隙會被兩側各 28
+   * 完全瓜分,拖空白處平移畫布與框選就再也做不到了。所以只認線本身左右 SEQ_LIFELINE_GRAB 的範圍。
+   */
+  private seqLifelineUnder(clientX: number, clientY: number): SceneNode | null {
+    const w = this.host.viewport.screenToWorld(clientX, clientY);
+    const scene = this.host.getScene();
+    if (scene.diagramType !== 'sequence') return null;
+    let best: SceneNode | null = null;
+    let bestDist = Infinity;
+    for (const n of scene.nodes) {
+      if (n.data?.kind !== 'sequence') continue;
+      const dist = Math.abs(w.x - (n.x + n.w / 2));
+      if (dist <= SEQ_LIFELINE_GRAB && dist < bestDist) {
+        bestDist = dist;
+        best = n;
+      }
+    }
+    return best;
+  }
+
+  /**
    * 由放開時的螢幕 Y 推出要插在第幾則陳述。
    *
    * 用已渲染的 `[data-seq-msg]` 元素直接比 client 座標,不做世界座標換算 —— 那些元素身上的
@@ -235,6 +264,36 @@ export class PointerController {
       }
     }
     return insertAt;
+  }
+
+  /**
+   * 拖曳訊息換序時的插入指示線:一條橫跨所有生命線、畫在「放手後會落在哪」的高度的線。
+   *
+   * Y 同樣用已渲染的 `[data-seq-msg]` client 座標推(與 seqInsertIndexAt 同一套依據,
+   * 兩者才不會各說各話);插入點指到的若是片段之類沒有命中區的陳述,就取索引大於等於它的
+   * 第一個訊息,再不然就落到最後一則下方。X 用參與者欄位的世界座標左右各留 24 的餘裕。
+   */
+  private seqInsertGuide(insertAt: number): { x1: number; y1: number; x2: number; y2: number } | null {
+    const els = [...this.svg.querySelectorAll('[data-seq-msg]')] as SVGGraphicsElement[];
+    if (els.length === 0) return null;
+    let clientY: number | null = null;
+    let bestIdx = Infinity;
+    for (const el of els) {
+      const idx = Number(el.getAttribute('data-seq-msg'));
+      if (!Number.isFinite(idx) || idx < insertAt || idx >= bestIdx) continue;
+      bestIdx = idx;
+      clientY = el.getBoundingClientRect().y - 5;
+    }
+    if (clientY == null) {
+      const last = els[els.length - 1].getBoundingClientRect();
+      clientY = last.y + last.height + 5;
+    }
+    const cols = this.host.getScene().nodes.filter((n) => n.data?.kind === 'sequence');
+    if (cols.length === 0) return null;
+    const x1 = Math.min(...cols.map((n) => n.x)) - 24;
+    const x2 = Math.max(...cols.map((n) => n.x + n.w)) + 24;
+    const y = this.host.viewport.screenToWorld(0, clientY).y;
+    return { x1, y1: y, x2, y2: y };
   }
 
   /**
@@ -304,7 +363,11 @@ export class PointerController {
       }
       this.lastEdgeClickTime = tnow;
       this.lastClickEdgeId = key;
-      this.mode = { kind: 'idle' };
+      // 單擊不只是「等第二下」:按住往上下拖 = 改這則訊息在時間軸上的位置。
+      // 之前這裡直接 mode=idle 然後 return,等於在圖上最顯眼的箭頭身上開了一塊死區 ——
+      // 拖曳不但不換序,連「拖空白處平移畫布」都被這個 return 一起吃掉,體感就是整張圖卡住。
+      // 有沒有真的要搬,交給 processMove 的位移門檻判斷;沒過門檻就還原成單純的一次點擊。
+      this.mode = { kind: 'seq-msg-move', idx: i, startClient: { x: e.clientX, y: e.clientY }, targetIndex: -1 };
       return;
     }
 
@@ -347,7 +410,9 @@ export class PointerController {
             return;
           }
         }
-        const sid = this.hitNode(target);
+        // 方框用 DOM 命中,生命線改用幾何命中:生命線是 pointerEvents:none 的細線,DOM 抓不到,
+        // 但在使用者眼裡「那條線就是這個參與者」,沿著它拖卻變成平移畫布 + 放手清空選取,很莫名。
+        const sid = this.hitNode(target) ?? this.seqLifelineUnder(e.clientX, e.clientY)?.id ?? null;
         const snode = sid ? getNode(seqScene, sid) : null;
         if (snode && snode.data?.kind === 'sequence') {
           const now = performance.now();
@@ -653,6 +718,19 @@ export class PointerController {
       return;
     }
 
+    if (m.kind === 'seq-msg-move') {
+      // 還在點擊容差內就別動:這一下很可能只是雙擊改字的第一擊,提早畫線會像誤觸。
+      if (Math.abs(c.y - m.startClient.y) < DRAG_THRESHOLD) return;
+      m.targetIndex = this.seqInsertIndexAt(c.y);
+      const guide = this.seqInsertGuide(m.targetIndex);
+      if (guide) this.host.overlay.showGuides([guide], zoom);
+      // 被拖的那則本身給個選取框當「我抓到的是這條」的回饋 —— 訊息不是 node,
+      // previewMove 對它無效,所以只移動框、不動真正的圖元,放手才重排。
+      const rect = this.host.renderer.getSeqMsgRect(m.idx);
+      if (rect) this.host.overlay.showSelection([{ id: `seq:${m.idx}`, rect }], zoom, { handles: false });
+      return;
+    }
+
     if (m.kind === 'reconnect-edge') {
       const tgt = this.nodeUnder(c.x, c.y);
       const snap = tgt ? this.snapAnchor(tgt, world) : null;
@@ -696,6 +774,15 @@ export class PointerController {
       } else {
         this.host.refreshOverlay(); // 沒換序(或只是點一下)→ 選取框彈回原位。
       }
+      return;
+    }
+    if (m.kind === 'seq-msg-move') {
+      this.host.overlay.clearGuides();
+      this.host.overlay.clearTransient();
+      // targetIndex 還是 -1 = 從頭到尾沒超過位移門檻 → 這就是一次單純的點擊(可能是雙擊的第一下),
+      // 什麼都不做,也不留 undo 紀錄。
+      if (m.targetIndex >= 0) this.host.runCommand(cmdMoveSeqStatement(m.idx, m.targetIndex), 'move-statement');
+      else this.host.refreshOverlay();
       return;
     }
     if (m.kind === 'seq-msg-draw') {

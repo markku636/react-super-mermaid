@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.25.1 — you can see what you are dragging again
+
+**Fix**: rendering a sequence diagram wiped the overlay layer. Its seven groups are built once when
+`Overlay` is constructed and held by reference, so clearing them from the renderer detached them from
+the document for good — every later `showSelection` / `showGuides` / rubber band / resize handle /
+drop outline was written into nodes nobody could see. Drags still applied, but the canvas gave back
+nothing at all while you made them, which reads as a frozen editor. It outlived the diagram that
+caused it: once a sequence had rendered, switching to a flowchart cleared the layer a second time, so
+the feedback stayed invisible for the rest of the session. The renderer now leaves that layer alone —
+stale visuals were already being cleaned up by `Overlay`'s own `clearXxx` and the controller's
+`refreshOverlay` after each render.
+
+**Fix**: in a sequence diagram, dragging a *lifeline* under the select tool panned the canvas and
+dropped the selection on release. Participants were matched by DOM hit-testing, and a lifeline is a
+`pointer-events: none` line — but to the person dragging it, that line *is* the participant. It
+reorders now, matched geometrically within a narrow band around the line so that dragging the empty
+space between lifelines still pans and marquee-selects.
+
+**Feature**: drag a message (or a note) up and down to change where it sits in time. Pressing one
+used to set the mode to idle and return, which swallowed everything downstream — the message wouldn't
+move, and the canvas wouldn't even pan from there. An insertion line now spans the lifelines at the
+landing position while you drag, and the message you grabbed is outlined. A press that never passes
+the drag threshold is still just a click, so double-click-to-edit is unchanged. Dragging a `loop` /
+`alt` / `opt` header moves the whole block, `end` included; grabbing a bare `end` does nothing, so a
+drag can't strand a block's tail above its own header and emit mermaid that won't parse.
+
 ## 0.24.0 — you can see where a drag will land
 
 On the types where **position is the data**, letting go rewrites the source immediately — but nothing

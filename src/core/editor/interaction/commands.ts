@@ -13,6 +13,7 @@ import type {
   SceneContainer,
   SceneEdge,
   SceneNode,
+  SeqStatement,
 } from '../scene/types';
 import {
   addEdge,
@@ -292,6 +293,51 @@ export function cmdDeleteSeqStatement(index: number): Command {
     if (!scene.sequence) return { scene, patch: {} };
     const statements = scene.sequence.statements.filter((_, i) => i !== index);
     return { scene: { ...scene, sequence: { ...scene.sequence, statements } }, patch: { structural: true } };
+  };
+}
+
+// 片段開頭關鍵字(與 round-trip/sequence/serialize.ts 的 OPENERS 同一份語意)。
+// 這裡不 import 是因為 commands 層只該依賴 scene/,不該反向依賴 round-trip 的序列化細節。
+const SEQ_BLOCK_OPENERS = new Set(['loop', 'alt', 'opt', 'par', 'critical', 'break', 'rect', 'box']);
+
+/** 從 statements[start] 這個片段開頭往下數到配對的 end,回傳整個區塊的長度(含頭尾)。 */
+function seqBlockLength(statements: readonly SeqStatement[], start: number): number {
+  let depth = 0;
+  for (let i = start; i < statements.length; i += 1) {
+    const s = statements[i];
+    if (s.kind === 'fragment' && SEQ_BLOCK_OPENERS.has(s.keyword)) depth += 1;
+    else if (s.kind === 'end') {
+      depth -= 1;
+      if (depth <= 0) return i - start + 1;
+    }
+  }
+  return statements.length - start; // 沒有配對的 end(來源本來就不完整)→ 搬到尾巴為止。
+}
+
+/**
+ * sequence:把某條陳述搬到新的時間位置(上下拖曳改順序)。
+ *
+ * to 是「插入點」而非目的索引:與 cmdInsertSeqMessage 一致,指的是搬移前陣列中要插在誰前面。
+ * 拖的若是 loop/alt/opt 這類片段開頭,單獨搬走會把配對的 end 留在原地、整段縮排爛掉,
+ * 所以連同整個區塊一起搬;反過來抓著 end 拖則不動作 —— 要搬區塊請抓開頭,
+ * 否則使用者一拖就能把 end 丟到自己的開頭前面,產生一份 mermaid 根本不吃的原始碼。
+ */
+export function cmdMoveSeqStatement(from: number, to: number): Command {
+  return (scene) => {
+    if (!scene.sequence) return { scene, patch: {} };
+    const statements = scene.sequence.statements;
+    if (from < 0 || from >= statements.length) return { scene, patch: {} };
+    const src = statements[from];
+    if (src.kind === 'end') return { scene, patch: {} };
+    const len = src.kind === 'fragment' && SEQ_BLOCK_OPENERS.has(src.keyword) ? seqBlockLength(statements, from) : 1;
+    const target = Math.max(0, Math.min(to, statements.length));
+    // 落點就在自己身上(含整個區塊)→ 沒有實際位移,不留 undo 紀錄。
+    if (target >= from && target <= from + len) return { scene, patch: {} };
+    const next = [...statements];
+    const moved = next.splice(from, len);
+    // 往下搬時,前面被抽走的 len 條會讓插入點整體上移。
+    next.splice(target > from ? target - len : target, 0, ...moved);
+    return { scene: { ...scene, sequence: { ...scene.sequence, statements: next } }, patch: { structural: true } };
   };
 }
 

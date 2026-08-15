@@ -109,7 +109,7 @@ export class SceneRenderer {
   /** sequence:整張圖的世界座標範圍(供 fit;sequence 內容延伸到節點下方,不能只用節點 bbox)。 */
   private seqBounds: { x: number; y: number; w: number; h: number } | null = null;
 
-  /** 取得 sequence 訊息的世界座標矩形(host 開啟文字編輯器定位用)。 */
+  /** 取得 sequence 訊息的世界座標矩形(host 開啟文字編輯器定位、拖曳換序時畫選取框用)。 */
   getSeqMsgRect(index: number): { x: number; y: number; w: number; h: number } | undefined {
     return this.seqMsgRects.get(index);
   }
@@ -1437,7 +1437,12 @@ export class SceneRenderer {
     this.nodeCache.clear();
     this.edgeEls.clear();
     this.seqMsgRects.clear();
-    for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer, this.overlayLayer]) {
+    // 不清 overlayLayer:那一層的子群組是 Overlay 建構時建好、之後一直持有參考的,
+    // 從這裡砍掉等於把它們從文件上摘下來,Overlay 之後所有 showSelection / showGuides
+    // 都寫進脫離 DOM 的節點 —— 拖曳照樣生效,但選取框、吸附線、橡皮筋一個都看不到,
+    // 使用者只會覺得「拖了沒反應」。殘留的舊視覺由 Overlay 自己的 clearXxx 與
+    // controller 每次渲染後的 refreshOverlay 收拾。
+    for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer]) {
       while (layer.firstChild) layer.removeChild(layer.firstChild);
     }
     const g = this.nodesLayer;
@@ -1712,7 +1717,8 @@ export class SceneRenderer {
       this.nodeCache.clear();
       this.edgeEls.clear();
       this.seqMsgRects.clear();
-      for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer, this.overlayLayer]) {
+      // 同上:overlayLayer 的子群組屬於 Overlay,清了就再也回不來(見 renderSequence 的說明)。
+      for (const layer of [this.containersLayer, this.edgesLayer, this.nodesLayer]) {
         while (layer.firstChild) layer.removeChild(layer.firstChild);
       }
     }
