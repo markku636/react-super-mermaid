@@ -15,6 +15,8 @@ export interface RoughOptionsLike {
   fillWeight?: number;
   hachureGap?: number;
   strokeLineDash?: number[];
+  /** 只畫一道筆觸(rough 預設來回兩道)。帶箭頭的線要用,否則一條線會長出兩個箭頭。 */
+  disableMultiStroke?: boolean;
 }
 
 export interface RoughGeneratorLike {
@@ -37,8 +39,10 @@ export interface RoughPathInfo {
   fillStyle?: string;
 }
 
-function roundedRectPath(w: number, h: number, r: number): string {
+/** 本地座標(0..w / 0..h)的圓角矩形路徑;r 可任意指定,r<=0 視為直角。 */
+export function roundedRectPath(w: number, h: number, r: number): string {
   const rr = Math.min(r, w / 2, h / 2);
+  if (rr <= 0) return `M0,0 L${w},0 L${w},${h} L0,${h} Z`;
   return (
     `M${rr},0 L${w - rr},0 Q${w},0 ${w},${rr} ` +
     `L${w},${h - rr} Q${w},${h} ${w - rr},${h} ` +

@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.27.1 — the hand-drawn button did nothing on a sequence diagram
+
+Pressing ✏ 手繪 on a sequence diagram changed one thing: it dropped the soft shadow under the
+participant boxes. Nothing else on the canvas is drawn by the shared node path, so nothing else
+moved, and the handwriting font never came in on *any* diagram type.
+
+- **Fix**: the handwriting font (Virgil) is switched by a `rsm-clean` class on the editor host, and
+  that class was only ever set once, at construction. `setLook()` now toggles it, so the font follows
+  the button — on every diagram type, not just sequence.
+- **Fix**: the sequence renderer draws its own participant boxes, notes, fragment frames, activation
+  bars, autonumber circles and message lines, and every one of them ignored the look. They now go
+  through rough.js in sketch mode, with the same stroke and seed scheme as nodes elsewhere.
+- Message arrows use a single rough stroke (`disableMultiStroke`) so a line grows one arrowhead, not
+  one per pass, and the arrow marker rides the last stroke only.
+- Participant boxes keep a transparent hit rect in sketch mode. Hand-drawn strokes are
+  `pointer-events: none` paths with gaps between them, so without it the boxes would have become
+  unclickable and dragging one would have panned the canvas instead of reordering.
+- Dashes (lifelines, `loop` / `alt` frames, dashed replies) go on as `stroke-dasharray` rather than
+  rough's `strokeLineDash` — `generator.toPaths()` drops the latter, which silently turned every
+  dashed line solid in sketch mode.
+- The built-in toolbar reads the editor's actual look when toggling instead of trusting its own
+  state, and its default matches the documented `'sketch'` default rather than `'clean'`.
+
 ## 0.27.0 — drag a message across lifelines
 
 Dragging a message could change *when* it happens but never *who it is between*. Changing that meant

@@ -59,7 +59,7 @@ function verticalAxisText(
   t.textContent = s;
   return t;
 }
-import { buildNodeDrawables, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
+import { buildNodeDrawables, roundedRectPath, type RoughGeneratorLike, type RoughPathInfo } from './shapes';
 
 /** 'sketch' = Excalidraw 手繪抖動;'clean' = 俐落圓角 + 柔和陰影(貼近 colorful 主題)。 */
 export type EditorLook = 'sketch' | 'clean';
@@ -266,24 +266,7 @@ export class SceneRenderer {
     if (this.look === 'clean') shapesG.style.filter = `url(#${NODE_SHADOW_ID})`;
     // clean 風把直角方框畫成圓角,視覺更貼近 colorful 主題。
     const shape = this.look === 'clean' && node.shape === 'rectangle' ? 'rounded' : node.shape;
-    for (const drawable of buildNodeDrawables(this.gen, shape, node.w, node.h, opts)) {
-      for (const pi of this.gen.toPaths(drawable) as RoughPathInfo[]) {
-        const isFill = pi.fill && pi.fill !== 'none';
-        const path = svgEl('path', { d: pi.d });
-        if (isFill) {
-          path.setAttribute('fill', pi.fill as string);
-          path.setAttribute('stroke', 'none');
-        } else {
-          path.setAttribute('fill', 'none');
-          path.setAttribute('stroke', pi.stroke);
-          path.setAttribute('stroke-width', String(pi.strokeWidth));
-          path.setAttribute('vector-effect', 'non-scaling-stroke');
-          if (dash) path.setAttribute('stroke-dasharray', dash);
-        }
-        path.style.pointerEvents = 'none';
-        shapesG.appendChild(path);
-      }
-    }
+    this.appendRoughPaths(shapesG, buildNodeDrawables(this.gen, shape, node.w, node.h, opts), { dash });
     g.appendChild(shapesG);
 
     // ER 實體 / class:多隔間框(標題列 + 屬性/成員列),貼近「Edit Diagram」預覽外觀。
@@ -1403,6 +1386,110 @@ export class SceneRenderer {
     g.appendChild(fo);
   }
 
+  /** rough Drawable → <path>:填色與描邊分開兩種 path,描邊不隨縮放變粗。 */
+  private appendRoughPaths(g: SVGElement, drawables: unknown[], o: { dash?: string; marker?: string } = {}): void {
+    const paths: SVGElement[] = [];
+    for (const drawable of drawables) {
+      for (const pi of this.gen.toPaths(drawable) as RoughPathInfo[]) {
+        const isFill = pi.fill && pi.fill !== 'none';
+        const path = svgEl('path', { d: pi.d });
+        if (isFill) {
+          path.setAttribute('fill', pi.fill as string);
+          path.setAttribute('stroke', 'none');
+        } else {
+          path.setAttribute('fill', 'none');
+          path.setAttribute('stroke', pi.stroke);
+          path.setAttribute('stroke-width', String(pi.strokeWidth));
+          path.setAttribute('vector-effect', 'non-scaling-stroke');
+          if (o.dash) path.setAttribute('stroke-dasharray', o.dash);
+          paths.push(path);
+        }
+        path.style.pointerEvents = 'none';
+        g.appendChild(path);
+      }
+    }
+    // 箭頭只掛最後一道描邊:掛在每一道上會冒出多個箭頭。
+    const last = paths[paths.length - 1];
+    if (o.marker && last) last.setAttribute('marker-end', `url(#${o.marker})`);
+  }
+
+  /**
+   * sequence 圖小工具:依目前 look 畫方框。
+   *
+   * sketch 走 rough.js(與其它圖種的節點同一套手繪筆觸),clean 維持銳利 rect。
+   * 回傳的 <g> 已含 translate,呼叫端在它身上設 cursor / filter 即可(會傳給子路徑)。
+   *
+   * hit:補一層透明命中矩形。手繪筆觸是一堆 pointer-events:none 的 path,沒有這層,
+   * 參與者方框在手繪模式下就變成點不到 —— 拖曳換序 / 雙擊改名全部穿透到背景變成平移畫布。
+   */
+  private seqBox(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    o: {
+      rx?: number;
+      fill: string;
+      stroke: string;
+      strokeWidth?: number;
+      dash?: string;
+      seedKey: string;
+      hit?: boolean;
+    },
+  ): SVGGElement {
+    const g = svgEl('g', { transform: `translate(${x},${y})` }) as SVGGElement;
+    const sw = o.strokeWidth ?? 1.5;
+    if (this.look === 'clean') {
+      const r = svgEl('rect', { x: 0, y: 0, width: w, height: h, rx: o.rx ?? 0, fill: o.fill, stroke: o.stroke, 'stroke-width': sw });
+      if (o.dash) r.setAttribute('stroke-dasharray', o.dash);
+      g.appendChild(r);
+    } else {
+      const opts = {
+        ...ROUGH_LOOKS.sketch,
+        seed: seedFor(o.seedKey, this.baseSeed),
+        stroke: o.stroke,
+        strokeWidth: sw,
+        ...(o.fill === 'none' ? {} : { fill: o.fill }),
+      };
+      const rx = o.rx ?? 0;
+      const drawable = rx > 0 ? this.gen.path(roundedRectPath(w, h, rx), opts) : this.gen.rectangle(0, 0, w, h, opts);
+      // 虛線走 stroke-dasharray,不用 rough 的 strokeLineDash —— generator.toPaths() 不會把它
+      // 帶進 path 資訊裡(只有 canvas 渲染路徑吃),設了等於白設,片段框會變成實線。
+      this.appendRoughPaths(g, [drawable], { dash: o.dash });
+    }
+    if (o.hit) g.appendChild(svgEl('rect', { x: 0, y: 0, width: w, height: h, fill: 'transparent' }));
+    return g;
+  }
+
+  /** sequence 圖小工具:依目前 look 畫直線 / 路徑(sketch 單筆抖動,箭頭端點才對得準)。 */
+  private seqStroke(
+    d: string,
+    o: { stroke: string; strokeWidth: number; dash?: boolean; marker?: string; opacity?: number; seedKey: string },
+  ): SVGElement {
+    if (this.look === 'sketch') {
+      const g = svgEl('g') as SVGGElement;
+      const opts = {
+        ...ROUGH_LOOKS.sketch,
+        seed: seedFor(o.seedKey, this.baseSeed),
+        stroke: o.stroke,
+        strokeWidth: o.strokeWidth,
+        disableMultiStroke: true,
+      };
+      // 虛線同樣走 stroke-dasharray(見 seqBox 的說明)。
+      this.appendRoughPaths(g, [this.gen.path(d, opts)], { marker: o.marker, dash: o.dash ? '5 4' : undefined });
+      if (o.opacity != null) g.style.opacity = String(o.opacity);
+      g.style.pointerEvents = 'none';
+      return g;
+    }
+    const p = svgEl('path', { d, fill: 'none', stroke: o.stroke, 'stroke-width': o.strokeWidth });
+    p.setAttribute('vector-effect', 'non-scaling-stroke');
+    if (o.dash) p.setAttribute('stroke-dasharray', '5 4');
+    if (o.opacity != null) p.style.opacity = String(o.opacity);
+    if (o.marker) p.setAttribute('marker-end', `url(#${o.marker})`);
+    p.style.pointerEvents = 'none';
+    return p;
+  }
+
   /** sequence 圖小工具:foreignObject 文字(CJK 友善)。 */
   private seqText(
     x: number,
@@ -1523,15 +1610,16 @@ export class SceneRenderer {
       x2: number,
       y2: number,
       o: { dash?: boolean; w?: number; marker?: boolean; stroke?: string; opacity?: number } = {},
-    ): SVGPathElement => {
-      const p = svgEl('path', { d: `M${x1},${y1} L${x2},${y2}`, fill: 'none', stroke: o.stroke ?? ink, 'stroke-width': o.w ?? 1.6 });
-      p.setAttribute('vector-effect', 'non-scaling-stroke');
-      if (o.dash) p.setAttribute('stroke-dasharray', '5 4');
-      if (o.opacity != null) p.style.opacity = String(o.opacity);
+    ): SVGElement => {
       const mk = markerIdFor('arrow', this.dark);
-      if (o.marker && mk) p.setAttribute('marker-end', `url(#${mk})`);
-      p.style.pointerEvents = 'none';
-      return p;
+      return this.seqStroke(`M${x1},${y1} L${x2},${y2}`, {
+        stroke: o.stroke ?? ink,
+        strokeWidth: o.w ?? 1.6,
+        dash: o.dash,
+        opacity: o.opacity,
+        marker: o.marker && mk ? mk : undefined,
+        seedKey: `line:${Math.round(x1)},${Math.round(y1)}-${Math.round(x2)},${Math.round(y2)}`,
+      });
     };
 
     // 片段框(墊底)
@@ -1539,12 +1627,24 @@ export class SceneRenderer {
       if (f.y1 == null) f.y1 = bottomY;
       const fx = 20;
       const fw = rightEdge + 20;
-      const box = svgEl('rect', { x: fx, y: f.y0 - 14, width: fw - fx, height: f.y1 - f.y0 + 24, rx: 4, fill: 'none', stroke: ink, 'stroke-width': 1, 'stroke-dasharray': '3 3' });
+      const box = this.seqBox(fx, f.y0 - 14, fw - fx, f.y1 - f.y0 + 24, {
+        rx: 4,
+        fill: 'none',
+        stroke: ink,
+        strokeWidth: 1,
+        dash: '3 3',
+        seedKey: `frag:${f.kw}:${f.y0}`,
+      });
       box.style.opacity = '0.6';
       box.style.pointerEvents = 'none';
       g.appendChild(box);
       const tagW = Math.max(40, f.kw.length * 8 + 24);
-      const tag = svgEl('rect', { x: fx, y: f.y0 - 14, width: tagW, height: 18, fill: this.dark ? '#3a3a40' : '#e2e8f0', stroke: ink, 'stroke-width': 1 });
+      const tag = this.seqBox(fx, f.y0 - 14, tagW, 18, {
+        fill: this.dark ? '#3a3a40' : '#e2e8f0',
+        stroke: ink,
+        strokeWidth: 1,
+        seedKey: `fragtag:${f.kw}:${f.y0}`,
+      });
       tag.style.pointerEvents = 'none';
       g.appendChild(tag);
       g.appendChild(this.seqText(fx + 5, f.y0 - 1, `${f.kw}${f.label ? ' ' + f.label : ''}`, ink, 11, 700, 'start'));
@@ -1579,14 +1679,11 @@ export class SceneRenderer {
     for (const ab of actBars) {
       const cx = cxOf(ab.actor);
       g.appendChild(
-        svgEl('rect', {
-          x: cx - 5,
-          y: ab.y0,
-          width: 10,
-          height: Math.max(8, ab.y1 - ab.y0),
+        this.seqBox(cx - 5, ab.y0, 10, Math.max(8, ab.y1 - ab.y0), {
           fill: fillBox,
           stroke: ink,
-          'stroke-width': 1,
+          strokeWidth: 1,
+          seedKey: `act:${ab.actor}:${ab.y0}`,
         }),
       );
     }
@@ -1603,13 +1700,28 @@ export class SceneRenderer {
         if (seq.autonumber) {
           autoNum += 1;
           const nx = s.from === s.to ? x1 : x1 + (x2 > x1 ? 9 : -9);
-          g.appendChild(svgEl('circle', { cx: nx, cy: d.y, r: 9, fill: this.dark ? '#26262b' : '#ffffff', stroke: ink, 'stroke-width': 1 }));
+          // 圓圈也吃 look:sketch 用 seqBox 的 rx=半徑(圓角矩形收成圓),與其它框同一套筆觸。
+          g.appendChild(
+            this.seqBox(nx - 9, d.y - 9, 18, 18, {
+              rx: 9,
+              fill: this.dark ? '#26262b' : '#ffffff',
+              stroke: ink,
+              strokeWidth: 1,
+              seedKey: `num:${autoNum}`,
+            }),
+          );
           g.appendChild(this.seqText(nx, d.y + 1, String(autoNum), ink, 10, 700, 'middle'));
         }
         let rect: { x: number; y: number; w: number; h: number };
         if (s.from === s.to) {
           const r = 20;
-          g.appendChild(svgEl('path', { d: `M${x1},${d.y} h${r} v18 h${-r}`, fill: 'none', stroke: ink, 'stroke-width': 1.6 }));
+          g.appendChild(
+            this.seqStroke(`M${x1},${d.y} h${r} v18 h${-r}`, {
+              stroke: ink,
+              strokeWidth: 1.6,
+              seedKey: `self:${s.from}:${d.idx}`,
+            }),
+          );
           const back = line(x1 + r, d.y + 18, x1, d.y + 18, { marker: true });
           g.appendChild(back);
           if (s.text) g.appendChild(this.seqText(x1 + r + 6, d.y + 4, s.text, ink, 12, 400, 'start'));
@@ -1642,7 +1754,13 @@ export class SceneRenderer {
         const nw = s.placement === 'over' ? maxx - minx + 80 : 120;
         const nx = s.placement === 'over' ? minx - 40 : s.placement === 'left of' ? minx - 130 : maxx + 10;
         const w = Math.max(80, nw);
-        const nbox = svgEl('rect', { x: nx, y: d.y - 12, width: w, height: 26, rx: 2, fill: this.dark ? '#3d3a22' : '#fff7d6', stroke: ink, 'stroke-width': 1 });
+        const nbox = this.seqBox(nx, d.y - 12, w, 26, {
+          rx: 2,
+          fill: this.dark ? '#3d3a22' : '#fff7d6',
+          stroke: ink,
+          strokeWidth: 1,
+          seedKey: `note:${d.idx}`,
+        });
         nbox.style.pointerEvents = 'none';
         g.appendChild(nbox);
         g.appendChild(this.seqText(nx + w / 2, d.y + 1, s.text, ink, 11, 400, 'middle'));
@@ -1666,14 +1784,26 @@ export class SceneRenderer {
     cols.forEach((c, i) => {
       const pal = paletteByIndex(i);
       const top = svgEl('g', { 'data-node-id': c.id, class: 'rsm-node' });
-      const tb = svgEl('rect', { x: c.x, y: c.y, width: c.w, height: c.h, rx: c.actor ? 16 : 6, fill: pal.fill, stroke: pal.stroke, 'stroke-width': 1.5 });
+      const tb = this.seqBox(c.x, c.y, c.w, c.h, {
+        rx: c.actor ? 16 : 6,
+        fill: pal.fill,
+        stroke: pal.stroke,
+        seedKey: `actor:${c.id}:top`,
+        hit: true,
+      });
       if (shadow) tb.style.filter = shadow;
       tb.style.cursor = 'ew-resize';
       top.appendChild(tb);
       top.appendChild(this.seqText(c.cx, c.y + c.h / 2 + 1, c.label, INK, 13, 700, 'middle'));
       g.appendChild(top);
       const bottom = svgEl('g', { 'data-node-id': c.id, class: 'rsm-node' });
-      const bb = svgEl('rect', { x: c.x, y: bottomY + 4, width: c.w, height: HEAD_H, rx: c.actor ? 16 : 6, fill: pal.fill, stroke: pal.stroke, 'stroke-width': 1.5 });
+      const bb = this.seqBox(c.x, bottomY + 4, c.w, HEAD_H, {
+        rx: c.actor ? 16 : 6,
+        fill: pal.fill,
+        stroke: pal.stroke,
+        seedKey: `actor:${c.id}:bottom`,
+        hit: true,
+      });
       if (shadow) bb.style.filter = shadow;
       bb.style.cursor = 'ew-resize';
       bottom.appendChild(bb);

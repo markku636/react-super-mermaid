@@ -1571,6 +1571,10 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
     toggleHelp: (show) => toggleHelp(show),
     setLook: (look) => {
+      // 手寫字體(Virgil)是靠 host 上的 rsm-clean class 開關的 —— 只叫 renderer 重畫,
+      // 文字外觀一個字都不會變。這個 class 以前只在建構時設一次,切風格時沒人動它,
+      // 於是「手繪」按下去只換得到形狀,體感就是沒反應。
+      host.classList.toggle('rsm-clean', look === 'clean');
       renderer.setLook(look);
       refreshOverlay();
     },

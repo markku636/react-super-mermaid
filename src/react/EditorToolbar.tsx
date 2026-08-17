@@ -76,7 +76,7 @@ function LineGlyph({ kind }: { kind: LineKind }): React.JSX.Element {
 export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const { handle: h, tool } = props;
   const [copied, setCopied] = useState(false);
-  const [look, setLookState] = useState<EditorLook>(props.look ?? 'clean');
+  const [look, setLookState] = useState<EditorLook>(props.look ?? 'sketch');
   // 連線控制項顯示的樣式(= 新連線預設;選到單一連線時改顯示該線的樣式)。
   const [edge, setEdge] = useState<{ lineKind: LineKind; arrowStart: ArrowHead; arrowEnd: ArrowHead }>({
     lineKind: 'solid',
@@ -104,7 +104,10 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   };
 
   const toggleLook = (): void => {
-    const next: EditorLook = look === 'sketch' ? 'clean' : 'sketch';
+    // 以編輯器實際的 look 為準(props.look 只是初始值),避免本地 state 漂掉之後
+    // 按一次才「補正」、看起來像第一下沒反應。
+    const cur = h?.getLook() ?? look;
+    const next: EditorLook = cur === 'sketch' ? 'clean' : 'sketch';
     h?.setLook(next);
     setLookState(next);
   };

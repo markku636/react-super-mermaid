@@ -96,7 +96,7 @@ export const MermaidEditor = forwardRef<MermaidEditorHandle, MermaidEditorProps>
             onToggleSource={() => setShowSource((s) => !s)}
             diagramType={ed.diagramType}
             selection={ed.selection}
-            look={props.look ?? 'clean'}
+            look={props.look ?? 'sketch'}
           />
         ) : null}
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
