@@ -4,6 +4,7 @@
 import { assertBrowser } from '../env';
 import type { MermaidLike, MermaidTheme, RenderDiagramOptions, RenderResult } from '../types';
 import { stripCheckDirectives } from './checks/parse';
+import { transpileOrid } from './orid/transpile';
 import { stripTipDirectives } from './tips/parse';
 import { boostLegibility, colorizeDiagram } from './themes/colorize';
 import { ensureSketchFont, SKETCH_FONT, sketchifyDiagram } from './themes/sketch';
@@ -71,7 +72,10 @@ export async function renderToSvg(args: RenderToSvgArgs): Promise<RenderedSvg> {
   const id = `rsm-${renderSeq}`;
   // 檢查 / 懸停提示指令在這個唯一咽喉點剝除,viewer / renderDiagram / 編輯器排版三條路徑同時受惠。
   // (原始碼本身不動 —— 編輯器 round-trip 讀的是原始碼,提示不會在來回轉換中遺失。)
-  const { svg } = await args.mermaid.render(id, stripTipDirectives(stripCheckDirectives(args.code)));
+  // 剝完再轉譯 ORID:transpileOrid 對非 ORID 是零成本直通,對 ORID 則吐出等價 flowchart,
+  // 於是 mermaid 完全不必認識 `orid` 這個關鍵字,下游(主題 / 搜尋 / 匯出)也一律照舊。
+  const prepared = transpileOrid(stripTipDirectives(stripCheckDirectives(args.code)));
+  const { svg } = await args.mermaid.render(id, prepared);
   return { svgString: svg, id, postProcess: args.pristine ? 'none' : resolved.postProcess };
 }
 

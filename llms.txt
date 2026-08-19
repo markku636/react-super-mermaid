@@ -36,11 +36,22 @@ A themed tooltip when the mouse rests on a node — the one-liner counterpart to
 - Viewer props: `nodeTips` (default true, master switch), `tips` (`DiagramTip[]` or `Record<target, text>` shorthand; same target overrides `%% @tip`), `tipsFromSource` (default true), `getNodeTip({ id, label, node })` (string = show, `null` = silence the node, `undefined` = fall through), `tipFallbackLabel` (default false; nodes without a tip show full label + id — useful when fitted diagrams squeeze long labels).
 - A node carrying check hints (and no tip) shows the check summary on hover; the badge itself keeps its native tooltip. The tooltip follows the cursor, flips at canvas edges, hides during drag-pan, and is `pointer-events: none`.
 
+## ORID diagrams (`orid`) — a diagram type Mermaid does not have
+
+The ICA "focused conversation" method as a diagram: four fixed stages — Objective (facts) → Reflective (feelings) → Interpretive (meaning) → Decisional (action) — drawn as a vertical funnel, each stage a colour-coded band holding a row of items. Good for retrospectives, incident reviews and workshop notes, where a flowchart would force you to invent structure the method already gives you.
+
+- Syntax: `orid`, then `title <text>`, then a stage keyword line (`objective` / `reflective` / `interpretive` / `decisional`, optionally followed by a custom heading), then one indented line per item. Bullet prefixes (`- `, `* `, `• `) are optional and force item interpretation — use one when an item itself starts with a stage keyword. Stages render in canonical O→R→I→D order regardless of writing order; a declared-but-empty stage renders as a dashed "（待填）" placeholder. YAML frontmatter is preserved; an `orid` `title` becomes the chart title.
+- Single-letter abbreviations are deliberately **not** accepted: an English item beginning `I feel…` would silently open an Interpretive stage and swallow everything after it.
+- How it renders: `transpileOrid(code)` rewrites ORID into an equivalent `flowchart TB` (one subgraph per stage, `direction LR` + `~~~` invisible links to lay items out in rows, `classDef` for the semantic palette) *before* mermaid sees it. Everything downstream is unchanged — themes, pan/zoom, search, SVG/PNG export, `%% @check`, `%% @tip`. Item node ids are `O1`, `R2`, `I1`, `D3`… so check/tip directives can target them.
+- `renderDiagram` / `MermaidViewer` / `MermaidEditor` transpile internally — nothing to wire up. Hosts that call `mermaid.render` themselves import the ~10 KB subpath entry: `import { transpileOrid } from 'react-super-mermaid/orid'` then `mermaid.render(id, transpileOrid(source))`. Non-ORID source passes straight through.
+- Editing: like `timeline`, ORID has no coordinates to drag, so the editor hands it to a structured form (four stage cards, add/remove/reorder items, live preview) instead of the canvas.
+- API (`react-super-mermaid/orid`, also re-exported from the main entry and `/editor`): `transpileOrid`, `isOridSource`, `oridToMermaid`, `parseOrid`, `serializeOrid`, `emptyOridModel`, `orderedStages`, `stageHeading`, `oridStageSpec`, `oridStageByKeyword`, `ORID_STAGES`, `ORID_PALETTE`, `oridItemClass`, `oridStageClass`.
+
 ## Framework-agnostic core API
 
 - `renderDiagram({ code, container, theme, dark, seed, fontUrl, mermaidConfig, mermaid, injectStyles })` — one-shot render + post-process into a container, returns `{ svg, svgString, id }`.
 - `loadMermaid({ source })` — resolve external mermaid: injected instance → peer `import('mermaid')` → CDN; memoized.
-- `colorizeDiagram(svgOrRoot, { dark })` — apply the `colorful` post-process (palette + shadows + per-type colouring for flowchart / sequence / class / state / ER / pie / gantt / mindmap / timeline / journey).
+- `colorizeDiagram(svgOrRoot, { dark })` — apply the `colorful` post-process (palette + shadows + per-type colouring for flowchart / sequence / class / state / ER / pie / gantt / mindmap / timeline / journey / ORID). Invisible (`~~~`) links are left invisible.
 - `boostLegibility(svgOrRoot)` — bump label font-weight for crisp text in every theme (weight-only, never changes colours). Applied automatically by the viewer.
 - `sketchifyDiagram(svgOrRoot, { dark, seed })` — apply the Excalidraw hand-drawn post-process (sequence diagrams especially).
 - `parseChecks(code)` / `stripCheckDirectives(code)` / `mergeChecks(base, overrides)` — the `%% @check` directive parser.

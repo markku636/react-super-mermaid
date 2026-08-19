@@ -4,8 +4,9 @@ import { defineConfig } from 'tsup';
 const USE_CLIENT = "'use client';\n";
 
 export default defineConfig({
-  // index = React 元件入口(含 'use client');editor = 框架無關繪製/round-trip 引擎(零 React)。
-  entry: { index: 'src/index.ts', editor: 'src/editor.ts' },
+  // index = React 元件入口(含 'use client');editor = 框架無關繪製/round-trip 引擎(零 React);
+  // orid = 只有 ORID 轉譯的極小入口(自行呼叫 mermaid.render 的 host 用)。
+  entry: { index: 'src/index.ts', editor: 'src/editor.ts', orid: 'src/orid.ts' },
   format: ['esm', 'cjs'],
   target: 'es2020',
   dts: true,

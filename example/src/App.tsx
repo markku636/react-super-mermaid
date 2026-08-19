@@ -94,6 +94,25 @@ const PIPELINE_WITH_TIPS = `flowchart LR
 %% @tip "結算 worker" 消費者群組 settle-cg,失敗會重排(最多 3 次)
 %% @tip REJ 退件會回 webhook 給上游,帶 reject_reason`;
 
+// ORID:mermaid 沒有這個圖種 —— 送進 mermaid 前由 transpileOrid 轉成等價 flowchart,
+// 所以主題 / pan-zoom / 搜尋 / 匯出 / @check / @tip 全部照用。
+const ORID_RETRO = `orid
+    title 上線後回顧會議
+    objective
+        上線後錯誤率 3.2%
+        平均延遲 850ms
+        客訴 12 件
+    reflective
+        團隊感到焦慮
+        使用者抱怨變多
+    interpretive
+        監控缺口是根因
+    decisional
+        補上告警 @mark 8/25
+        加壓力測試 @amy 9/1
+
+%% @tip O1 錯誤率取自 APM 的 5xx / 總請求,只算成功部署後 30 分鐘
+%% @tip D1 告警門檻沿用 SLO:錯誤率 > 1% 持續 5 分鐘`;
 /**
  * 程式化提示:與原始碼裡的 `%% @check` 合併,同 target 以這裡為準。
  * 這則示範「host 想補一個原始碼沒寫的節點」。
@@ -213,6 +232,20 @@ export function App(): React.JSX.Element {
             // 程式化補充/覆寫:DONE 在原始碼裡沒寫 @tip,由 host 補上。
             tips={{ DONE: '結算完成後 5 分鐘內對帳,對不平會進人工覆核' }}
           />
+        </div>
+      </section>
+
+      <section>
+        <h2>5) ORID 焦點討論（mermaid 沒有的圖種）</h2>
+        <p style={{ color: '#6b7280', fontSize: 13, margin: '0 0 8px' }}>
+          <code>orid</code> → <code>objective / reflective / interpretive / decisional</code>，
+          每段一串條列。送進 mermaid 前由 <code>transpileOrid</code> 轉成等價 flowchart，
+          所以主題、pan/zoom、搜尋、匯出、<code>%% @tip</code> 全部照用（項目 id 是 O1 / R2 / I1 / D3…）。
+          <br />
+          把滑鼠停在「上線後錯誤率 3.2%」或「補上告警」上看提示。
+        </p>
+        <div style={{ height: 560 }}>
+          <MermaidViewer code={ORID_RETRO} toolbar theme={theme} />
         </div>
       </section>
     </main>

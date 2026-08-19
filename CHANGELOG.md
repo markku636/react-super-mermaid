@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.28.0 — ORID, a diagram type mermaid doesn't have
+
+Running a retrospective with mermaid meant picking a diagram that wasn't about retrospectives and
+rebuilding the structure by hand every time — four subgraphs, four colour rules, arrows between
+them, and no help from the tool when a stage was left empty. ORID is now its own diagram type.
+
+- **New**: `orid` source — `title`, then `objective` / `reflective` / `interpretive` / `decisional`
+  stage lines, then one indented line per item. Stages render in canonical O→R→I→D order however
+  they were written, each as a colour-coded band (blue facts → orange feelings → purple meaning →
+  green action) with its items laid out in rows. A declared-but-empty stage renders as a dashed
+  placeholder rather than a collapsed sliver.
+- **How it works**: `transpileOrid(code)` rewrites ORID into an equivalent `flowchart TB` *before*
+  mermaid parses it, so nothing downstream had to learn a new diagram type — both themes, dark mode,
+  pan/zoom, search, SVG/PNG export, `%% @check` and `%% @tip` all work on ORID unchanged. Item ids
+  are `O1` / `R2` / `I1` / `D3`, so directives can target them.
+- **New entry point**: `react-super-mermaid/orid` (~10 KB, no React, no editor) for hosts that call
+  `mermaid.render` themselves. `renderDiagram`, `MermaidViewer` and `MermaidEditor` transpile
+  internally — there is nothing to wire up.
+- **Editor**: ORID has no coordinates to drag, so — like `timeline` — it opens a structured form
+  (four stage cards, add / remove / reorder items, live preview) instead of the canvas. The form
+  dispatch is now a keyword → factory table rather than a hard-coded `timeline` branch.
+- Single-letter stage abbreviations are deliberately not accepted: an English item beginning
+  `I feel…` would have silently opened an Interpretive stage and swallowed the rest of the block.
+  Serialization re-adds a `- ` prefix to any item that would re-parse as a stage keyword, so a
+  round-trip through the editor cannot eat an item.
+- **Fix (all diagram types)**: `~~~` invisible links were being repainted as visible slate lines by
+  the `colorful` post-process. They now stay invisible, which is the entire point of writing one.
+
 ## 0.27.1 — the hand-drawn button did nothing on a sequence diagram
 
 Pressing ✏ 手繪 on a sequence diagram changed one thing: it dropped the soft shadow under the

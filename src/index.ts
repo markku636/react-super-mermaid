@@ -47,6 +47,23 @@ export type {
   Tool,
 } from './core/editor';
 
+// ── ORID(焦點討論法)—— 自訂圖種,渲染前轉譯成原生 flowchart ──
+// transpileOrid 是唯一需要串接的函式:對非 ORID 原始碼零成本直通,
+// 只有自行呼叫 mermaid.render 的 host(而非本套件的 renderDiagram / MermaidViewer)才需要。
+export {
+  ORID_STAGES,
+  emptyOridModel,
+  orderedStages,
+  oridStageByKeyword,
+  oridStageSpec,
+  parseOrid,
+  serializeOrid,
+  stageHeading,
+} from './core/orid/model';
+export type { OridModel, OridStage, OridStageKey, OridStageSpec } from './core/orid/model';
+export { isOridSource, oridToMermaid, transpileOrid } from './core/orid/transpile';
+export { ORID_PALETTE, oridItemClass, oridStageClass } from './core/orid/theme';
+
 // ── core(框架無關) ──
 export { renderDiagram } from './core/render-pipeline';
 export { loadMermaid } from './core/load-mermaid';

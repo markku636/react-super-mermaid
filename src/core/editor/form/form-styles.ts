@@ -49,6 +49,17 @@ const CSS = `
 .rsm-form-addbtn:hover{border-color:var(--rsm-form-accent);background:color-mix(in srgb,var(--rsm-form-accent) 8%,transparent);}
 .rsm-form-add-event{font-size:12px;padding:3px 9px;}
 .rsm-form-add-section{font-weight:600;}
+
+/* ── ORID:四段各有語意主色(--rsm-orid-accent 由 orid-editor 逐卡設定) ── */
+.rsm-orid-stage{border-left:4px solid var(--rsm-orid-accent,var(--rsm-form-accent));}
+.rsm-orid-stage .rsm-orid-tag{color:var(--rsm-orid-accent,var(--rsm-form-accent));font-size:13px;}
+.rsm-orid-stage .rsm-form-input:focus{border-color:var(--rsm-orid-accent,var(--rsm-form-accent));
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--rsm-orid-accent,var(--rsm-form-accent)) 30%,transparent);}
+.rsm-orid-stage .rsm-form-addbtn{color:var(--rsm-orid-accent,var(--rsm-form-accent));}
+.rsm-orid-hint{font-size:12px;color:var(--rsm-form-muted);margin:-2px 0 8px;line-height:1.45;}
+.rsm-orid-missing{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:6px;}
+.rsm-orid-missing .rsm-form-section-tag{margin-right:2px;}
+.rsm-orid-add-stage{margin-top:0;font-size:13px;}
 `;
 
 export function ensureFormStyles(): void {

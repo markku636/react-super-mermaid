@@ -178,8 +178,58 @@ gitGraph
   commit
 ```
 
+### ORID — a diagram type mermaid doesn't have
+
+The ICA **focused conversation** method as a diagram: four fixed stages, drawn as a vertical funnel
+with one colour-coded band per stage.
+
+> ℹ️ The fence below is deliberately **not** tagged `mermaid` — GitHub renders fences with vanilla
+> mermaid, which has never heard of `orid`. It renders as a diagram anywhere this library does the
+> rendering (viewer, editor, VS Code extension, Slack app, Jira/Confluence panel).
+
+```text
+orid
+    title Post-launch review
+    objective
+        Error rate 3.2%
+        p95 latency 850ms
+        12 support tickets
+    reflective
+        The team feels anxious
+        Users are complaining more
+    interpretive
+        The monitoring gap is the root cause
+    decisional
+        Add alerting @mark 8/25
+        Add a load test @amy 9/1
+```
+
+| | |
+|---|---|
+| **O**bjective | What did we see or hear? Verifiable facts only. |
+| **R**eflective | Gut reactions and feelings — no justification required. |
+| **I**nterpretive | What does it mean? Root causes, insights. |
+| **D**ecisional | What will we do? Who owns it, by when. |
+
+Stages render in canonical O→R→I→D order however you write them; a declared-but-empty stage shows a
+dashed placeholder. Items go one per indented line — prefix with `-` when an item itself starts with
+a stage keyword (`- objective is a vague word`), otherwise it would open a new stage.
+
+Under the hood `transpileOrid()` rewrites ORID into an equivalent `flowchart TB` before mermaid sees
+it, so **every** existing capability applies unchanged: both themes, dark mode, pan/zoom, search,
+SVG/PNG export, `%% @check`, `%% @tip` (item ids are `O1`, `R2`, `I1`, `D3`…). If you call
+`mermaid.render` yourself, import the ~10 KB subpath entry:
+
+```ts
+import { transpileOrid } from 'react-super-mermaid/orid';
+
+await mermaid.render(id, transpileOrid(source)); // non-ORID source passes straight through
+```
+
 ## Features
 
+- 🧭 **ORID diagrams** — the focused-conversation method as a first-class diagram type (mermaid has
+  no such thing), transpiled to a flowchart at render time so every other feature applies to it.
 - 🎨 **Beautified themes** — `colorful` (palette + shadows) and `sketch` (Excalidraw hand-drawn), plus native themes and `auto`.
 - 🧰 **Toolbox or diagram-only** — show the built-in toolbar, or just the chart with `toolbar={false}`.
 - 🔍 **In-diagram search** — highlight + pan to matches (`/` or `Ctrl/Cmd+F`).

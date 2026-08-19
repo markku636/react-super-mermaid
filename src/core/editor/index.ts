@@ -44,7 +44,7 @@ export type { LayoutEngine, LayoutContext } from './layout/types';
 export { sceneToFlowchart } from './round-trip/flowchart/serialize';
 export { flowDbToScene } from './round-trip/flowchart/parse';
 
-// timeline 等資料圖表的 form 子編輯器(由 controller 在偵測到 timeline 時惰性接管)。
+// timeline / orid 等資料圖表的 form 子編輯器(由 controller 偵測到關鍵字時惰性接管)。
 export { createTimelineForm } from './form/timeline-editor';
 export type { TimelineFormHandle, TimelineFormOptions } from './form/timeline-editor';
 export {
@@ -53,6 +53,24 @@ export {
   emptyTimelineModel,
 } from './form/timeline-model';
 export type { TimelineModel, TimelineSection, TimelinePeriod } from './form/timeline-model';
+export { createOridForm } from './form/orid-editor';
+export type { OridFormHandle, OridFormOptions } from './form/orid-editor';
+export type { FormEditorHandle } from './form/types';
+
+// ── ORID(焦點討論法)—— 本專案自訂圖種,渲染前轉譯成原生 flowchart ──
+export {
+  ORID_STAGES,
+  emptyOridModel,
+  orderedStages,
+  oridStageByKeyword,
+  oridStageSpec,
+  parseOrid,
+  serializeOrid,
+  stageHeading,
+} from '../orid/model';
+export type { OridModel, OridStage, OridStageKey, OridStageSpec } from '../orid/model';
+export { isOridSource, oridToMermaid, transpileOrid } from '../orid/transpile';
+export { ORID_PALETTE, oridItemClass, oridStageClass } from '../orid/theme';
 
 export type { Tool } from './interaction/pointer';
 export { History } from './interaction/commands';

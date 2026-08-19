@@ -134,11 +134,12 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   );
 
   // sequence 不吃自由拖曳建點/連線(改右鍵新增參與者/訊息);mindmap/sequence 無流程方向。
-  // timeline 走結構化表單(非畫布),所有畫布工具(選取/連線/縮放/整理)都隱藏。
+  // timeline / orid 走結構化表單(非畫布),所有畫布工具(選取/連線/縮放/整理)都隱藏。
   const isSeq = props.diagramType === 'sequence';
   // 訊息 / 筆記不是 node,以 `seq:{index}` 這個假 id 進選取集合(見 controller 的 refreshOverlay)。
   const seqStatementSelected = (props.selection ?? []).some((id) => id.startsWith('seq:'));
-  const isTimeline = props.diagramType === 'timeline';
+  // 資料圖表(timeline / orid)由 form 子編輯器接管,整條畫布工具列都沒有意義。
+  const isFormMode = props.diagramType === 'timeline' || props.diagramType === 'orid';
   const hasDirection =
     props.diagramType === 'flowchart' ||
     props.diagramType === 'state' ||
@@ -163,7 +164,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
   const isC4 = props.diagramType === 'c4';
   // 有沒有連線這回事由 adapter 能力決定(而不是在這裡列圖種名單)。
   const hasEdges = caps?.supportsEdges !== false;
-  const showEdgeStyle = !isSeq && !isTimeline && !isReq && hasEdges && !isC4 && caps !== null;
+  const showEdgeStyle = !isSeq && !isFormMode && !isReq && hasEdges && !isC4 && caps !== null;
   const showLineKinds = showEdgeStyle && lineKinds.length > 1;
   const showArrowEnd = showEdgeStyle && arrowHeads.length > 1;
   // 雙向箭頭(`<-->`)目前只在 flowchart 有明確語法。
@@ -172,23 +173,29 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
 
   return (
     <div className="rsm-toolbar rsm-editor-toolbar">
-      {!isTimeline && toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
-      {!isTimeline &&
+      {!isFormMode && toolBtn('select', '➤ 選取', '選取 / 移動（V）')}
+      {!isFormMode &&
         hasEdges &&
         toolBtn(
           'edge-create',
           isSeq ? '↘ 訊息' : '↘ 連線',
           isSeq ? '從一條生命線拖到另一條，插入一則訊息（E）' : '從節點拉出連線（E）',
         )}
-      {!isTimeline && toolBtn('pan', '✋ 平移', '平移畫布')}
+      {!isFormMode && toolBtn('pan', '✋ 平移', '平移畫布')}
 
-      {isTimeline && <span className="rsm-tb-hint">時間軸：在左側表單編輯區段 / 時間點 / 事件</span>}
+      {isFormMode && (
+        <span className="rsm-tb-hint">
+          {props.diagramType === 'orid'
+            ? 'ORID：在左側表單編輯四個階段的項目'
+            : '時間軸：在左側表單編輯區段 / 時間點 / 事件'}
+        </span>
+      )}
 
-      {!isSeq && !isTimeline && <span className="rsm-tb-sep" aria-hidden="true" />}
+      {!isSeq && !isFormMode && <span className="rsm-tb-sep" aria-hidden="true" />}
 
       {/* 一鍵新增節點(常用外形直接攤開 + 「更多外形」下拉);sequence/timeline 不適用 */}
       {!isSeq &&
-        !isTimeline &&
+        !isFormMode &&
         quickShapes.map((shape) => {
           const m = shapeMeta(shape);
           return (
@@ -205,7 +212,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
             </button>
           );
         })}
-      {!isSeq && !isTimeline && moreShapes.length > 0 && (
+      {!isSeq && !isFormMode && moreShapes.length > 0 && (
         <select
           className="rsm-btn"
           title="更多外形（新增節點）"
@@ -325,13 +332,13 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       <button type="button" className="rsm-btn" disabled={!props.canRedo} onClick={() => h?.redo()} title="重做（Ctrl+Y）">
         ↷
       </button>
-      {!isTimeline && (
+      {!isFormMode && (
         <button type="button" className="rsm-btn" onClick={() => h?.deleteSelection()} title="刪除選取（Del）">
           🗑
         </button>
       )}
 
-      {!isTimeline && (
+      {!isFormMode && (
         <>
           <span className="rsm-tb-sep" aria-hidden="true" />
           <button type="button" className="rsm-btn" onClick={() => h?.zoomOut()} title="縮小">
@@ -381,7 +388,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
       >
         {copied ? '✓ 已複製' : '⧉ 複製'}
       </button>
-      {!isTimeline && (
+      {!isFormMode && (
         <button
           type="button"
           className={`rsm-btn${look === 'sketch' ? ' rsm-btn-active' : ''}`}
@@ -391,7 +398,7 @@ export function EditorToolbar(props: EditorToolbarProps): React.JSX.Element {
           ✏ 手繪
         </button>
       )}
-      {!isTimeline && (
+      {!isFormMode && (
         <button type="button" className="rsm-btn" onClick={() => h?.toggleHelp()} title="鍵盤快捷鍵說明（?）">
           ?
         </button>

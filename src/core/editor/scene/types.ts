@@ -26,7 +26,8 @@ export type DiagramType =
   | 'block'
   | 'packet'
   | 'gitgraph'
-  | 'timeline';
+  | 'timeline'
+  | 'orid';
 
 /** 節點外形 — 先填 flowchart / state 值,後續圖種(class/er/sequence)再擴充。 */
 export type NodeShape =
@@ -350,8 +351,9 @@ export type SceneMeta =
   /** relative = 原始碼用的是 +N 相對寬度而非絕對位元範圍;沿用作者的寫法。 */
   | { type: 'packet'; title?: string; relative: boolean }
   | { type: 'gitgraph' }
-  // timeline 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
-  | { type: 'timeline' };
+  // timeline / orid 等「資料圖表」不吃 node/edge 場景,內容由 form 編輯器自管;此處只保留判別式。
+  | { type: 'timeline' }
+  | { type: 'orid' };
 
 /** round-trip 時 DB 看不到 / 尚未模型化的內容,逐字保留。 */
 export interface SceneRaw {
@@ -421,6 +423,7 @@ const EMPTY_META: Record<DiagramType, SceneMeta> = {
   packet: { type: 'packet', relative: false },
   gitgraph: { type: 'gitgraph' },
   timeline: { type: 'timeline' },
+  orid: { type: 'orid' },
   er: { type: 'er' },
 };
 

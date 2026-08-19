@@ -3,6 +3,15 @@
 // 純 DOM 操作,需在瀏覽器端執行;每個 pass 在零命中時自動跳過,
 // 故 mermaid 的 DOM 結構變動不會讓渲染中斷。
 
+import {
+  ORID_EMPTY_CLASS,
+  ORID_PALETTE,
+  oridItemClass,
+  oridStageClass,
+  type OridPaletteEntry,
+} from '../orid/theme';
+import type { OridStageKey } from '../orid/model';
+
 export interface ColorizeOptions {
   dark?: boolean;
 }
@@ -199,6 +208,12 @@ function styleEdges(svg: Element, dark: boolean): void {
     'path.relationshipLine',
   ].join(', ');
   for (const edge of Array.from(svg.querySelectorAll<SVGElement>(edgeSelectors))) {
+    // `~~~` 隱形連線只是排版用的骨架(ORID 的項目列就靠它),不能被重新上色畫成實線。
+    if (edge.classList.contains('edge-thickness-invisible')) {
+      edge.style.stroke = 'none';
+      edge.style.strokeWidth = '0';
+      continue;
+    }
     edge.style.stroke = edgeColor;
     edge.style.strokeWidth = '1.7px';
     edge.style.strokeLinecap = 'round';
@@ -632,6 +647,97 @@ function styleQuadrant(svg: Element, dark: boolean): void {
  * 字體清晰度:對「任何主題」渲染出的圖加重文字字重,小字與縮圖也讀得清楚。
  * 只動 font-weight(不改色),故對原生 neutral/forest/dark 主題也安全,不會打架。
  */
+/**
+ * ORID 圖的語意配色。
+ *
+ * 一般 flowchart 的節點是「依 DOM 順序輪播調色盤」,但 ORID 的顏色是有意義的
+ * (藍=事實 / 橘=感受 / 紫=詮釋 / 綠=行動),同一階段的項目必須同色才看得出分段。
+ * 所以這裡不看順序,只看轉譯器種在節點上的類名(見 orid/theme.ts),
+ * 在通用 pass 之後覆蓋回正確的顏色。非 ORID 圖零命中、直接早退。
+ */
+function styleOrid(svg: Element, dark: boolean): void {
+  // 轉譯器產生的 classDef 會被 mermaid 寫成帶 !important 的 <style> 規則
+  // (`.oridItemO>*{fill:…!important}`),普通 inline style 蓋不過去 ——
+  // 深色模式下就會變成「淺底 + 淺字」的看不見。故這裡一律用 important 寫回。
+  const set = (el: ElementCSSInlineStyle, prop: string, value: string): void =>
+    el.style.setProperty(prop, value, 'important');
+
+  const paint = (group: Element, entry: OridPaletteEntry, cluster: boolean): void => {
+    const fill = cluster
+      ? dark
+        ? entry.stageFillDark
+        : entry.stageFill
+      : dark
+        ? entry.itemFillDark
+        : entry.itemFill;
+    const stroke = cluster ? entry.stageStroke : entry.itemStroke;
+    for (const shape of Array.from(
+      group.querySelectorAll<SVGElement>(':scope > rect, :scope > polygon, :scope > path'),
+    )) {
+      set(shape, 'fill', fill);
+      set(shape, 'stroke', stroke);
+      set(shape, 'stroke-width', '1.5px');
+      shape.style.removeProperty('stroke-dasharray');
+      roundRect(shape, cluster ? 10 : 8);
+    }
+  };
+
+  /** 項目文字:底色深淺跟著主題走,字色也得跟著翻,否則對比會歸零。 */
+  const paintText = (group: Element, color: string): void => {
+    for (const el of Array.from(group.querySelectorAll<SVGTextElement>('text, tspan'))) {
+      set(el, 'fill', color);
+    }
+    for (const el of Array.from(group.querySelectorAll<HTMLElement>('.nodeLabel, span, p'))) {
+      set(el, 'color', color);
+    }
+  };
+
+  let hit = false;
+  const itemText = dark ? '#E2E8F0' : NODE_TEXT;
+  for (const key of Object.keys(ORID_PALETTE) as OridStageKey[]) {
+    const entry = ORID_PALETTE[key];
+    for (const node of Array.from(svg.querySelectorAll<SVGGElement>(`g.node.${oridItemClass(key)}`))) {
+      hit = true;
+      paint(node, entry, false);
+      paintText(node, itemText);
+    }
+    for (const cluster of Array.from(
+      svg.querySelectorAll<SVGGElement>(`g.cluster.${oridStageClass(key)}`),
+    )) {
+      hit = true;
+      paint(cluster, entry, true);
+      // 段落標題用該階段的主色 + 粗體,四段的節奏一眼看得出來。
+      const label = cluster.querySelector(':scope > .cluster-label');
+      if (!label) continue;
+      paintText(label, entry.stageStroke);
+      for (const el of Array.from(
+        label.querySelectorAll<SVGTextElement | HTMLElement>('text, tspan, .nodeLabel, span, p'),
+      )) {
+        set(el, 'font-weight', '700');
+      }
+      for (const lr of Array.from(label.querySelectorAll<SVGElement>('rect'))) {
+        set(lr, 'fill', 'transparent');
+      }
+    }
+  }
+  if (!hit) return;
+
+  // 空階段的佔位塊:通用 pass 會把它塗成實心色票,這裡改回虛線淡框(「這段還沒填」)。
+  const muted = dark ? '#64748B' : '#94A3B8';
+  for (const node of Array.from(svg.querySelectorAll<SVGGElement>(`g.node.${ORID_EMPTY_CLASS}`))) {
+    for (const shape of Array.from(
+      node.querySelectorAll<SVGElement>(':scope > rect, :scope > polygon, :scope > path'),
+    )) {
+      set(shape, 'fill', 'transparent');
+      set(shape, 'stroke', muted);
+      set(shape, 'stroke-width', '1px');
+      set(shape, 'stroke-dasharray', '4 4');
+      shape.removeAttribute('filter');
+    }
+    paintText(node, muted);
+  }
+}
+
 export function boostLegibility(root: ParentNode): void {
   const svg = resolveSvg(root);
   if (!svg) {
@@ -722,4 +828,8 @@ export function colorizeDiagram(root: ParentNode, opts: ColorizeOptions = {}): v
   } else if (kind === 'quadrantChart') {
     styleQuadrant(svg, dark);
   }
+
+  // ORID 轉譯出來的就是一張 flowchart(aria-roledescription 也是 flowchart),
+  // 故不走上面的分派,改以類名偵測;必須排在通用節點 / 叢集 pass 之後才蓋得掉輪播配色。
+  styleOrid(svg, dark);
 }

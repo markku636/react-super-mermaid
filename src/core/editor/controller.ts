@@ -13,7 +13,9 @@ import {
 import type { ExportRasterOptions, MermaidSource, MermaidTheme } from '../../types';
 import { getAdapter, detectDiagramType, firstKeyword } from './adapters/registry';
 import type { DiagramCapabilities } from './adapters/types';
-import { createTimelineForm, type TimelineFormHandle } from './form/timeline-editor';
+import { createOridForm } from './form/orid-editor';
+import { createTimelineForm } from './form/timeline-editor';
+import type { FormEditorHandle } from './form/types';
 import { mermaidSvgLayout } from './layout/mermaid-svg-layout';
 import {
   History,
@@ -198,8 +200,23 @@ export interface DiagramEditorHandle {
   destroy(): void;
 }
 
-// 走 form 子編輯器(而非畫布)的圖種關鍵字。timeline 是資料圖表,內容為 section/period/event。
-const FORM_KEYWORDS = new Set(['timeline']);
+// 走 form 子編輯器(而非畫布)的圖種。這些是「資料圖表」——
+// timeline 是 section/period/event、orid 是四階段條列 —— 都沒有座標可拖,
+// 硬塞進畫布只會做出一個不能存回原始碼的假編輯。關鍵字 → 建構子的對照表。
+const FORM_FACTORIES: Record<
+  string,
+  { type: DiagramType; create: (host: HTMLElement, o: FormFactoryOptions) => FormEditorHandle }
+> = {
+  timeline: { type: 'timeline', create: createTimelineForm },
+  orid: { type: 'orid', create: createOridForm },
+};
+
+interface FormFactoryOptions {
+  mermaid?: MermaidSource;
+  dark?: boolean;
+  fontUrl?: string;
+  emit?: (event: string, payload?: unknown) => void;
+}
 
 // 右鍵可快速切換的外形 = 目前圖種 adapter 宣告支援的外形。
 // (先前寫死 flowchart 那 11 種,於是在狀態圖 / 類別圖 / ER 圖上按右鍵會看到一排「圓柱、梯形」,
@@ -431,6 +448,12 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
         '   checkout main\n   commit id: "修正"\n   merge feature tag: "v1.0"',
     ],
     ['時間軸', 'timeline\n  title 時間軸標題\n  section 區段一\n    時間點 : 事件'],
+    [
+      'ORID',
+      'orid\n    title ORID 焦點討論\n    objective\n        看到的事實一\n        看到的事實二\n' +
+        '    reflective\n        當下的感受\n    interpretive\n        這代表什麼\n' +
+        '    decisional\n        下一步要做什麼',
+    ],
   ];
   function updateEmptyHint(): void {
     if (formActive) {
@@ -478,8 +501,10 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
   };
   let cancelTextEdit: (() => void) | null = null;
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  // timeline 等「資料圖表」不吃畫布拖拉,改走結構化 form 子編輯器(惰性建立、接管 handle 子集)。
-  let form: TimelineFormHandle | null = null;
+  // timeline / orid 等「資料圖表」不吃畫布拖拉,改走結構化 form 子編輯器(惰性建立、接管 handle 子集)。
+  let form: FormEditorHandle | null = null;
+  /** 目前這個 form 實例是哪一種(切換圖種時要整個換掉,不能沿用)。 */
+  let formKeyword: string | null = null;
   let formActive = false;
 
   const adapterFor = (type: DiagramType) => getAdapter(type) ?? getAdapter('flowchart');
@@ -1305,20 +1330,28 @@ export function createDiagramEditor(host: HTMLElement, opts: DiagramEditorOption
     },
     loadSource: async (text: string) => {
       try {
-        // timeline 等資料圖表 → form 子編輯器(惰性建立、隱藏畫布)。
-        if (FORM_KEYWORDS.has(firstKeyword(text))) {
+        // timeline / orid 等資料圖表 → form 子編輯器(惰性建立、隱藏畫布)。
+        const kw = firstKeyword(text);
+        const factory = FORM_FACTORIES[kw];
+        if (factory) {
+          // 換了另一種 form(timeline ↔ orid)就整個換掉實例,不沿用舊表單的 DOM 與歷史。
+          if (form && formKeyword !== kw) {
+            form.destroy();
+            form = null;
+          }
           if (!form) {
-            form = createTimelineForm(host, {
+            form = factory.create(host, {
               mermaid: opts.mermaid,
               dark,
               fontUrl: opts.fontUrl,
-              // change 事件補帶 timeline 場景(host 期望 payload 為 scene);其餘原樣轉發。
+              // change 事件補帶場景(host 期望 payload 為 scene);其餘原樣轉發。
               emit: (e, p) => emit(e as EditorEvent, e === 'change' ? scene : p),
             });
+            formKeyword = kw;
           }
           formActive = true;
-          scene = emptyScene('timeline');
-          diagramType = 'timeline';
+          scene = emptyScene(factory.type);
+          diagramType = factory.type;
           svg.style.display = 'none';
           emptyHint.style.display = 'none';
           form.show();

@@ -1,28 +1,32 @@
-// Timeline 表單編輯器(框架無關)。timeline 不吃畫布拖拉,故用「結構化表單 + 即時預覽」:
-// 左側編輯 section / time-period / events,右側即時渲染 mermaid。所有變更序列化回 mermaid
-// 並透過 emit 回呼通知 host(VS Code webview / React)寫回原檔。
+// ORID 表單編輯器(框架無關)。ORID 是條列式的引導討論資料,不是自由拖拉的畫布圖,
+// 故沿用 timeline 的「結構化表單 + 即時預覽」模式:左側四段固定卡片(O/R/I/D)可增刪、
+// 排序項目,右側即時渲染。所有變更序列化回 ORID 原始碼並透過 emit 通知 host 寫回原檔。
 //
-// 由 controller.createDiagramEditor 在偵測到 timeline 時惰性建立並接管 handle 的子集。
+// 與 timeline 的差別:階段是固定的四個、順序不可改(那正是 ORID 的方法論本身),
+// 所以卡片沒有「上移 / 下移 / 刪除階段」,改成「這段先不談 → 收合(移除)/ 加回來」。
+//
+// 由 controller.createDiagramEditor 在偵測到 orid 時惰性建立並接管 handle 的子集。
 
 import { assertBrowser } from '../../../env';
 import { renderDiagram } from '../../render-pipeline';
-import {
-  prepareSvgElement,
-  rasterizeToBlob,
-  flattenForeignObjects,
-} from '../../export';
+import { prepareSvgElement, rasterizeToBlob, flattenForeignObjects } from '../../export';
 import type { MermaidSource } from '../../../types';
 import {
-  parseTimeline,
-  serializeTimeline,
-  type TimelineModel,
-  type TimelineSection,
-  type TimelinePeriod,
-} from './timeline-model';
+  ORID_STAGES,
+  emptyOridModel,
+  orderedStages,
+  oridStageSpec,
+  parseOrid,
+  serializeOrid,
+  type OridModel,
+  type OridStage,
+  type OridStageKey,
+} from '../../orid/model';
+import { ORID_PALETTE } from '../../orid/theme';
 import { ensureFormStyles } from './form-styles';
 import type { FormEditorHandle } from './types';
 
-export interface TimelineFormOptions {
+export interface OridFormOptions {
   mermaid?: MermaidSource;
   dark?: boolean;
   fontUrl?: string;
@@ -30,8 +34,8 @@ export interface TimelineFormOptions {
   emit?: (event: string, payload?: unknown) => void;
 }
 
-export interface TimelineFormHandle extends FormEditorHandle {
-  getModel(): TimelineModel;
+export interface OridFormHandle extends FormEditorHandle {
+  getModel(): OridModel;
 }
 
 type Attrs = Record<string, string | undefined>;
@@ -52,16 +56,16 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const clone = (m: TimelineModel): TimelineModel => JSON.parse(JSON.stringify(m)) as TimelineModel;
+const clone = (m: OridModel): OridModel => JSON.parse(JSON.stringify(m)) as OridModel;
 
-export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions = {}): TimelineFormHandle {
-  assertBrowser('createTimelineForm');
+export function createOridForm(host: HTMLElement, opts: OridFormOptions = {}): OridFormHandle {
+  assertBrowser('createOridForm');
   ensureFormStyles();
 
   let dark = opts.dark ?? false;
-  let model: TimelineModel = { sections: [] };
-  const undoStack: TimelineModel[] = [];
-  const redoStack: TimelineModel[] = [];
+  let model: OridModel = { stages: [] };
+  const undoStack: OridModel[] = [];
+  const redoStack: OridModel[] = [];
   let lastPreviewSvg: SVGSVGElement | null = null;
   let previewTimer: ReturnType<typeof setTimeout> | null = null;
   let mermaidTimer: ReturnType<typeof setTimeout> | null = null;
@@ -69,7 +73,7 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
   /** 重建表單後要自動聚焦的輸入(由結構操作設定)。 */
   let focusKey: string | null = null;
 
-  const root = el('div', { class: 'rsm-form-root' });
+  const root = el('div', { class: 'rsm-form-root rsm-orid-root' });
   const pane = el('div', { class: 'rsm-form-pane' });
   const preview = el('div', { class: 'rsm-form-preview' });
   root.append(pane, preview);
@@ -88,8 +92,9 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
 
   async function doRenderPreview(): Promise<void> {
     if (destroyed) return;
-    const code = serializeTimeline(model);
+    const code = serializeOrid(model);
     try {
+      // renderDiagram 內部會轉譯 ORID → flowchart,故這裡直接餵 ORID 原始碼即可。
       const { svg } = await renderDiagram({
         code,
         container: preview,
@@ -112,12 +117,12 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
   /** mermaidchange 寫回防抖(對齊畫布編輯器,避免每個按鍵都觸發 host 寫回原檔)。 */
   function emitMermaidDebounced(): void {
     if (mermaidTimer) clearTimeout(mermaidTimer);
-    mermaidTimer = setTimeout(() => emit('mermaidchange', serializeTimeline(model)), 220);
+    mermaidTimer = setTimeout(() => emit('mermaidchange', serializeOrid(model)), 220);
   }
 
   /** 文字編輯:即時更新模型 + 預覽 + 寫回,但不重建表單(保留游標)。 */
   function softSync(): void {
-    emit('change'); // 即時(供 React 原始碼面板 / 型別),mermaidchange 寫回則防抖
+    emit('change');
     emitMermaidDebounced();
     schedulePreview();
   }
@@ -152,7 +157,7 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
     });
     input.addEventListener('change', () => {
       if (baseline !== null && baseline !== JSON.stringify(model)) {
-        undoStack.push(JSON.parse(baseline) as TimelineModel);
+        undoStack.push(JSON.parse(baseline) as OridModel);
         if (undoStack.length > 100) undoStack.shift();
         redoStack.length = 0;
         emitHistory();
@@ -161,12 +166,17 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
     });
   }
 
-  function iconBtn(glyph: string, title: string, onClick: () => void, opts2: { danger?: boolean; disabled?: boolean } = {}): HTMLButtonElement {
-    const b = el('button', {
-      type: 'button',
-      class: 'rsm-form-iconbtn' + (opts2.danger ? ' rsm-form-del' : ''),
-      title,
-    }, [glyph]);
+  function iconBtn(
+    glyph: string,
+    title: string,
+    onClick: () => void,
+    opts2: { danger?: boolean; disabled?: boolean } = {},
+  ): HTMLButtonElement {
+    const b = el(
+      'button',
+      { type: 'button', class: 'rsm-form-iconbtn' + (opts2.danger ? ' rsm-form-del' : ''), title },
+      [glyph],
+    );
     if (opts2.disabled) b.disabled = true;
     b.addEventListener('click', onClick);
     return b;
@@ -178,98 +188,98 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
     return b;
   }
 
-  function renderEvent(section: TimelineSection, period: TimelinePeriod, ei: number): HTMLElement {
+  function swap<T>(arr: T[], a: number, b: number): void {
+    if (a < 0 || b < 0 || a >= arr.length || b >= arr.length) return;
+    [arr[a], arr[b]] = [arr[b], arr[a]];
+  }
+
+  const stageOf = (key: OridStageKey): OridStage | undefined => model.stages.find((s) => s.key === key);
+
+  function renderItem(stage: OridStage, index: number): HTMLElement {
     const row = el('div', { class: 'rsm-form-event' });
     const input = el('input', {
       class: 'rsm-form-input',
       type: 'text',
-      value: period.events[ei],
-      placeholder: '事件',
+      value: stage.items[index],
+      placeholder: oridStageSpec(stage.key).hint,
     }) as HTMLInputElement;
     bindText(input, (v) => {
-      period.events[ei] = v;
+      stage.items[index] = v;
     });
-    if (focusKey === `e:${section.name}:${period.period}:${ei}`) setTimeout(() => input.focus(), 0);
+    if (focusKey === `i:${stage.key}:${index}`) setTimeout(() => input.focus(), 0);
     row.append(
       input,
-      iconBtn('✕', '刪除事件', () => mutate(() => period.events.splice(ei, 1)), { danger: true }),
+      iconBtn('↑', '上移項目', () => mutate(() => swap(stage.items, index, index - 1)), {
+        disabled: index === 0,
+      }),
+      iconBtn('↓', '下移項目', () => mutate(() => swap(stage.items, index, index + 1)), {
+        disabled: index === stage.items.length - 1,
+      }),
+      iconBtn('✕', '刪除項目', () => mutate(() => stage.items.splice(index, 1)), { danger: true }),
     );
     return row;
   }
 
-  function renderPeriod(section: TimelineSection, pi: number): HTMLElement {
-    const period = section.periods[pi];
-    const wrap = el('div', { class: 'rsm-form-period' });
-    const head = el('div', { class: 'rsm-form-period-head' });
-    const pInput = el('input', {
-      class: 'rsm-form-input',
-      type: 'text',
-      value: period.period,
-      placeholder: '時間點(如 Q1 / 2025-07)',
-    }) as HTMLInputElement;
-    bindText(pInput, (v) => {
-      period.period = v;
-    });
-    if (focusKey === `p:${section.name}:${pi}`) setTimeout(() => pInput.focus(), 0);
-    head.append(
-      pInput,
-      iconBtn('↑', '上移時間點', () => mutate(() => swap(section.periods, pi, pi - 1)), { disabled: pi === 0 }),
-      iconBtn('↓', '下移時間點', () => mutate(() => swap(section.periods, pi, pi + 1)), {
-        disabled: pi === section.periods.length - 1,
-      }),
-      iconBtn('✕', '刪除時間點', () => mutate(() => section.periods.splice(pi, 1)), { danger: true }),
-    );
-    wrap.append(head);
+  /** 已納入圖表的階段卡片。 */
+  function renderStage(stage: OridStage): HTMLElement {
+    const spec = oridStageSpec(stage.key);
+    const palette = ORID_PALETTE[stage.key];
+    const card = el('div', { class: 'rsm-form-section rsm-orid-stage' });
+    card.style.setProperty('--rsm-orid-accent', palette.itemStroke);
 
-    const events = el('div', { class: 'rsm-form-events' });
-    period.events.forEach((_, ei) => events.append(renderEvent(section, period, ei)));
-    events.append(
-      addBtn('＋ 事件', 'rsm-form-add-event', () =>
-        mutate(() => {
-          period.events.push('');
-          focusKey = `e:${section.name}:${period.period}:${period.events.length - 1}`;
-        }),
-      ),
-    );
-    wrap.append(events);
-    return wrap;
-  }
-
-  function renderSection(si: number): HTMLElement {
-    const section = model.sections[si];
-    const card = el('div', { class: 'rsm-form-section' });
     const head = el('div', { class: 'rsm-form-section-head' });
-    head.append(el('span', { class: 'rsm-form-section-tag' }, ['區段']));
-    const nameInput = el('input', {
+    head.append(
+      el('span', { class: 'rsm-form-section-tag rsm-orid-tag' }, [`${spec.ordinal} ${spec.zh}`]),
+    );
+    const headingInput = el('input', {
       class: 'rsm-form-input',
       type: 'text',
-      value: section.name ?? '',
-      placeholder: '區段名稱(可留空)',
+      value: stage.heading ?? '',
+      placeholder: `段落標題(留空 = ${spec.ordinal} ${spec.zh} · ${spec.en})`,
     }) as HTMLInputElement;
-    bindText(nameInput, (v) => {
-      section.name = v === '' ? null : v;
+    bindText(headingInput, (v) => {
+      stage.heading = v.trim() === '' ? undefined : v;
     });
-    if (focusKey === `s:${si}`) setTimeout(() => nameInput.focus(), 0);
+    if (focusKey === `h:${stage.key}`) setTimeout(() => headingInput.focus(), 0);
     head.append(
-      nameInput,
-      iconBtn('↑', '上移區段', () => mutate(() => swap(model.sections, si, si - 1)), { disabled: si === 0 }),
-      iconBtn('↓', '下移區段', () => mutate(() => swap(model.sections, si, si + 1)), {
-        disabled: si === model.sections.length - 1,
-      }),
-      iconBtn('✕', '刪除區段', () => mutate(() => model.sections.splice(si, 1)), { danger: true }),
+      headingInput,
+      iconBtn(
+        '✕',
+        `這次不談「${spec.zh}」(從圖表移除整段)`,
+        () =>
+          mutate(() => {
+            model.stages = model.stages.filter((s) => s.key !== stage.key);
+          }),
+        { danger: true },
+      ),
     );
     card.append(head);
+    card.append(el('div', { class: 'rsm-orid-hint' }, [spec.hint]));
 
-    section.periods.forEach((_, pi) => card.append(renderPeriod(section, pi)));
-    card.append(
-      addBtn('＋ 時間點', '', () =>
+    const items = el('div', { class: 'rsm-form-events' });
+    stage.items.forEach((_, i) => items.append(renderItem(stage, i)));
+    items.append(
+      addBtn('＋ 項目', 'rsm-form-add-event', () =>
         mutate(() => {
-          section.periods.push({ period: '', events: [] });
-          focusKey = `p:${section.name}:${section.periods.length - 1}`;
+          stage.items.push('');
+          focusKey = `i:${stage.key}:${stage.items.length - 1}`;
         }),
       ),
     );
+    card.append(items);
     return card;
+  }
+
+  /** 尚未納入的階段:一顆「加回來」按鈕,順序仍照 O→R→I→D 插回正確位置。 */
+  function renderMissingStage(key: OridStageKey): HTMLElement {
+    const spec = oridStageSpec(key);
+    return addBtn(`＋ ${spec.ordinal} ${spec.zh} · ${spec.en}`, 'rsm-orid-add-stage', () =>
+      mutate(() => {
+        model.stages.push({ key, items: [''] });
+        model.stages = orderedStages(model);
+        focusKey = `i:${key}:0`;
+      }),
+    );
   }
 
   function renderForm(): void {
@@ -282,7 +292,7 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
       class: 'rsm-form-input',
       type: 'text',
       value: model.title ?? '',
-      placeholder: '時間軸顯示標題',
+      placeholder: '例:上線後回顧會議',
     }) as HTMLInputElement;
     bindText(titleInput, (v) => {
       model.title = v;
@@ -290,37 +300,33 @@ export function createTimelineForm(host: HTMLElement, opts: TimelineFormOptions 
     titleRow.append(titleInput);
     pane.append(titleRow);
 
-    model.sections.forEach((_, si) => pane.append(renderSection(si)));
+    for (const stage of orderedStages(model)) pane.append(renderStage(stage));
 
-    pane.append(
-      addBtn('＋ 新增區段', 'rsm-form-add-section', () =>
-        mutate(() => {
-          model.sections.push({ name: '新區段', periods: [{ period: '時間點', events: ['事件'] }] });
-          focusKey = `s:${model.sections.length - 1}`;
-        }),
-      ),
-    );
+    const missing = ORID_STAGES.filter((spec) => !stageOf(spec.key));
+    if (missing.length > 0) {
+      const row = el('div', { class: 'rsm-orid-missing' });
+      row.append(el('span', { class: 'rsm-form-section-tag' }, ['加回階段']));
+      for (const spec of missing) row.append(renderMissingStage(spec.key));
+      pane.append(row);
+    }
 
     if (consumedFocus === focusKey) focusKey = null; // 已消費(setTimeout 內聚焦)
   }
 
-  function swap<T>(arr: T[], a: number, b: number): void {
-    if (a < 0 || b < 0 || a >= arr.length || b >= arr.length) return;
-    [arr[a], arr[b]] = [arr[b], arr[a]];
-  }
-
-  const handle: TimelineFormHandle = {
+  const handle: OridFormHandle = {
     loadSource: (text) => {
-      model = parseTimeline(text);
+      const parsed = parseOrid(text);
+      // 只有 `orid` 一行(全新圖)→ 用四段齊備的骨架起手,別給使用者一張空白表單。
+      model = parsed.stages.length === 0 && !parsed.raw ? { ...parsed, ...emptyOridModel() } : parsed;
       undoStack.length = 0;
       redoStack.length = 0;
       renderForm();
       emit('change');
-      emit('mermaidchange', serializeTimeline(model));
+      emit('mermaidchange', serializeOrid(model));
       emitHistory();
       void doRenderPreview();
     },
-    toMermaid: () => serializeTimeline(model),
+    toMermaid: () => serializeOrid(model),
     getModel: () => model,
     undo: () => {
       const prev = undoStack.pop();
