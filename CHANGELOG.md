@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.28.1 — `<b>` was showing up in exported PNGs
+
+The live view renders labels with `htmlLabels` on, so inline HTML like `<b>` and `<i>` becomes real
+bold and italics. Exports re-render with `htmlLabels:false` to keep the SVG canvas-safe — and in
+that mode mermaid only understands `<br>`; every other inline tag is drawn as literal text. A node
+labelled `<b>TpBetLimit</b>` exported as… exactly that, tags and all.
+
+- **Fix**: any render whose effective `htmlLabels` is `false` — the pristine export path, the editor
+  layout probe, or a host forcing it through `mermaidConfig` (as the Slack harness does) — now strips
+  inline HTML tags from the source first. Label text and `<br>` line breaks survive; the only loss is
+  bolding that plain SVG text can't express anyway. Stripping happens *before* mermaid measures the
+  label, so node boxes fit the visible text instead of being sized for tag soup.
+- **New**: the sanitizer is exported as `stripHtmlFormattingTags` (from the main entry and from
+  `react-super-mermaid/orid`) for hosts that call `mermaid.render` themselves.
+
 ## 0.28.0 — ORID, a diagram type mermaid doesn't have
 
 Running a retrospective with mermaid meant picking a diagram that wasn't about retrospectives and

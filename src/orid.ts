@@ -41,3 +41,9 @@ export {
   oridStageFromClassList,
 } from './core/orid/theme';
 export type { OridPaletteEntry } from './core/orid/theme';
+
+// 非 ORID,但同屬「送進 mermaid 前」的極小前處理(零依賴、零 DOM),一起放在這個
+// 輕量入口:host 以 htmlLabels:false 渲染(匯出 pristine SVG)前,先剝掉 mermaid
+// 純 SVG 文字模式無法解析的行內 HTML 標籤(<b>、<i>…,保留 <br>),
+// 否則標籤會原封不動畫進圖裡。
+export { stripHtmlFormattingTags } from './core/strip-html-formatting';

@@ -88,6 +88,10 @@ export {
   type PreparedSvg,
 } from './core/export';
 
+// 匯出 / pristine 渲染(htmlLabels:false)前的原始碼淨化 —— renderToSvg 內部已自動套用,
+// 這裡輸出給自行呼叫 mermaid.render 的 host(VS Code webview 等)。
+export { stripHtmlFormattingTags } from './core/strip-html-formatting';
+
 // ── 懸停提示(tips)的框架無關工具 ──
 export { parseTips, stripTipDirectives, mergeTips, normalizeTips } from './core/tips/parse';
 export { attachHoverTips } from './core/tips/hover';

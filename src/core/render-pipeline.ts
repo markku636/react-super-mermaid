@@ -11,6 +11,7 @@ import { ensureSketchFont, SKETCH_FONT, sketchifyDiagram } from './themes/sketch
 import { ensureStyles } from './ensure-styles';
 import { loadMermaid } from './load-mermaid';
 import { resolveTheme, type PostProcess } from './resolve-theme';
+import { stripHtmlFormattingTags } from './strip-html-formatting';
 
 // mermaid.render 需要唯一且合法的 id,用模組級流水號確保不衝突(無 DOM,SSR 安全)。
 let renderSeq = 0;
@@ -67,14 +68,21 @@ export async function renderToSvg(args: RenderToSvgArgs): Promise<RenderedSvg> {
     // 先載入手寫字體再 render,確保 mermaid 量測文字寬度時用的就是 Virgil。
     await ensureSketchFont(args.fontUrl);
   }
-  args.mermaid.initialize(buildConfig(args));
+  const config = buildConfig(args);
+  args.mermaid.initialize(config);
   renderSeq += 1;
   const id = `rsm-${renderSeq}`;
   // 檢查 / 懸停提示指令在這個唯一咽喉點剝除,viewer / renderDiagram / 編輯器排版三條路徑同時受惠。
   // (原始碼本身不動 —— 編輯器 round-trip 讀的是原始碼,提示不會在來回轉換中遺失。)
   // 剝完再轉譯 ORID:transpileOrid 對非 ORID 是零成本直通,對 ORID 則吐出等價 flowchart,
   // 於是 mermaid 完全不必認識 `orid` 這個關鍵字,下游(主題 / 搜尋 / 匯出)也一律照舊。
-  const prepared = transpileOrid(stripTipDirectives(stripCheckDirectives(args.code)));
+  let prepared = transpileOrid(stripTipDirectives(stripCheckDirectives(args.code)));
+  // htmlLabels 關閉時(pristine 匯出、或 host 經 mermaidConfig 強制,如 Slack harness),
+  // mermaid 改用純 SVG <text> 畫標籤,<b>/<i> 這類行內 HTML 會原樣入圖 —— 先剝掉(保留 <br>)。
+  const flowchartCfg = config.flowchart as Record<string, unknown> | undefined;
+  if (config.htmlLabels === false || flowchartCfg?.htmlLabels === false) {
+    prepared = stripHtmlFormattingTags(prepared);
+  }
   const { svg } = await args.mermaid.render(id, prepared);
   return { svgString: svg, id, postProcess: args.pristine ? 'none' : resolved.postProcess };
 }

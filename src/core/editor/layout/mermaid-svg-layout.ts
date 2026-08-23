@@ -5,6 +5,7 @@ import { assertBrowser } from '../../../env';
 import { loadMermaid } from '../../load-mermaid';
 import { authorIdFromDomId, nodeLabelText } from '../../node-index';
 import { renderToSvg } from '../../render-pipeline';
+import { stripHtmlFormattingTags } from '../../strip-html-formatting';
 import { boundingBox, type Rect } from '../scene/geometry';
 import { fitToContent } from '../render/node-metrics';
 import type { EditorScene, SceneNode } from '../scene/types';
@@ -109,7 +110,8 @@ export const mermaidSvgLayout: LayoutEngine = {
         // 沒有這條退路整張圖會全部疊在原點(比錯位難看得多)。
         for (const n of scene.nodes) {
           if (positions.has(n.id)) continue;
-          const key = (n.label || n.id).trim();
+          // pristine 渲染前已剝掉行內 HTML 標籤,比對鍵也得剝 —— 否則含 <b> 的標籤永遠對不上。
+          const key = stripHtmlFormattingTags(n.label || n.id).trim();
           const hit = key ? spare.find((s) => s.text.includes(key)) : undefined;
           if (hit) positions.set(n.id, hit.box);
         }
